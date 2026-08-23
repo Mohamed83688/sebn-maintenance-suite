@@ -1,0 +1,566 @@
+{% extends 'base.html' %}
+{% block title %}Plan de Progrès — SEBN-TN{% endblock %}
+{% block page_title %}Plan de Progrès & Réunions{% endblock %}
+{% block page_subtitle %}Suivi des actions correctives et réunions d'équipe{% endblock %}
+
+{% block topbar_actions %}
+<button class="btn btn-primary btn-sm" onclick="openModal('add-meeting-modal')">
+    <i class="fa-solid fa-calendar-plus"></i> Nouvelle Réunion
+</button>
+<button class="btn btn-glass btn-sm" onclick="openModal('add-action-modal')">
+    <i class="fa-solid fa-plus"></i> Nouvelle Action
+</button>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+/* Tab system */
+.plan-tabs {
+    display: flex; gap: 4px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 6px;
+    margin-bottom: 28px;
+    width: fit-content;
+}
+.plan-tab {
+    padding: 9px 20px;
+    border-radius: var(--radius-sm);
+    font-size: 13px; font-weight: 600;
+    color: var(--text-sec);
+    cursor: pointer;
+    transition: var(--transition-s);
+    display: flex; align-items: center; gap: 8px;
+    white-space: nowrap;
+}
+.plan-tab.active { background: rgba(37,99,235,0.15); color: var(--primary); }
+.plan-tab:hover:not(.active) { background: rgba(255,255,255,0.04); color: var(--text); }
+.plan-panel { display: none; animation: fadeIn 0.25s ease; }
+.plan-panel.active { display: block; }
+
+/* KPI row */
+.plan-kpi-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; margin-bottom: 28px; }
+
+/* Kanban */
+.kanban-board { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; }
+.kanban-col {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    min-height: 300px;
+}
+.kanban-col-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.2px;
+}
+.kanban-col-body { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+
+.action-card {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 14px;
+    transition: var(--transition);
+    position: relative;
+}
+.action-card:hover { border-color: var(--border-h); transform: translateY(-2px); box-shadow: var(--shadow-sm); }
+.action-card.overdue { border-left: 3px solid var(--danger); }
+
+.action-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 8px; line-height: 1.4; }
+.action-meta  { font-size: 11px; color: var(--text-sec); display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+.action-meta i { width: 12px; color: var(--text-dim); }
+
+.action-actions { display: flex; gap: 4px; margin-top: 10px; flex-wrap: wrap; }
+
+/* Kanban column colors */
+.col-backlog  .kanban-col-header { color: var(--text-sec); }
+.col-inprog   .kanban-col-header { color: var(--warning); }
+.col-done     .kanban-col-header { color: var(--success); }
+.col-blocked  .kanban-col-header { color: var(--danger); }
+.col-backlog  { border-top: 3px solid rgba(148,163,184,0.4); }
+.col-inprog   { border-top: 3px solid rgba(245,158,11,0.4); }
+.col-done     { border-top: 3px solid rgba(16,185,129,0.4); }
+.col-blocked  { border-top: 3px solid rgba(239,68,68,0.4); }
+
+/* Meeting table */
+.meeting-status {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 10px; border-radius: 20px;
+    font-size: 11px; font-weight: 700;
+}
+.ms-planifiee  { background: var(--info-bg);    color: var(--info); }
+.ms-encours    { background: var(--warning-bg); color: var(--warning); }
+.ms-terminee   { background: var(--success-bg); color: var(--success); }
+.ms-annulee    { background: var(--danger-bg);  color: var(--danger); }
+
+.empty-col {
+    padding: 32px 16px; text-align: center;
+    color: var(--text-dim); font-size: 12px;
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+}
+.empty-col i { font-size: 28px; opacity: 0.3; }
+
+@media(max-width: 1024px) {
+    .kanban-board { grid-template-columns: repeat(2,1fr); }
+    .plan-kpi-row { grid-template-columns: repeat(2,1fr); }
+}
+@media(max-width: 640px) {
+    .kanban-board { grid-template-columns: 1fr; }
+    .plan-kpi-row { grid-template-columns: 1fr 1fr; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- KPI Cards -->
+<div class="plan-kpi-row stagger">
+    <div class="kpi-card" style="--kpi-accent: var(--primary);">
+        <div class="kpi-card-top">
+            <div class="kpi-icon-wrap" style="background:rgba(37,99,235,0.12);">
+                <i class="fa-solid fa-list-check" style="color:var(--primary);"></i>
+            </div>
+        </div>
+        <div class="kpi-value">{{ kpis.total }}</div>
+        <div class="kpi-label">Actions Totales</div>
+        <div class="kpi-trend trend-neu"><i class="fa-solid fa-circle-info"></i> Plan complet</div>
+    </div>
+    <div class="kpi-card" style="--kpi-accent: var(--success);">
+        <div class="kpi-card-top">
+            <div class="kpi-icon-wrap" style="background:var(--success-bg);">
+                <i class="fa-solid fa-circle-check" style="color:var(--success);"></i>
+            </div>
+        </div>
+        <div class="kpi-value" style="color:var(--success);">{{ kpis.done }}</div>
+        <div class="kpi-label">Terminées</div>
+        <div class="kpi-trend trend-up"><i class="fa-solid fa-arrow-up"></i> {{ kpis.rate }}% taux</div>
+    </div>
+    <div class="kpi-card" style="--kpi-accent: var(--warning);">
+        <div class="kpi-card-top">
+            <div class="kpi-icon-wrap" style="background:var(--warning-bg);">
+                <i class="fa-solid fa-spinner" style="color:var(--warning);"></i>
+            </div>
+        </div>
+        <div class="kpi-value" style="color:var(--warning);">{{ kpis.inprog }}</div>
+        <div class="kpi-label">En Cours</div>
+        <div class="kpi-trend trend-neu"><i class="fa-solid fa-clock"></i> Actives</div>
+    </div>
+    <div class="kpi-card" style="--kpi-accent: var(--danger);">
+        <div class="kpi-card-top">
+            <div class="kpi-icon-wrap" style="background:var(--danger-bg);">
+                <i class="fa-solid fa-triangle-exclamation" style="color:var(--danger);"></i>
+            </div>
+        </div>
+        <div class="kpi-value" style="color:var(--danger);">{{ kpis.overdue }}</div>
+        <div class="kpi-label">En Retard</div>
+        {% if kpis.overdue > 0 %}
+        <div class="kpi-trend trend-down"><i class="fa-solid fa-arrow-down"></i> Attention requise</div>
+        {% else %}
+        <div class="kpi-trend trend-up"><i class="fa-solid fa-check"></i> Aucun retard</div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Tabs -->
+<div class="plan-tabs">
+    <div class="plan-tab active" onclick="switchTab('actions')" id="tab-actions">
+        <i class="fa-solid fa-chart-gantt"></i> Plan d'Action
+        {% if kpis.total > 0 %}<span class="badge badge-info" style="margin-left:4px;">{{ kpis.total }}</span>{% endif %}
+    </div>
+    <div class="plan-tab" onclick="switchTab('meetings')" id="tab-meetings">
+        <i class="fa-solid fa-users-rectangle"></i> Réunions
+        {% if meetings %}<span class="badge badge-info" style="margin-left:4px;">{{ meetings|length }}</span>{% endif %}
+    </div>
+</div>
+
+<!-- ── Panel: Actions (Kanban) ───────────────────────────────────────────── -->
+<div id="panel-actions" class="plan-panel active">
+    <div class="kanban-board">
+
+        <!-- Backlog -->
+        <div class="kanban-col col-backlog">
+            <div class="kanban-col-header">
+                <span><i class="fa-solid fa-inbox"></i> Backlog</span>
+                <span class="badge badge-info">{{ kanban['Backlog']|length }}</span>
+            </div>
+            <div class="kanban-col-body">
+                {% if kanban['Backlog'] %}
+                {% for a in kanban['Backlog'] %}
+                {{ _action_card(a) }}
+                {% endfor %}
+                {% else %}
+                <div class="empty-col"><i class="fa-solid fa-inbox"></i>Vide</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- En cours -->
+        <div class="kanban-col col-inprog">
+            <div class="kanban-col-header">
+                <span><i class="fa-solid fa-spinner"></i> En Cours</span>
+                <span class="badge badge-warning" style="background:var(--warning-bg);color:var(--warning);">{{ kanban['En cours']|length }}</span>
+            </div>
+            <div class="kanban-col-body">
+                {% if kanban['En cours'] %}
+                {% for a in kanban['En cours'] %}
+                {{ _action_card(a) }}
+                {% endfor %}
+                {% else %}
+                <div class="empty-col"><i class="fa-solid fa-spinner"></i>Vide</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Terminée -->
+        <div class="kanban-col col-done">
+            <div class="kanban-col-header">
+                <span><i class="fa-solid fa-circle-check"></i> Terminée</span>
+                <span class="badge badge-success">{{ kanban['Terminée']|length }}</span>
+            </div>
+            <div class="kanban-col-body">
+                {% if kanban['Terminée'] %}
+                {% for a in kanban['Terminée'] %}
+                {{ _action_card(a) }}
+                {% endfor %}
+                {% else %}
+                <div class="empty-col"><i class="fa-solid fa-circle-check"></i>Vide</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Bloquée -->
+        <div class="kanban-col col-blocked">
+            <div class="kanban-col-header">
+                <span><i class="fa-solid fa-ban"></i> Bloquée</span>
+                <span class="badge badge-danger" style="background:var(--danger-bg);color:var(--danger);">{{ kanban['Bloquée']|length }}</span>
+            </div>
+            <div class="kanban-col-body">
+                {% if kanban['Bloquée'] %}
+                {% for a in kanban['Bloquée'] %}
+                {{ _action_card(a) }}
+                {% endfor %}
+                {% else %}
+                <div class="empty-col"><i class="fa-solid fa-ban"></i>Vide</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    {% if not actions %}
+    <div class="empty-state" style="margin-top:40px;">
+        <i class="fa-solid fa-chart-gantt empty-icon"></i>
+        <div class="empty-title">Aucune action planifiée</div>
+        <div class="empty-desc">Créez votre première action corrective pour démarrer le suivi.</div>
+        <button class="btn btn-primary" onclick="openModal('add-action-modal')">
+            <i class="fa-solid fa-plus"></i> Ajouter une action
+        </button>
+    </div>
+    {% endif %}
+</div>
+
+<!-- ── Panel: Meetings ───────────────────────────────────────────────────── -->
+<div id="panel-meetings" class="plan-panel">
+    <div class="table-card animate-up">
+        <div class="table-header">
+            <div class="table-title"><i class="fa-solid fa-calendar-days" style="color:var(--primary);"></i> Historique des Réunions</div>
+            <button class="btn btn-primary btn-sm" onclick="openModal('add-meeting-modal')">
+                <i class="fa-solid fa-plus"></i> Nouvelle
+            </button>
+        </div>
+
+        {% if meetings %}
+        <div style="overflow-x:auto;">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Titre</th>
+                        <th>Responsable</th>
+                        <th>Participants</th>
+                        <th style="text-align:center;">Statut</th>
+                        <th>Notes</th>
+                        <th style="text-align:right;">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for m in meetings | reverse %}
+                    <tr>
+                        <td class="td-mono" style="white-space:nowrap;">
+                            <i class="fa-solid fa-calendar" style="color:var(--primary); margin-right:6px;"></i>{{ m.Date }}
+                        </td>
+                        <td style="font-weight:600;">{{ m.Titre }}</td>
+                        <td>
+                            <span style="display:flex; align-items:center; gap:6px;">
+                                <div style="width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--purple));display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:white;flex-shrink:0;">{{ m.Responsable[0]|upper if m.Responsable else '?' }}</div>
+                                {{ m.Responsable }}
+                            </span>
+                        </td>
+                        <td style="font-size:12px; color:var(--text-sec);">{{ m.Participants or '—' }}</td>
+                        <td style="text-align:center;">
+                            {% set sc = {'Planifiée':'ms-planifiee','En cours':'ms-encours','Terminée':'ms-terminee','Annulée':'ms-annulee'} %}
+                            <span class="meeting-status {{ sc.get(m.Statut, 'ms-planifiee') }}">{{ m.Statut }}</span>
+                        </td>
+                        <td style="font-size:12px; color:var(--text-sec); max-width:200px;">{{ m.Notes or '—' }}</td>
+                        <td style="text-align:right;">
+                            <form method="POST" action="{{ url_for('manager_plan_add_meeting') }}" style="display:inline;">
+                                <!-- Status quick-update would go here -->
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <i class="fa-solid fa-calendar-xmark empty-icon"></i>
+            <div class="empty-title">Aucune réunion enregistrée</div>
+            <div class="empty-desc">Ajoutez vos réunions d'équipe pour un suivi centralisé.</div>
+            <button class="btn btn-primary" onclick="openModal('add-meeting-modal')">
+                <i class="fa-solid fa-calendar-plus"></i> Créer une réunion
+            </button>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     MACRO: Action Card
+═══════════════════════════════════════════════════════════════ -->
+{% macro _action_card(a) %}
+<div class="action-card {% if a.overdue %}overdue{% endif %}">
+    <div class="action-title">{{ a.Action }}</div>
+
+    <div class="action-meta">
+        <i class="fa-solid fa-user"></i>
+        <span>{{ a.Responsable or '—' }}</span>
+    </div>
+    {% if a['Échéance'] %}
+    <div class="action-meta" style="{% if a.overdue %}color:var(--danger);{% endif %}">
+        <i class="fa-solid fa-calendar-day"></i>
+        <span>{{ a['Échéance'] }}</span>
+        {% if a.overdue %}<span class="badge badge-danger" style="padding:2px 6px; font-size:9px;">RETARD</span>{% endif %}
+    </div>
+    {% endif %}
+    {% if a['Réunion_Ref'] %}
+    <div class="action-meta">
+        <i class="fa-solid fa-link"></i>
+        <span style="font-size:10px;">{{ a['Réunion_Ref'] }}</span>
+    </div>
+    {% endif %}
+    {% if a.Notes %}
+    <div style="font-size:11px; color:var(--text-sec); margin-top:8px; padding-top:8px; border-top:1px solid var(--border); line-height:1.5;">{{ a.Notes }}</div>
+    {% endif %}
+
+    <div class="action-actions">
+        <!-- Move to next status -->
+        {% set next_map = {'Backlog': 'En cours', 'En cours': 'Terminée', 'Bloquée': 'En cours'} %}
+        {% if next_map.get(a.Statut) %}
+        <form method="POST" action="{{ url_for('manager_plan_update_action', action_id=a.ID) }}" style="display:inline;">
+            <input type="hidden" name="statut" value="{{ next_map[a.Statut] }}">
+            <button type="submit" class="btn btn-glass btn-xs" title="Avancer">
+                <i class="fa-solid fa-arrow-right"></i>
+            </button>
+        </form>
+        {% endif %}
+        {% if a.Statut != 'Bloquée' %}
+        <form method="POST" action="{{ url_for('manager_plan_update_action', action_id=a.ID) }}" style="display:inline;">
+            <input type="hidden" name="statut" value="Bloquée">
+            <button type="submit" class="btn btn-glass btn-xs" title="Marquer bloquée" style="color:var(--danger);">
+                <i class="fa-solid fa-ban"></i>
+            </button>
+        </form>
+        {% endif %}
+        <form method="POST" action="{{ url_for('manager_plan_delete_action', action_id=a.ID) }}"
+              onsubmit="return confirm('Supprimer cette action ?');" style="display:inline;">
+            <button type="submit" class="btn btn-glass btn-xs" title="Supprimer" style="color:var(--danger);">
+                <i class="fa-solid fa-trash"></i>
+            </button>
+        </form>
+    </div>
+</div>
+{% endmacro %}
+
+<!-- ═══════════════════════════════════════════════════════════
+     MODAL: Add Meeting
+═══════════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="add-meeting-modal">
+    <div class="modal-box" style="max-width:540px;">
+        <div class="modal-close" onclick="closeModal('add-meeting-modal')">
+            <i class="fa-solid fa-xmark"></i>
+        </div>
+        <h3 style="font-size:17px; font-weight:800; margin-bottom:6px;">
+            <i class="fa-solid fa-calendar-plus" style="color:var(--primary);"></i> Nouvelle Réunion
+        </h3>
+        <p style="font-size:12px; color:var(--text-sec); margin-bottom:20px;">Enregistrez une réunion d'équipe ou de revue.</p>
+
+        <form method="POST" action="{{ url_for('manager_plan_add_meeting') }}">
+            <div class="grid-2">
+                <div class="form-group">
+                    <label class="form-label">Date</label>
+                    <div class="input-with-icon">
+                        <i class="input-icon fa-solid fa-calendar"></i>
+                        <input type="date" name="date" class="form-control" required
+                               value="{{ today | default('') }}">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Statut</label>
+                    <div class="input-with-icon">
+                        <i class="input-icon fa-solid fa-tag"></i>
+                        <select name="statut" class="form-control">
+                            <option value="Planifiée">Planifiée</option>
+                            <option value="En cours">En cours</option>
+                            <option value="Terminée">Terminée</option>
+                            <option value="Annulée">Annulée</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Titre de la Réunion</label>
+                <div class="input-with-icon">
+                    <i class="input-icon fa-solid fa-heading"></i>
+                    <input type="text" name="titre" class="form-control" required
+                           placeholder="ex: Revue mensuelle PMA — Juillet 2026">
+                </div>
+            </div>
+            <div class="grid-2">
+                <div class="form-group">
+                    <label class="form-label">Responsable</label>
+                    <div class="input-with-icon">
+                        <i class="input-icon fa-solid fa-user"></i>
+                        <input type="text" name="responsable" class="form-control"
+                               placeholder="Nom du responsable">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Participants</label>
+                    <div class="input-with-icon">
+                        <i class="input-icon fa-solid fa-users"></i>
+                        <input type="text" name="participants" class="form-control"
+                               placeholder="Noms séparés par virgule">
+                    </div>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Notes / Ordre du Jour</label>
+                <textarea name="notes" class="form-control" rows="3"
+                          style="resize:vertical;"
+                          placeholder="Points abordés, décisions prises..."></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary w-full" style="justify-content:center;">
+                <i class="fa-solid fa-save"></i> Enregistrer la Réunion
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     MODAL: Add Action
+═══════════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="add-action-modal">
+    <div class="modal-box" style="max-width:540px;">
+        <div class="modal-close" onclick="closeModal('add-action-modal')">
+            <i class="fa-solid fa-xmark"></i>
+        </div>
+        <h3 style="font-size:17px; font-weight:800; margin-bottom:6px;">
+            <i class="fa-solid fa-plus" style="color:var(--primary);"></i> Nouvelle Action
+        </h3>
+        <p style="font-size:12px; color:var(--text-sec); margin-bottom:20px;">Créez une action corrective ou préventive à suivre.</p>
+
+        <form method="POST" action="{{ url_for('manager_plan_add_action') }}">
+            <div class="form-group">
+                <label class="form-label">Description de l'Action <span style="color:var(--danger);">*</span></label>
+                <div class="input-with-icon">
+                    <i class="input-icon fa-solid fa-tasks"></i>
+                    <input type="text" name="action" class="form-control" required
+                           placeholder="ex: Mettre en place une procédure de nettoyage hebdomadaire">
+                </div>
+            </div>
+            <div class="grid-2">
+                <div class="form-group">
+                    <label class="form-label">Responsable</label>
+                    <div class="input-with-icon">
+                        <i class="input-icon fa-solid fa-user"></i>
+                        <input type="text" name="responsable" class="form-control"
+                               placeholder="Nom du responsable">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Échéance</label>
+                    <div class="input-with-icon">
+                        <i class="input-icon fa-solid fa-calendar"></i>
+                        <input type="date" name="echeance" class="form-control">
+                    </div>
+                </div>
+            </div>
+            <div class="grid-2">
+                <div class="form-group">
+                    <label class="form-label">Statut Initial</label>
+                    <div class="input-with-icon">
+                        <i class="input-icon fa-solid fa-tag"></i>
+                        <select name="statut" class="form-control">
+                            <option value="Backlog">Backlog</option>
+                            <option value="En cours">En cours</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Réunion Associée</label>
+                    <div class="input-with-icon">
+                        <i class="input-icon fa-solid fa-link"></i>
+                        <select name="reunion_ref" class="form-control">
+                            <option value="">— Aucune —</option>
+                            {% for title in meeting_titles %}
+                            <option value="{{ title }}">{{ title }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Notes</label>
+                <textarea name="notes" class="form-control" rows="2"
+                          style="resize:vertical;"
+                          placeholder="Contexte, objectif mesurable..."></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary w-full" style="justify-content:center;">
+                <i class="fa-solid fa-save"></i> Créer l'Action
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function switchTab(name) {
+    document.querySelectorAll('.plan-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.plan-tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('panel-' + name).classList.add('active');
+    document.getElementById('tab-' + name).classList.add('active');
+}
+
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+// Close modal on overlay click
+document.querySelectorAll('.modal-overlay').forEach(el => {
+    el.addEventListener('click', function(e) {
+        if (e.target === el) el.classList.remove('open');
+    });
+});
+
+// Set today's date in meeting form
+(function() {
+    const today = new Date().toISOString().slice(0, 10);
+    document.querySelectorAll('input[type="date"]').forEach(inp => {
+        if (!inp.value) inp.value = today;
+    });
+})();
+</script>
+{% endblock %}

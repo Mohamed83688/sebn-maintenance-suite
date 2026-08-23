@@ -1,0 +1,235 @@
+{% extends 'base.html' %}
+{% block title %}Signaler une Anomalie — SEBN-TN{% endblock %}
+{% block page_title %}Signalement d'Anomalie Critique{% endblock %}
+{% block page_subtitle %}Déclenchez une alerte urgente vers les responsables{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('pma_dashboard') }}" class="btn btn-glass btn-sm">
+    <i class="fa-solid fa-arrow-left"></i> Planning
+</a>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.anomaly-container {
+    max-width: 720px;
+    margin: 0 auto;
+}
+.anomaly-hero {
+    background: linear-gradient(135deg, rgba(220,38,38,0.15) 0%, rgba(185,28,28,0.08) 100%);
+    border: 1px solid rgba(220,38,38,0.35);
+    border-radius: var(--radius-lg);
+    padding: 32px 36px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 22px;
+    animation: scaleIn 0.4s ease;
+}
+.anomaly-icon-big {
+    width: 68px;
+    height: 68px;
+    border-radius: 16px;
+    background: rgba(220,38,38,0.18);
+    border: 2px solid rgba(220,38,38,0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 26px;
+    color: #ef4444;
+    flex-shrink: 0;
+    animation: pulse 2s infinite;
+}
+@keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(220,38,38,0.4); }
+    50%  { box-shadow: 0 0 0 10px rgba(220,38,38,0); }
+}
+.anomaly-hero h2 { font-size: 19px; font-weight: 900; color: #f87171; margin-bottom: 6px; }
+.anomaly-hero p  { font-size: 13px; color: var(--text-sec); }
+
+.anomaly-form-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    animation: slideUp 0.4s ease;
+}
+.anomaly-form-header {
+    background: rgba(220,38,38,0.08);
+    border-bottom: 1px solid rgba(220,38,38,0.2);
+    padding: 18px 28px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.anomaly-form-header h3 { font-size: 14px; font-weight: 800; color: #f87171; letter-spacing: 0.5px; }
+.anomaly-form-body { padding: 28px 32px; display: flex; flex-direction: column; gap: 20px; }
+
+.form-field label { display: block; font-size: 11px; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 7px; }
+.form-field .ctrl {
+    width: 100%;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-size: 13px;
+    font-family: inherit;
+    padding: 10px 14px;
+    outline: none;
+    transition: var(--transition-s);
+    box-sizing: border-box;
+}
+.form-field .ctrl:focus { border-color: #ef4444; box-shadow: 0 0 0 3px rgba(220,38,38,0.12); }
+.form-field .ctrl option { background: #1E293B; }
+
+textarea.ctrl { resize: vertical; min-height: 130px; }
+
+.type-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.type-radio { display: none; }
+.type-label {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    padding: 14px 10px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 11px; font-weight: 700; color: var(--text-sec);
+    transition: var(--transition-s);
+    text-align: center;
+}
+.type-label i { font-size: 18px; color: var(--text-dim); }
+.type-radio:checked + .type-label {
+    border-color: #ef4444;
+    background: rgba(220,38,38,0.1);
+    color: #f87171;
+}
+.type-radio:checked + .type-label i { color: #ef4444; }
+.type-label:hover { border-color: rgba(220,38,38,0.4); }
+
+.anomaly-footer {
+    padding: 20px 32px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.btn-anomaly {
+    background: linear-gradient(135deg, #dc2626, #b91c1c) !important;
+    color: #fff !important;
+    border: 1px solid rgba(220,38,38,0.6) !important;
+    font-weight: 800 !important;
+    font-size: 13px !important;
+    padding: 12px 28px !important;
+    letter-spacing: 0.5px !important;
+}
+.btn-anomaly:hover { background: linear-gradient(135deg, #b91c1c, #991b1b) !important; transform: translateY(-1px); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="anomaly-container">
+    <!-- Hero Banner -->
+    <div class="anomaly-hero">
+        <div class="anomaly-icon-big">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+        </div>
+        <div>
+            <h2>SYSTÈME D'ALERTE ANOMALIE</h2>
+            <p>Ce formulaire déclenche une alerte urgente enregistrée dans la base de données et notifie les responsables par email. Utilisez ce formulaire uniquement pour des problèmes réels nécessitant une intervention immédiate.</p>
+        </div>
+    </div>
+
+    <!-- Form Card -->
+    <div class="anomaly-form-card">
+        <div class="anomaly-form-header">
+            <i class="fa-solid fa-bell-exclamation" style="color:#ef4444;"></i>
+            <h3>FORMULAIRE DE SIGNALEMENT</h3>
+        </div>
+        <form method="POST" action="{{ url_for('anomaly_report') }}">
+            <div class="anomaly-form-body">
+                <!-- Machine ID -->
+                <div class="form-field">
+                    <label><i class="fa-solid fa-gears"></i> Équipement / Machine *</label>
+                    {% if machines %}
+                    <select name="machine_id" class="ctrl" required>
+                        <option value="">— Sélectionner la machine —</option>
+                        {% for m in machines %}
+                        <option value="{{ m.machine_id }}">{{ m.machine_id }} — {{ m.machine_name }}</option>
+                        {% endfor %}
+                    </select>
+                    {% else %}
+                    <input type="text" name="machine_id" class="ctrl" required
+                           placeholder="ex: TS-1240-01 (saisie manuelle)">
+                    {% endif %}
+                </div>
+
+                <!-- Anomaly Type Grid -->
+                <div class="form-field">
+                    <label><i class="fa-solid fa-tags"></i> Type d'Anomalie *</label>
+                    <div class="type-grid">
+                        <input type="radio" name="anomaly_type" id="t1" class="type-radio" value="Panne Mécanique" required>
+                        <label for="t1" class="type-label">
+                            <i class="fa-solid fa-wrench"></i>
+                            Panne Mécanique
+                        </label>
+
+                        <input type="radio" name="anomaly_type" id="t2" class="type-radio" value="Problème Électrique">
+                        <label for="t2" class="type-label">
+                            <i class="fa-solid fa-bolt"></i>
+                            Problème Électrique
+                        </label>
+
+                        <input type="radio" name="anomaly_type" id="t3" class="type-radio" value="Risque Sécurité">
+                        <label for="t3" class="type-label">
+                            <i class="fa-solid fa-shield-halved"></i>
+                            Risque Sécurité
+                        </label>
+
+                        <input type="radio" name="anomaly_type" id="t4" class="type-radio" value="Fuite Pneumatique">
+                        <label for="t4" class="type-label">
+                            <i class="fa-solid fa-wind"></i>
+                            Fuite Pneumatique
+                        </label>
+
+                        <input type="radio" name="anomaly_type" id="t5" class="type-radio" value="Déviation Qualité">
+                        <label for="t5" class="type-label">
+                            <i class="fa-solid fa-chart-bar"></i>
+                            Déviation Qualité
+                        </label>
+
+                        <input type="radio" name="anomaly_type" id="t6" class="type-radio" value="Autre">
+                        <label for="t6" class="type-label">
+                            <i class="fa-solid fa-circle-question"></i>
+                            Autre
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Description -->
+                <div class="form-field">
+                    <label><i class="fa-solid fa-file-lines"></i> Description Détaillée *</label>
+                    <textarea name="description" class="ctrl" required
+                              placeholder="Décrivez le problème, l'impact actuel, l'urgence, et toute observation pertinente..."></textarea>
+                </div>
+
+                <!-- Signataire Info -->
+                <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; display:flex; align-items:center; gap:12px;">
+                    <i class="fa-solid fa-user-shield" style="color:var(--text-dim); font-size:18px;"></i>
+                    <div>
+                        <p style="font-size:12px; font-weight:700; color:var(--text);">{{ name }}</p>
+                        <p style="font-size:11px; color:var(--text-dim);">Matricule: {{ matricule }} · Poste: {{ shift }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="anomaly-footer">
+                <a href="{{ url_for('pma_dashboard') }}" class="btn btn-glass">
+                    <i class="fa-solid fa-xmark"></i> Annuler
+                </a>
+                <button type="submit" class="btn btn-anomaly">
+                    <i class="fa-solid fa-paper-plane"></i> Envoyer l'Alerte au Manager
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

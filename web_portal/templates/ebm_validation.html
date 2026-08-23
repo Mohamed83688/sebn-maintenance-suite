@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}EBM — Validation des Équipements — SEBN-TN{% endblock %}
+{% block page_title %}EBM — Validation des Équipements (Owner){% endblock %}
+
+{% block content %}
+<div class="animate-up">
+    <!-- Top Controls -->
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; margin-bottom:20px;">
+        <div style="display:flex; align-items:center; gap:8px;">
+            <a href="{{ url_for('ebm_dashboard') }}" class="btn btn-secondary btn-sm">
+                <i class="fa-solid fa-arrow-left"></i> Tableau de bord EBM
+            </a>
+            <span class="badge" style="background:#ECFDF5; color:#059669; border:1px solid #A7F3D0; font-weight:700;">
+                <i class="fa-solid fa-clipboard-check"></i> WORKFLOW DE VALIDATION
+            </span>
+        </div>
+        <input type="text" id="val-filter" placeholder="Filtrer par projet, désignation, PO, responsable..." 
+               class="form-control" style="max-width:320px; font-size:12px;" onkeyup="filterItems()">
+    </div>
+
+    <!-- Validation Table -->
+    <div class="card" style="padding:0; overflow:hidden;">
+        <div style="overflow-x:auto;">
+            <table class="data-table" id="val-table">
+                <thead>
+                    <tr>
+                        <th style="width:40px; text-align:center;">#</th>
+                        <th>Projet / Code</th>
+                        <th>Désignation / Équipement</th>
+                        <th>N° Commande (PO)</th>
+                        <th>Responsable</th>
+                        <th>Statut Actuel</th>
+                        <th style="text-align:right;">Montant (€)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in kpis.items_list %}
+                    <tr class="val-row" data-search="{{ (item.project or '')|lower }} {{ (item.description or '')|lower }} {{ (item.po or '')|lower }} {{ (item.responsible or '')|lower }}">
+                        <td style="text-align:center; color:var(--text-sec); font-size:12px;">{{ item.id }}</td>
+                        <td style="font-weight:700; color:var(--text);">{{ item.project or '–' }}</td>
+                        <td>{{ item.description or '–' }}</td>
+                        <td><code>{{ item.po or '–' }}</code></td>
+                        <td>{{ item.responsible or '–' }}</td>
+                        <td>
+                            {% if 'valid' in item.status|lower %}<span class="badge badge-success"><i class="fa-solid fa-check"></i> Validé</span>
+                            {% elif 'rejet' in item.status|lower or 'refus' in item.status|lower %}<span class="badge badge-danger"><i class="fa-solid fa-xmark"></i> Refusé</span>
+                            {% else %}<span class="badge badge-warning"><i class="fa-solid fa-clock"></i> {{ item.status }}</span>{% endif %}
+                        </td>
+                        <td style="text-align:right; font-weight:700; color:#1E3A8A;">{{ "{:,.2f}".format(item.price) }} €</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="7" style="text-align:center; color:var(--text-sec);">Aucune ligne à afficher.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function filterItems() {
+    const q = document.getElementById('val-filter').value.toLowerCase();
+    document.querySelectorAll('.val-row').forEach(row => {
+        const txt = row.getAttribute('data-search') || '';
+        row.style.display = txt.includes(q) ? '' : 'none';
+    });
+}
+</script>
+{% endblock %}

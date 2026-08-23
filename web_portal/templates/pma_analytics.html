@@ -1,0 +1,660 @@
+{% extends 'base.html' %}
+{% block title %}Analyse Préventive — SEBN-TN Maintenance{% endblock %}
+{% block page_title %}Analyse préventive{% endblock %}
+{% block page_subtitle %}Suivi et analyse des opérations de maintenance préventive{% endblock %}
+
+{% block topbar_actions %}
+<div class="flex items-center gap-2">
+    <a href="{{ url_for('pma_analytics_export', month=filters.month, week=filters.week, sheet=filters.sheet, machine=filters.machine, status=filters.status, type=filters.type) }}" 
+       class="btn btn-secondary btn-sm" title="Exporter les données filtrées">
+        <i class="fa-solid fa-file-excel" style="color:var(--success);"></i> Exporter CSV
+    </a>
+    <a href="{{ url_for('pma_dashboard') }}" class="btn btn-primary btn-sm">
+        <i class="fa-solid fa-calendar-check"></i> Planning Préventif
+    </a>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ── ANALYTICS CARDS & GRIDS ────────────────────────── */
+.analytics-filter-card {
+    background: #FFFFFF;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 18px 20px;
+    margin-bottom: 24px;
+    box-shadow: var(--shadow-sm);
+}
+
+.filter-grid-6 {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 12px;
+    align-items: flex-end;
+}
+@media (max-width: 1300px) { .filter-grid-6 { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 768px) { .filter-grid-6 { grid-template-columns: 1fr; } }
+
+.filter-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--text-sec);
+    margin-bottom: 5px;
+}
+
+.filter-select, .filter-input {
+    width: 100%;
+    padding: 8px 12px;
+    font-size: 13px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: #FFFFFF;
+    color: var(--text);
+    outline: none;
+    transition: var(--transition);
+}
+.filter-select:focus, .filter-input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-glow);
+}
+
+/* ── KPI TILES ──────────────────────────────────────── */
+.kpi-grid-6 {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+}
+@media (max-width: 1200px) { .kpi-grid-6 { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 640px) { .kpi-grid-6 { grid-template-columns: repeat(2, 1fr); } }
+
+.kpi-tile {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 18px 20px;
+    position: relative;
+    overflow: hidden;
+    transition: var(--transition);
+    box-shadow: var(--shadow-xs);
+}
+.kpi-tile:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-sm);
+    border-color: var(--border-h);
+}
+.kpi-tile::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+}
+.kpi-tile.kpi-blue::before    { background: var(--primary); }
+.kpi-tile.kpi-green::before   { background: var(--success); }
+.kpi-tile.kpi-amber::before   { background: var(--warning); }
+.kpi-tile.kpi-purple::before  { background: var(--purple); }
+.kpi-tile.kpi-red::before     { background: var(--danger); }
+.kpi-tile.kpi-cyan::before    { background: var(--cyan); }
+
+.kpi-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+.kpi-tag {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-dim);
+}
+.kpi-icon-wrap {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+}
+.kpi-blue .kpi-icon-wrap   { background: var(--primary-light); color: var(--primary); }
+.kpi-green .kpi-icon-wrap  { background: var(--success-bg);    color: var(--success); }
+.kpi-amber .kpi-icon-wrap  { background: var(--warning-bg);    color: var(--warning); }
+.kpi-purple .kpi-icon-wrap { background: var(--purple-bg);     color: var(--purple); }
+.kpi-red .kpi-icon-wrap    { background: var(--danger-bg);     color: var(--danger); }
+.kpi-cyan .kpi-icon-wrap   { background: var(--cyan-bg);       color: var(--cyan); }
+
+.kpi-value {
+    font-size: 1.85rem;
+    font-weight: 800;
+    color: var(--text);
+    line-height: 1.1;
+    margin-bottom: 4px;
+}
+.kpi-subtitle {
+    font-size: 11px;
+    color: var(--text-sec);
+    font-weight: 500;
+}
+
+/* ── CHARTS SECTION ─────────────────────────────────── */
+.charts-grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 24px;
+}
+@media (max-width: 992px) { .charts-grid-2 { grid-template-columns: 1fr; } }
+
+.chart-card {
+    background: #FFFFFF;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px 22px;
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    flex-direction: column;
+}
+.chart-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+}
+.chart-title {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.chart-badge {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: var(--bg-page);
+    color: var(--text-dim);
+}
+.chart-canvas-box {
+    position: relative;
+    height: 250px;
+    width: 100%;
+    flex: 1;
+}
+
+.donut-center {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+}
+.donut-center-val {
+    font-size: 24px;
+    font-weight: 800;
+    color: var(--text);
+    line-height: 1;
+}
+.donut-center-sub {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-dim);
+    margin-top: 4px;
+}
+
+/* ── DATA TABLE ─────────────────────────────────────── */
+.table-filter-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    background: #FFFFFF;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+.table-search-input {
+    width: 260px;
+    padding: 7px 12px;
+    font-size: 12.5px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    outline: none;
+}
+.table-search-input:focus {
+    border-color: var(--primary);
+}
+
+.empty-analytics {
+    text-align: center;
+    padding: 48px 20px;
+    color: var(--text-sec);
+}
+.empty-analytics i {
+    font-size: 42px;
+    color: var(--text-dim);
+    margin-bottom: 12px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- ── FILTER BAR ─────────────────────────────────────── -->
+<div class="analytics-filter-card animate-up">
+    <form method="GET" action="{{ url_for('pma_analytics') }}" id="pma-filter-form">
+        <div class="filter-grid-6">
+            <div>
+                <label class="filter-label"><i class="fa-regular fa-calendar"></i> Mois</label>
+                <select name="month" class="filter-select" id="filter-month">
+                    <option value="All">Tous les mois</option>
+                    {% for m in data.filters.months %}
+                    <option value="{{ m }}" {% if filters.month == m %}selected{% endif %}>{{ m }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="filter-label"><i class="fa-solid fa-calendar-week"></i> Semaine</label>
+                <select name="week" class="filter-select" id="filter-week">
+                    <option value="All">Toutes les semaines</option>
+                    {% for w in data.filters.weeks %}
+                    <option value="{{ w }}" {% if filters.week == w %}selected{% endif %}>{{ w }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="filter-label"><i class="fa-solid fa-layer-group"></i> Groupe / Zone</label>
+                <select name="sheet" class="filter-select" id="filter-sheet">
+                    <option value="All">Tous les groupes</option>
+                    {% for g in data.filters.groups %}
+                    <option value="{{ g }}" {% if filters.sheet == g %}selected{% endif %}>{{ g }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="filter-label"><i class="fa-solid fa-industry"></i> Machine</label>
+                <select name="machine" class="filter-select" id="filter-machine">
+                    <option value="All">Toutes les machines</option>
+                    {% for mac in data.filters.machines %}
+                    <option value="{{ mac }}" {% if filters.machine == mac %}selected{% endif %}>{{ mac }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="filter-label"><i class="fa-solid fa-list-check"></i> Statut</label>
+                <select name="status" class="filter-select" id="filter-status">
+                    <option value="All">Tous les statuts</option>
+                    <option value="COMPLÉTÉ" {% if filters.status == 'COMPLÉTÉ' %}selected{% endif %}>Complétées</option>
+                    <option value="EN ATTENTE" {% if filters.status == 'EN ATTENTE' %}selected{% endif %}>En attente</option>
+                </select>
+            </div>
+            <div class="flex items-center gap-2">
+                <button type="submit" class="btn btn-primary w-full" style="padding: 8px 12px;">
+                    <i class="fa-solid fa-filter"></i> Filtrer
+                </button>
+                <a href="{{ url_for('pma_analytics') }}" class="btn btn-secondary" title="Réinitialiser" style="padding: 8px 12px;">
+                    <i class="fa-solid fa-rotate-left"></i>
+                </a>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- ── KPI TILES ──────────────────────────────────────── -->
+<div class="kpi-grid-6 stagger">
+    <div class="kpi-tile kpi-blue">
+        <div class="kpi-header">
+            <span class="kpi-tag">Total Préventifs</span>
+            <div class="kpi-icon-wrap"><i class="fa-solid fa-list-check"></i></div>
+        </div>
+        <div class="kpi-value" id="kpi-total">{{ data.kpis.total }}</div>
+        <div class="kpi-subtitle">Tâches planifiées</div>
+    </div>
+
+    <div class="kpi-tile kpi-green">
+        <div class="kpi-header">
+            <span class="kpi-tag">Réalisées</span>
+            <div class="kpi-icon-wrap"><i class="fa-solid fa-circle-check"></i></div>
+        </div>
+        <div class="kpi-value" style="color:var(--success);" id="kpi-done">{{ data.kpis.done }}</div>
+        <div class="kpi-subtitle">Tâches validées (X)</div>
+    </div>
+
+    <div class="kpi-tile kpi-amber">
+        <div class="kpi-header">
+            <span class="kpi-tag">En Attente</span>
+            <div class="kpi-icon-wrap"><i class="fa-solid fa-hourglass-half"></i></div>
+        </div>
+        <div class="kpi-value" style="color:var(--warning);" id="kpi-pending">{{ data.kpis.pending }}</div>
+        <div class="kpi-subtitle">À venir dans le planning</div>
+    </div>
+
+    <div class="kpi-tile kpi-red">
+        <div class="kpi-header">
+            <span class="kpi-tag">En Retard</span>
+            <div class="kpi-icon-wrap"><i class="fa-solid fa-triangle-exclamation"></i></div>
+        </div>
+        <div class="kpi-value" style="color:var(--danger);" id="kpi-overdue">{{ data.kpis.overdue }}</div>
+        <div class="kpi-subtitle">Semaines passées non faites</div>
+    </div>
+
+    <div class="kpi-tile kpi-cyan">
+        <div class="kpi-header">
+            <span class="kpi-tag">Taux de Réalisation</span>
+            <div class="kpi-icon-wrap"><i class="fa-solid fa-gauge-high"></i></div>
+        </div>
+        <div class="kpi-value" style="color:var(--cyan);" id="kpi-rate">{{ data.kpis.rate }}%</div>
+        <div class="kpi-subtitle">Performance globale</div>
+    </div>
+
+    <div class="kpi-tile kpi-purple">
+        <div class="kpi-header">
+            <span class="kpi-tag">Taux de Retard</span>
+            <div class="kpi-icon-wrap"><i class="fa-solid fa-chart-line"></i></div>
+        </div>
+        <div class="kpi-value" style="color:var(--purple);" id="kpi-overdue-rate">{{ data.kpis.overdue_rate }}%</div>
+        <div class="kpi-subtitle">Tâches échues restantes</div>
+    </div>
+</div>
+
+<!-- ── CHARTS ROW 1 ───────────────────────────────────── -->
+<div class="charts-grid-2 animate-up">
+    <!-- Chart 1: Évolution hebdomadaire du préventif -->
+    <div class="chart-card">
+        <div class="chart-card-header">
+            <div class="chart-title">
+                <i class="fa-solid fa-calendar-days" style="color:var(--primary);"></i>
+                Évolution du Préventif par Semaine
+            </div>
+            <span class="chart-badge">Par Semaine</span>
+        </div>
+        <div class="chart-canvas-box">
+            <canvas id="chartWeeklyPMA"></canvas>
+        </div>
+    </div>
+
+    <!-- Chart 2: Taux de réalisation & Respect du planning -->
+    <div class="chart-card">
+        <div class="chart-card-header">
+            <div class="chart-title">
+                <i class="fa-solid fa-chart-pie" style="color:var(--success);"></i>
+                Respect du Planning &amp; Réalisation
+            </div>
+            <span class="chart-badge">Progression</span>
+        </div>
+        <div class="chart-canvas-box" style="display:flex; align-items:center; justify-content:center;">
+            <canvas id="chartAdherence"></canvas>
+            <div class="donut-center">
+                <div class="donut-center-val">{{ data.kpis.rate }}%</div>
+                <div class="donut-center-sub">Réalisé</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── CHARTS ROW 2 ───────────────────────────────────── -->
+<div class="charts-grid-2 animate-up">
+    <!-- Chart 3: Préventifs par machine -->
+    <div class="chart-card">
+        <div class="chart-card-header">
+            <div class="chart-title">
+                <i class="fa-solid fa-industry" style="color:var(--purple);"></i>
+                Préventifs par Machine (Top 12)
+            </div>
+            <span class="chart-badge">Équipements</span>
+        </div>
+        <div class="chart-canvas-box">
+            <canvas id="chartMachinePMA"></canvas>
+        </div>
+    </div>
+
+    <!-- Chart 4: Réalisation par groupe / zone -->
+    <div class="chart-card">
+        <div class="chart-card-header">
+            <div class="chart-title">
+                <i class="fa-solid fa-layer-group" style="color:var(--info);"></i>
+                Réalisation par Groupe / Zone
+            </div>
+            <span class="chart-badge">Groupes</span>
+        </div>
+        <div class="chart-canvas-box">
+            <canvas id="chartGroupPMA"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- ── DETAILED TABLE ─────────────────────────────────── -->
+<div class="table-card animate-up">
+    <div class="table-filter-bar">
+        <div class="flex items-center gap-2">
+            <span class="table-title"><i class="fa-solid fa-table-list" style="color:var(--primary);"></i> Détail des Tâches Préventives</span>
+            <span class="badge badge-info">{{ data.tasks|length }} affichées</span>
+        </div>
+        <div class="flex items-center gap-2">
+            <input type="text" id="tableFilterInput" class="table-search-input" placeholder="Rechercher machine, zone, semaine...">
+        </div>
+    </div>
+
+    <div style="overflow-x:auto;">
+        <table class="data-table" id="pmaTable">
+            <thead>
+                <tr>
+                    <th>Équipement</th>
+                    <th>Nom Machine</th>
+                    <th>Zone / Ligne</th>
+                    <th>N° Carte</th>
+                    <th>Type / Fréquence</th>
+                    <th>Semaine</th>
+                    <th>Mois</th>
+                    <th>Statut</th>
+                    <th style="text-align:right;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if data.tasks %}
+                    {% for t in data.tasks %}
+                    <tr>
+                        <td class="td-mono">
+                            <i class="fa-solid fa-industry" style="font-size:11px; margin-right:4px;"></i>
+                            {{ t.equipment }}
+                        </td>
+                        <td style="font-weight:600; color:var(--text);">{{ t.machine_name or t.equipment }}</td>
+                        <td style="color:var(--text-sec);">{{ t.zone }}</td>
+                        <td style="color:var(--text-dim); font-size:12px;">{{ t.carte or '—' }}</td>
+                        <td><span class="badge badge-info">{{ t.type }}</span></td>
+                        <td style="font-weight:700; color:var(--text);">{{ t.week }}</td>
+                        <td style="color:var(--text-sec);">{{ t.month }}</td>
+                        <td>
+                            {% if t.is_done %}
+                            <span class="badge badge-success"><i class="fa-solid fa-check"></i> Complété</span>
+                            {% elif t.is_overdue %}
+                            <span class="badge badge-danger"><i class="fa-solid fa-clock-rotate-left"></i> En Retard</span>
+                            {% else %}
+                            <span class="badge badge-warning"><i class="fa-solid fa-hourglass-half"></i> En Attente</span>
+                            {% endif %}
+                        </td>
+                        <td style="text-align:right;">
+                            <a href="{{ url_for('pma_dashboard', search=t.equipment, week=t.week) }}" class="btn btn-secondary btn-xs" title="Voir au planning">
+                                <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="9">
+                            <div class="empty-analytics">
+                                <i class="fa-solid fa-calendar-xmark"></i>
+                                <div style="font-weight:700; font-size:14px; color:var(--text); margin-bottom:4px;">Aucune tâche préventive trouvée</div>
+                                <div style="font-size:12px; color:var(--text-sec);">Modifiez vos filtres ou chargez un fichier Excel de planning.</div>
+                            </div>
+                        </td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% if not has_excel %}
+<div class="glass-card animate-up" style="text-align:center; padding: 28px; margin-top: 20px; border-color: rgba(245,158,11,0.3);">
+    <i class="fa-solid fa-file-excel" style="font-size:32px; color:var(--warning); margin-bottom:10px; display:block;"></i>
+    <div style="font-size:14px; font-weight:700; color:var(--text); margin-bottom:4px;">Aucun planning Excel actif</div>
+    <p style="font-size:12px; color:var(--text-sec);">Chargez un calendrier de maintenance dans la section <a href="{{ url_for('pma_dashboard') }}" style="color:var(--primary); font-weight:600;">Planning Préventif</a>.</p>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const rawData = {{ data | tojson | safe }};
+
+    // ── 1. WEEKLY PROGRESS CHART ──────────────────────────
+    const weeklyCtx = document.getElementById('chartWeeklyPMA');
+    if (weeklyCtx && rawData.timeline) {
+        const wLabels = rawData.timeline.map(x => x.week);
+        const wDone = rawData.timeline.map(x => x.done);
+        const wOverdue = rawData.timeline.map(x => x.overdue);
+        const wPending = rawData.timeline.map(x => x.pending);
+
+        new Chart(weeklyCtx, {
+            type: 'bar',
+            data: {
+                labels: wLabels.length ? wLabels : ['Aucune donnée'],
+                datasets: [
+                    { label: 'Complétées', data: wDone.length ? wDone : [0], backgroundColor: '#047857', borderRadius: 3 },
+                    { label: 'En Retard', data: wOverdue.length ? wOverdue : [0], backgroundColor: '#B91C1C', borderRadius: 3 },
+                    { label: 'En Attente', data: wPending.length ? wPending : [0], backgroundColor: '#B45309', borderRadius: 3 }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'top', labels: { boxWidth: 10, font: { family: "'Montserrat', sans-serif", size: 11, weight: '600' } } }
+                },
+                scales: {
+                    x: { stacked: true, grid: { color: '#F1F5F9' }, ticks: { font: { family: "'Montserrat', sans-serif", size: 10, weight: '600' } } },
+                    y: { stacked: true, beginAtZero: true, grid: { color: '#F1F5F9' }, ticks: { font: { size: 10 } } }
+                }
+            }
+        });
+    }
+
+    // ── 2. ADHERENCE DOUGHNUT ─────────────────────────────
+    const adhCtx = document.getElementById('chartAdherence');
+    if (adhCtx && rawData.schedule_adherence) {
+        const adh = rawData.schedule_adherence;
+        const total = (adh.done || 0) + (adh.overdue || 0) + (adh.pending || 0);
+
+        new Chart(adhCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Complétées', 'En Retard', 'En Attente'],
+                datasets: [{
+                    data: total > 0 ? [adh.done, adh.overdue, adh.pending] : [1],
+                    backgroundColor: total > 0 ? ['#047857', '#B91C1C', '#B45309'] : ['#E2E8F0'],
+                    borderWidth: 2,
+                    borderColor: '#FFFFFF'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '72%',
+                plugins: {
+                    legend: { position: 'bottom', labels: { boxWidth: 10, font: { family: "'Montserrat', sans-serif", size: 11, weight: '600' } } }
+                }
+            }
+        });
+    }
+
+    // ── 3. BY MACHINE HORIZONTAL BAR ──────────────────────
+    const macCtx = document.getElementById('chartMachinePMA');
+    if (macCtx && rawData.by_machine) {
+        const mLabels = rawData.by_machine.map(x => x.equipment);
+        const mDone = rawData.by_machine.map(x => x.done);
+        const mPending = rawData.by_machine.map(x => x.total - x.done);
+
+        new Chart(macCtx, {
+            type: 'bar',
+            data: {
+                labels: mLabels.length ? mLabels : ['Aucune donnée'],
+                datasets: [
+                    { label: 'Complétées', data: mDone.length ? mDone : [0], backgroundColor: '#047857', borderRadius: 3 },
+                    { label: 'Restantes', data: mPending.length ? mPending : [0], backgroundColor: '#94A3B8', borderRadius: 3 }
+                ]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'top', labels: { boxWidth: 10, font: { family: "'Montserrat', sans-serif", size: 11, weight: '600' } } }
+                },
+                scales: {
+                    x: { stacked: true, beginAtZero: true, grid: { color: '#F1F5F9' }, ticks: { font: { size: 10 } } },
+                    y: { stacked: true, grid: { color: '#F1F5F9' }, ticks: { font: { family: "'Montserrat', sans-serif", size: 9.5, weight: '600' } } }
+                }
+            }
+        });
+    }
+
+    // ── 4. BY GROUP BAR ───────────────────────────────────
+    const grpCtx = document.getElementById('chartGroupPMA');
+    if (grpCtx && rawData.by_group) {
+        const gLabels = rawData.by_group.map(x => x.group);
+        const gRates = rawData.by_group.map(x => x.rate);
+
+        new Chart(grpCtx, {
+            type: 'bar',
+            data: {
+                labels: gLabels.length ? gLabels : ['Aucune donnée'],
+                datasets: [{
+                    label: 'Taux de Réalisation (%)',
+                    data: gRates.length ? gRates : [0],
+                    backgroundColor: gRates.map(r => r >= 80 ? '#047857' : (r >= 40 ? '#2E008B' : '#B91C1C')),
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { grid: { color: '#F1F5F9' }, ticks: { font: { family: "'Montserrat', sans-serif", size: 9.5, weight: '600' }, maxRotation: 45 } },
+                    y: { beginAtZero: true, max: 100, grid: { color: '#F1F5F9' }, ticks: { font: { size: 10 } } }
+                }
+            }
+        });
+    }
+
+    // ── 5. CLIENT-SIDE TABLE FILTER ───────────────────────
+    const searchInput = document.getElementById('tableFilterInput');
+    const tableBody = document.querySelector('#pmaTable tbody');
+    if (searchInput && tableBody) {
+        searchInput.addEventListener('input', function(e) {
+            const query = e.target.value.toLowerCase().trim();
+            const rows = tableBody.querySelectorAll('tr');
+            rows.forEach(r => {
+                const text = r.textContent.toLowerCase();
+                r.style.display = text.includes(query) ? '' : 'none';
+            });
+        });
+    }
+});
+</script>
+{% endblock %}

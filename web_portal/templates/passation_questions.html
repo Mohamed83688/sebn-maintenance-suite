@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+
+{% block title %}Questions de Passation — SEBN-TN{% endblock %}
+{% block page_title %}Configuration des Points de Passation (Admin & Owner){% endblock %}
+
+{% block content %}
+<div class="animate-up" style="max-width:960px; margin:0 auto;">
+    <!-- Top Bar -->
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:20px;">
+        <a href="{{ url_for('passation_dashboard') }}" class="btn btn-secondary btn-sm">
+            <i class="fa-solid fa-arrow-left"></i> Retour au Journal
+        </a>
+        <button class="btn btn-primary btn-sm" onclick="openAddModal()">
+            <i class="fa-solid fa-plus"></i> Ajouter une Question
+        </button>
+    </div>
+
+    <!-- Questions Table -->
+    <div class="glass-card" style="padding:0; overflow:hidden;">
+        <div style="padding:16px 20px; border-bottom:1px solid var(--border); background:var(--bg-card-h); font-weight:700; font-size:14px; display:flex; justify-content:space-between; align-items:center;">
+            <span><i class="fa-solid fa-sliders" style="color:var(--primary); margin-right:6px;"></i> Points de Contrôle du Questionnaire de Passation</span>
+            <span class="badge badge-primary">{{ questions|length }} points</span>
+        </div>
+        <div style="overflow-x:auto;">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th style="width:40px; text-align:center;">#</th>
+                        <th>Point de Contrôle / Consigne</th>
+                        <th>Catégorie</th>
+                        <th>Type</th>
+                        <th>Options</th>
+                        <th>Statut</th>
+                        <th style="text-align:right; width:150px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for q in questions %}
+                    <tr>
+                        <td style="text-align:center; color:var(--text-sec);">{{ loop.index }}</td>
+                        <td style="font-weight:600; color:var(--text);">{{ q.text }}</td>
+                        <td><span class="badge badge-neutral">{{ q.category }}</span></td>
+                        <td><code>{{ q.type }}</code></td>
+                        <td style="font-size:12px; color:var(--text-sec);">{{ q.options or 'Texte libre' }}</td>
+                        <td>
+                            {% if q.is_active == 1 %}
+                            <span class="badge badge-success">Actif</span>
+                            {% else %}
+                            <span class="badge badge-danger">Inactif</span>
+                            {% endif %}
+                        </td>
+                        <td style="text-align:right;">
+                            <div style="display:flex; justify-content:flex-end; gap:6px;">
+                                <button type="button" class="btn btn-secondary btn-xs" title="Modifier"
+                                        onclick="openEditModal({{ q.id }}, '{{ q.text|replace("'", "\\'") }}', '{{ q.category|replace("'", "\\'") }}', '{{ q.type }}', '{{ (q.options or '')|replace("'", "\\'") }}', {{ q.sort_order or loop.index }})">
+                                    <i class="fa-solid fa-pen"></i>
+                                </button>
+                                <form method="POST" action="{{ url_for('passation_question_toggle', qid=q.id) }}" style="display:inline;">
+                                    <button type="submit" class="btn btn-secondary btn-xs" title="Activer / Désactiver">
+                                        <i class="fa-solid fa-power-off" style="color:{% if q.is_active == 1 %}#10B981{% else %}#EF4444{% endif %};"></i>
+                                    </button>
+                                </form>
+                                <form method="POST" action="{{ url_for('passation_question_delete', qid=q.id) }}" style="display:inline;" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer définitivement ce point de contrôle ?');">
+                                    <button type="submit" class="btn btn-danger btn-xs" title="Supprimer">
+                                        <i class="fa-solid fa-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="7" style="text-align:center; color:var(--text-sec); padding:30px;">Aucune question définie. Cliquez sur "Ajouter une Question".</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Add Question -->
+<div id="addModal" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center;">
+    <div class="glass-card animate-scale" style="width:100%; max-width:500px; margin:20px; background:#FFFFFF;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; border-bottom:1px solid var(--border); padding-bottom:12px;">
+            <h3 style="font-size:16px; font-weight:700; color:var(--text); margin:0;">
+                <i class="fa-solid fa-plus" style="color:var(--primary); margin-right:8px;"></i> Nouveau Point de Passation
+            </h3>
+            <button class="btn btn-secondary btn-xs" onclick="closeAddModal()"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <form method="POST" action="{{ url_for('passation_question_add') }}">
+            <div class="form-group">
+                <label class="field-label">Texte du point de contrôle *</label>
+                <input type="text" name="text" class="field-input" required placeholder="Ex: Contrôle des batteries chariots">
+            </div>
+            <div class="grid-2">
+                <div class="form-group">
+                    <label class="field-label">Catégorie *</label>
+                    <input type="text" name="category" class="field-input" required value="Général" placeholder="Sécurité, Production...">
+                </div>
+                <div class="form-group">
+                    <label class="field-label">Type de réponse</label>
+                    <select name="type" class="field-input">
+                        <option value="CHOICE">Choix multiple</option>
+                        <option value="TEXT">Texte libre</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="field-label">Options (séparées par virgules si Choix multiple)</label>
+                <input type="text" name="options" class="field-input" value="OK,NOK,N/A" placeholder="Ex: OK,NOK,N/A">
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:20px;">
+                <button type="button" class="btn btn-secondary" onclick="closeAddModal()">Annuler</button>
+                <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check"></i> Ajouter la question</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal Edit Question -->
+<div id="editModal" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center;">
+    <div class="glass-card animate-scale" style="width:100%; max-width:500px; margin:20px; background:#FFFFFF;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; border-bottom:1px solid var(--border); padding-bottom:12px;">
+            <h3 style="font-size:16px; font-weight:700; color:var(--text); margin:0;">
+                <i class="fa-solid fa-pen" style="color:var(--primary); margin-right:8px;"></i> Modifier le Point de Passation
+            </h3>
+            <button class="btn btn-secondary btn-xs" onclick="closeEditModal()"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <form id="editForm" method="POST" action="">
+            <div class="form-group">
+                <label class="field-label">Texte du point de contrôle *</label>
+                <input type="text" name="text" id="edit_text" class="field-input" required>
+            </div>
+            <div class="grid-2">
+                <div class="form-group">
+                    <label class="field-label">Catégorie *</label>
+                    <input type="text" name="category" id="edit_category" class="field-input" required>
+                </div>
+                <div class="form-group">
+                    <label class="field-label">Type de réponse</label>
+                    <select name="type" id="edit_type" class="field-input">
+                        <option value="CHOICE">Choix multiple</option>
+                        <option value="TEXT">Texte libre</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="field-label">Options (séparées par virgules si Choix multiple)</label>
+                <input type="text" name="options" id="edit_options" class="field-input">
+            </div>
+            <div class="form-group">
+                <label class="field-label">Ordre d'affichage</label>
+                <input type="number" name="sort_order" id="edit_sort_order" class="field-input" min="1">
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:20px;">
+                <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Annuler</button>
+                <button type="submit" class="btn btn-primary"><i class="fa-solid fa-save"></i> Enregistrer les modifications</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function openAddModal() {
+    document.getElementById('addModal').style.display = 'flex';
+}
+function closeAddModal() {
+    document.getElementById('addModal').style.display = 'none';
+}
+function openEditModal(qid, text, category, type, options, sort_order) {
+    document.getElementById('editForm').action = '/passation/questions/edit/' + qid;
+    document.getElementById('edit_text').value = text;
+    document.getElementById('edit_category').value = category;
+    document.getElementById('edit_type').value = type;
+    document.getElementById('edit_options').value = options;
+    document.getElementById('edit_sort_order').value = sort_order;
+    document.getElementById('editModal').style.display = 'flex';
+}
+function closeEditModal() {
+    document.getElementById('editModal').style.display = 'none';
+}
+</script>
+{% endblock %}

@@ -1,0 +1,234 @@
+{% extends 'base.html' %}
+{% block title %}Profil {{ profile.name }} — SEBN-TN{% endblock %}
+{% block page_title %}{{ profile.name }}{% endblock %}
+{% block page_subtitle %}Dossier de compétences & Habilitations{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('training') }}" class="btn btn-glass btn-sm">
+    <i class="fa-solid fa-arrow-left"></i> Équipe
+</a>
+{% if role == 'admin' %}
+<button class="btn btn-primary btn-sm" onclick="document.getElementById('exam-modal').classList.add('open')">
+    <i class="fa-solid fa-plus"></i> Saisir Examen
+</button>
+{% endif %}
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.profile-header {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 32px;
+    display: flex; gap: 32px; align-items: center;
+    margin-bottom: 24px;
+    animation: slideInDown 0.3s ease;
+}
+.profile-avatar {
+    width: 100px; height: 100px; border-radius: 24px;
+    background: linear-gradient(135deg, var(--primary), var(--purple));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 42px; font-weight: 900; color: white;
+    box-shadow: 0 10px 30px rgba(37,99,235,0.3); flex-shrink: 0;
+}
+.profile-info { flex: 1; }
+.profile-name { font-size: 28px; font-weight: 900; color: var(--text); margin-bottom: 8px; }
+.profile-meta { display: flex; gap: 16px; margin-bottom: 20px; }
+.meta-item {
+    font-size: 13px; color: var(--text-sec);
+    display: flex; align-items: center; gap: 6px;
+    background: rgba(255,255,255,0.03); padding: 6px 14px; border-radius: 20px;
+    border: 1px solid var(--border);
+}
+.meta-item i { color: var(--primary); }
+
+.prog-wrap { width: 100%; max-width: 400px; }
+.prog-head { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 8px; color: var(--text-sec); font-weight: 600; }
+.prog-bar-bg { height: 8px; background: rgba(255,255,255,0.06); border-radius: 4px; overflow: hidden; }
+.prog-bar-fill { height: 100%; background: linear-gradient(90deg, var(--primary), var(--success)); border-radius: 4px; transition: width 1s ease; }
+
+.levels-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; margin-bottom: 24px; }
+.level-card {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg);
+    padding: 24px; text-align: center; transition: var(--transition);
+}
+.level-card:hover { transform: translateY(-3px); border-color: var(--border-h); }
+.level-badge {
+    width: 48px; height: 48px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 18px; font-weight: 800; margin-bottom: 12px;
+}
+.level-card.active-N1 { border-color: rgba(6,182,212,0.3); }
+.level-card.active-N1 .level-badge { background: rgba(6,182,212,0.15); color: var(--cyan); }
+.level-card.active-N2 { border-color: rgba(16,185,129,0.3); }
+.level-card.active-N2 .level-badge { background: var(--success-bg); color: var(--success); }
+.level-card.active-N3 { border-color: rgba(245,158,11,0.3); }
+.level-card.active-N3 .level-badge { background: var(--warning-bg); color: var(--warning); }
+.level-card.active-N4 { border-color: rgba(239,68,68,0.3); }
+.level-card.active-N4 .level-badge { background: var(--danger-bg); color: var(--danger); }
+.level-card.inactive .level-badge { background: rgba(255,255,255,0.03); color: var(--text-dim); border: 1px solid var(--border); }
+.level-name { font-size: 13px; font-weight: 700; color: var(--text); }
+.level-stat { font-size: 11px; color: var(--text-sec); margin-top: 4px; }
+
+.timeline { position: relative; margin-top: 20px; padding-left: 20px; }
+.timeline::before {
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0;
+    width: 2px; background: var(--border);
+}
+.tl-item { position: relative; padding-bottom: 24px; animation: slideInUp 0.3s ease both; }
+.tl-item:last-child { padding-bottom: 0; }
+.tl-dot {
+    position: absolute; left: -26px; top: 0;
+    width: 14px; height: 14px; border-radius: 50%;
+    background: var(--bg-deep); border: 2px solid var(--primary);
+}
+.tl-card {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 16px;
+}
+.tl-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+.tl-type { font-size: 13px; font-weight: 700; color: var(--text); }
+.tl-date { font-size: 11px; color: var(--text-sec); }
+</style>
+{% endblock %}
+
+{% block content %}
+{% set validations = profile.get('exams', []) | selectattr('type', 'equalto', 'Validation') | list %}
+{% set v_levels = [] %}
+{% for v in validations %}{% if v.exam_level %}{% set _ = v_levels.append(v.exam_level) %}{% endif %}{% endfor %}
+{% set prog = [v_levels|length * 25, 100]|min %}
+
+<!-- Header -->
+<div class="profile-header">
+    <div class="profile-avatar">{{ profile.name[0]|upper }}</div>
+    <div class="profile-info">
+        <div class="profile-name">{{ profile.name }}</div>
+        <div class="profile-meta">
+            <div class="meta-item"><i class="fa-solid fa-id-badge"></i> {{ profile.matricule }}</div>
+            <div class="meta-item"><i class="fa-solid fa-users"></i> Équipe {{ profile.shift or '?' }}</div>
+            {% if prog == 100 %}
+            <div class="meta-item" style="border-color:rgba(16,185,129,0.3); color:var(--success); background:var(--success-bg);">
+                <i class="fa-solid fa-medal" style="color:var(--success);"></i> Expert
+            </div>
+            {% endif %}
+        </div>
+        <div class="prog-wrap">
+            <div class="prog-head"><span>Progression Globale</span><span style="color:var(--success);">{{ prog }}%</span></div>
+            <div class="prog-bar-bg"><div class="prog-bar-fill" style="width:{{ prog }}%;"></div></div>
+        </div>
+    </div>
+</div>
+
+<!-- Levels -->
+<div class="levels-grid stagger">
+    <div class="level-card {% if 'N1' in v_levels %}active-N1{% else %}inactive{% endif %}">
+        <div class="level-badge">N1</div>
+        <div class="level-name">Intervention Mineure</div>
+        <div class="level-stat">{{ 'Acquis' if 'N1' in v_levels else 'Non acquis' }}</div>
+    </div>
+    <div class="level-card {% if 'N2' in v_levels %}active-N2{% else %}inactive{% endif %}">
+        <div class="level-badge">N2</div>
+        <div class="level-name">Diagnostic Courant</div>
+        <div class="level-stat">{{ 'Acquis' if 'N2' in v_levels else 'Non acquis' }}</div>
+    </div>
+    <div class="level-card {% if 'N3' in v_levels %}active-N3{% else %}inactive{% endif %}">
+        <div class="level-badge">N3</div>
+        <div class="level-name">Expertise Avancée</div>
+        <div class="level-stat">{{ 'Acquis' if 'N3' in v_levels else 'Non acquis' }}</div>
+    </div>
+    <div class="level-card {% if 'N4' in v_levels %}active-N4{% else %}inactive{% endif %}">
+        <div class="level-badge">N4</div>
+        <div class="level-name">Dépannage Complexe</div>
+        <div class="level-stat">{{ 'Acquis' if 'N4' in v_levels else 'Non acquis' }}</div>
+    </div>
+</div>
+
+<!-- History -->
+<div class="glass-card animate-up" style="padding:24px;">
+    <div class="card-title"><i class="fa-solid fa-timeline"></i> Historique des Formations & Examens</div>
+    {% if profile.get('exams') %}
+    <div class="timeline">
+        {% for ex in profile.exams | reverse %}
+        <div class="tl-item" style="animation-delay:{{ loop.index0 * 0.1 }}s;">
+            <div class="tl-dot" style="border-color:{% if ex.type=='Validation' %}var(--success){% elif ex.type=='Echec' %}var(--danger){% else %}var(--info){% endif %};"></div>
+            <div class="tl-card">
+                <div class="tl-head">
+                    <div class="tl-type">
+                        {% if ex.type=='Validation' %}<span style="color:var(--success);"><i class="fa-solid fa-check"></i> Validation</span>
+                        {% elif ex.type=='Echec' %}<span style="color:var(--danger);"><i class="fa-solid fa-xmark"></i> Échec</span>
+                        {% else %}<span style="color:var(--info);"><i class="fa-solid fa-chalkboard-user"></i> Formation</span>{% endif %}
+                        &nbsp;·&nbsp; Niveau {{ ex.exam_level or '?' }}
+                    </div>
+                    <div class="tl-date">{{ ex.date[:10] }}</div>
+                </div>
+                {% if ex.notes %}
+                <div style="font-size:12px; color:var(--text-sec); margin-top:8px;">{{ ex.notes }}</div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <i class="fa-solid fa-clipboard-list empty-icon"></i>
+        <div class="empty-title">Aucun historique</div>
+        <div class="empty-desc">Aucune formation ou examen enregistré pour ce technicien.</div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Modal -->
+{% if role == 'admin' %}
+<div class="modal-overlay" id="exam-modal">
+    <div class="modal-box">
+        <div class="modal-close" onclick="document.getElementById('exam-modal').classList.remove('open')">
+            <i class="fa-solid fa-xmark"></i>
+        </div>
+        <h3 style="margin-bottom:20px; font-size:17px; font-weight:800;">Ajouter un Événement</h3>
+        <form method="POST" action="{{ url_for('training_add_exam', matricule=profile.matricule) }}">
+            <div class="grid-2">
+                <div class="form-group">
+                    <label class="form-label">Type</label>
+                    <div class="input-with-icon">
+                        <i class="input-icon fa-solid fa-tag"></i>
+                        <select name="type" class="form-control" required>
+                            <option value="Formation">Formation</option>
+                            <option value="Validation">Validation (Succès)</option>
+                            <option value="Echec">Échec Examen</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Niveau Visé</label>
+                    <div class="input-with-icon">
+                        <i class="input-icon fa-solid fa-layer-group"></i>
+                        <select name="exam_level" class="form-control" required>
+                            <option value="N1">N1</option><option value="N2">N2</option>
+                            <option value="N3">N3</option><option value="N4">N4</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Date</label>
+                <div class="input-with-icon">
+                    <i class="input-icon fa-solid fa-calendar"></i>
+                    <input type="date" name="date" class="form-control" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Notes / Sujet</label>
+                <div class="input-with-icon">
+                    <i class="input-icon fa-solid fa-align-left" style="top:14px; transform:none;"></i>
+                    <textarea name="notes" class="form-control" rows="2" style="padding-left:36px;"></textarea>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary w-full" style="justify-content:center;">
+                <i class="fa-solid fa-save"></i> Enregistrer
+            </button>
+        </form>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

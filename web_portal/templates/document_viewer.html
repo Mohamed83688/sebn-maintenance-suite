@@ -1,0 +1,632 @@
+{% extends "base.html" %}
+{% block title %}Visionneuse — {{ doc.display_name }} — SEBN-TN{% endblock %}
+{% block page_title %}{{ doc.display_name }}{% endblock %}
+{% block page_subtitle %}
+    <i class="fa-solid fa-file" style="margin-right:4px;"></i>
+    {{ doc.file_name }} — {{ doc.file_size_kb }} Ko
+{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ── Document Viewer Toolbar & Header ───────────────────────── */
+.viewer-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    background: var(--bg-card, #FFFFFF);
+    border: 1px solid var(--border, #E2E8F0);
+    border-radius: 14px;
+    padding: 12px 18px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 3px rgba(15,23,42,0.04);
+}
+.viewer-meta {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+.viewer-meta-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    color: var(--text-sec, #64748B);
+    font-weight: 500;
+}
+
+.viewer-frame {
+    width: 100%;
+    height: calc(100vh - 240px);
+    min-height: 550px;
+    border: none;
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 2px 8px rgba(15,23,42,0.08);
+}
+
+/* ── Excel Interactive Spreadsheet Viewer ─────────────────── */
+.excel-viewer-container {
+    background: #FFFFFF;
+    border: 1px solid var(--border, #E2E8F0);
+    border-radius: 14px;
+    box-shadow: 0 2px 10px rgba(15,23,42,0.06);
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 220px);
+    min-height: 580px;
+    overflow: hidden;
+}
+
+/* Excel Sub-header toolbar */
+.excel-subbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    background: #F8FAFC;
+    border-bottom: 1px solid #E2E8F0;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.excel-search-box {
+    position: relative;
+    max-width: 280px;
+    flex: 1;
+}
+.excel-search-box input {
+    width: 100%;
+    padding: 6px 12px 6px 32px;
+    border-radius: 8px;
+    border: 1px solid #CBD5E1;
+    font-size: 12px;
+    background: #FFFFFF;
+    color: #0F172A;
+}
+.excel-search-box i {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 12px;
+    color: #94A3B8;
+}
+
+.excel-tools {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.tool-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 10px;
+    border-radius: 7px;
+    border: 1px solid #E2E8F0;
+    background: #FFFFFF;
+    color: #475569;
+    font-size: 12px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.15s;
+}
+.tool-btn:hover {
+    background: #F1F5F9;
+    color: #0F172A;
+}
+
+/* Sheet Tabs Bar */
+.sheet-tabs-bar {
+    display: flex;
+    align-items: center;
+    background: #F1F5F9;
+    border-bottom: 1px solid #CBD5E1;
+    padding: 0 10px;
+    overflow-x: auto;
+    gap: 4px;
+    flex-shrink: 0;
+}
+.sheet-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 9px 16px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #64748B;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.18s;
+}
+.sheet-tab:hover {
+    color: #0F172A;
+    background: rgba(255,255,255,0.6);
+}
+.sheet-tab.active {
+    color: #059669;
+    background: #FFFFFF;
+    border-bottom: 2px solid #059669;
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+    box-shadow: 0 -2px 5px rgba(0,0,0,0.03);
+}
+
+/* Spreadsheet Grid Viewport */
+.excel-grid-viewport {
+    flex: 1;
+    overflow: auto;
+    background: #FFFFFF;
+    position: relative;
+}
+
+/* Spreadsheet Table Styling */
+.excel-table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 12px;
+    font-family: 'Inter', -apple-system, sans-serif;
+    color: #1E293B;
+}
+
+.excel-table th, .excel-table td {
+    border: 1px solid #E2E8F0;
+    padding: 6px 10px;
+    white-space: nowrap;
+    text-align: left;
+    max-width: 350px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Header Row (Column Letters or Detected Labels) */
+.excel-table thead tr th {
+    background: #F8FAFC;
+    color: #475569;
+    font-weight: 700;
+    font-size: 11.5px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    border-bottom: 2px solid #CBD5E1;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+
+/* Row Numbering Column */
+.excel-table .row-num {
+    background: #F8FAFC !important;
+    color: #94A3B8;
+    font-weight: 600;
+    font-size: 10.5px;
+    width: 44px;
+    min-width: 44px;
+    text-align: center;
+    position: sticky;
+    left: 0;
+    z-index: 5;
+    user-select: none;
+    border-right: 2px solid #CBD5E1;
+}
+
+.excel-table thead tr th.row-num {
+    z-index: 15;
+}
+
+.excel-table tbody tr:hover td {
+    background-color: #F0FDF4;
+}
+
+.excel-table tbody tr.row-highlight td {
+    background-color: #FEF3C7 !important;
+}
+
+/* Loading & Empty states */
+.excel-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #64748B;
+    gap: 12px;
+}
+.excel-spinner {
+    font-size: 32px;
+    color: #059669;
+    animation: spin 1s linear infinite;
+}
+@keyframes spin { 100% { transform: rotate(360deg); } }
+
+/* Footer status bar */
+.excel-statusbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 16px;
+    background: #F8FAFC;
+    border-top: 1px solid #E2E8F0;
+    font-size: 11px;
+    color: #64748B;
+    flex-shrink: 0;
+}
+
+/* Plain text / code viewer */
+.text-viewer-card {
+    background: #FFFFFF;
+    border: 1px solid var(--border, #E2E8F0);
+    border-radius: 14px;
+    padding: 20px;
+    height: calc(100vh - 240px);
+    overflow: auto;
+    font-family: 'JetBrains Mono', Consolas, monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    color: #1E293B;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="animate-up">
+
+    <!-- Top Toolbar -->
+    <div class="viewer-toolbar">
+        <div class="viewer-meta">
+            <a href="{{ url_for('documents_page') }}" class="btn btn-secondary btn-sm">
+                <i class="fa-solid fa-arrow-left"></i> Documents
+            </a>
+            <div class="viewer-meta-item">
+                <i class="fa-solid fa-file"></i>
+                <strong>{{ doc.file_name }}</strong>
+            </div>
+            <div class="viewer-meta-item">
+                {% if doc.file_type|lower == 'pdf' %}
+                    <i class="fa-solid fa-file-pdf" style="color:#EF4444;"></i>
+                {% elif doc.file_type|lower in ['xlsx','xls','xlsm','csv'] %}
+                    <i class="fa-solid fa-file-excel" style="color:#059669;"></i>
+                {% elif doc.file_type|lower in ['docx','doc'] %}
+                    <i class="fa-solid fa-file-word" style="color:#2563EB;"></i>
+                {% elif doc.file_type|lower in ['pptx','ppt'] %}
+                    <i class="fa-solid fa-file-powerpoint" style="color:#EA580C;"></i>
+                {% else %}
+                    <i class="fa-solid fa-file"></i>
+                {% endif %}
+                <span class="badge badge-secondary" style="font-size:10px; text-transform:uppercase;">
+                    {{ doc.file_type }}
+                </span>
+            </div>
+            <div class="viewer-meta-item">
+                <i class="fa-solid fa-weight-hanging"></i>
+                {{ doc.file_size_kb }} Ko
+            </div>
+            <div class="viewer-meta-item">
+                <i class="fa-regular fa-calendar"></i>
+                {{ doc.updated_at[:10] if doc.updated_at else '–' }}
+            </div>
+        </div>
+
+        <div style="display:flex; gap:8px;">
+            <a href="{{ url_for('document_download', doc_id=doc.id) }}"
+               class="btn btn-primary btn-sm"
+               download>
+                <i class="fa-solid fa-download"></i> Télécharger
+            </a>
+            {% if session.get('role') in ['OWNER','ADMIN','admin'] %}
+            <a href="{{ url_for('admin_documents') }}" class="btn btn-secondary btn-sm">
+                <i class="fa-solid fa-gear"></i> Gérer
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- ═══ 1. EXCEL / SPREADSHEET VIEWER (XLSX, XLS, XLSM, CSV) ═══ -->
+    {% if doc.file_type|lower in ['xlsx', 'xls', 'xlsm', 'csv'] %}
+    <div class="excel-viewer-container" id="excelViewer">
+        <!-- Subbar: Search + Tools -->
+        <div class="excel-subbar">
+            <div class="excel-search-box">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" id="excelSearch" placeholder="Rechercher dans la feuille..." onkeyup="filterExcelTable()">
+            </div>
+            <div class="excel-tools">
+                <button class="tool-btn" onclick="zoomGrid(-0.1)" title="Zoom arrière">
+                    <i class="fa-solid fa-magnifying-glass-minus"></i>
+                </button>
+                <span id="zoomLevel" style="font-size:11px; font-weight:600; color:#64748B; min-width:36px; text-align:center;">100%</span>
+                <button class="tool-btn" onclick="zoomGrid(0.1)" title="Zoom avant">
+                    <i class="fa-solid fa-magnifying-glass-plus"></i>
+                </button>
+                <button class="tool-btn" onclick="toggleFullscreen()" title="Plein écran">
+                    <i class="fa-solid fa-expand"></i>
+                </button>
+                <button class="tool-btn" onclick="window.print()" title="Imprimer">
+                    <i class="fa-solid fa-print"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Sheet Tabs Bar -->
+        <div class="sheet-tabs-bar" id="sheetTabsBar">
+            <!-- Tabs dynamically injected by JS -->
+        </div>
+
+        <!-- Viewport Grid -->
+        <div class="excel-grid-viewport" id="excelViewport">
+            <div class="excel-loading" id="excelLoading">
+                <div class="excel-spinner"><i class="fa-solid fa-circle-notch"></i></div>
+                <div style="font-weight:600; font-size:13px;">Chargement du classeur Excel en direct...</div>
+                <div style="font-size:11px; color:#94A3B8;">Analyse des feuilles de calcul et des formules</div>
+            </div>
+            <div id="excelTableContainer" style="display:none;"></div>
+        </div>
+
+        <!-- Status Bar -->
+        <div class="excel-statusbar">
+            <div id="statusSheetInfo"><i class="fa-solid fa-table" style="color:#059669; margin-right:4px;"></i> Prêt</div>
+            <div id="statusRowInfo">0 lignes · 0 colonnes</div>
+        </div>
+    </div>
+
+    <!-- ═══ 2. PDF VIEWER (IFRAME) ═══ -->
+    {% elif doc.file_type|lower == 'pdf' %}
+    <iframe
+        class="viewer-frame"
+        src="{{ url_for('document_view', doc_id=doc.id) }}?inline=1"
+        title="{{ doc.display_name }}">
+        <p>Votre navigateur ne supporte pas l'affichage PDF intégré.
+           <a href="{{ url_for('document_download', doc_id=doc.id) }}">Télécharger le PDF</a>.
+        </p>
+    </iframe>
+
+    <!-- ═══ 3. IMAGE VIEWER ═══ -->
+    {% elif doc.file_type|lower in ['png', 'jpg', 'jpeg', 'gif'] %}
+    <div style="text-align:center; background:#fff; border-radius:14px; padding:24px;
+                border:1px solid var(--border); box-shadow:0 2px 8px rgba(15,23,42,0.06);">
+        <img src="{{ url_for('document_view', doc_id=doc.id) }}?inline=1"
+             alt="{{ doc.display_name }}"
+             style="max-width:100%; max-height:75vh; border-radius:8px; object-fit:contain; box-shadow:0 4px 12px rgba(0,0,0,0.08);">
+    </div>
+
+    <!-- ═══ 4. TEXT / LOG / CSV VIEWER ═══ -->
+    {% elif doc.file_type|lower in ['txt', 'log', 'json', 'sql'] %}
+    <div class="text-viewer-card" id="textViewer">Chargement du contenu...</div>
+
+    <!-- ═══ 5. WORD / POWERPOINT (FALLBACK PREVIEW CARD) ═══ -->
+    {% else %}
+    <div style="background:var(--bg-card,#FFF); border:1px solid var(--border,#E2E8F0); border-radius:14px; padding:48px 32px; text-align:center;">
+        {% if doc.file_type|lower in ['docx','doc'] %}
+            <span style="font-size:72px; color:#2563EB; margin-bottom:16px; display:block;"><i class="fa-solid fa-file-word"></i></span>
+            <div style="font-size:18px; font-weight:700; margin-bottom:8px;">Document Microsoft Word</div>
+        {% elif doc.file_type|lower in ['pptx','ppt'] %}
+            <span style="font-size:72px; color:#EA580C; margin-bottom:16px; display:block;"><i class="fa-solid fa-file-powerpoint"></i></span>
+            <div style="font-size:18px; font-weight:700; margin-bottom:8px;">Présentation PowerPoint</div>
+        {% else %}
+            <span style="font-size:72px; color:#64748B; margin-bottom:16px; display:block;"><i class="fa-solid fa-file"></i></span>
+            <div style="font-size:18px; font-weight:700; margin-bottom:8px;">Fichier {{ doc.file_type|upper }}</div>
+        {% endif %}
+
+        <div style="font-size:14px; color:var(--text-sec); margin-bottom:24px; max-width:420px; margin-left:auto; margin-right:auto;">
+            Fichier prêt au téléchargement sécurisé.
+        </div>
+
+        <div style="display:flex; gap:12px; justify-content:center; flex-wrap:wrap;">
+            <a href="{{ url_for('document_download', doc_id=doc.id) }}" class="btn btn-primary" download>
+                <i class="fa-solid fa-download"></i> Télécharger {{ doc.file_name }}
+            </a>
+            <a href="{{ url_for('documents_page') }}" class="btn btn-secondary">
+                <i class="fa-solid fa-arrow-left"></i> Retour aux Documents
+            </a>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if doc.file_type|lower in ['xlsx', 'xls', 'xlsm', 'csv'] %}
+<!-- SheetJS Library for In-Browser Client-Side Excel Parsing -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script>
+let currentWorkbook = null;
+let currentSheetName = "";
+let currentScale = 1.0;
+
+document.addEventListener("DOMContentLoaded", () => {
+    loadExcelDocument("{{ url_for('document_view', doc_id=doc.id) }}?inline=1");
+});
+
+async function loadExcelDocument(url) {
+    const loadingEl = document.getElementById("excelLoading");
+    const container = document.getElementById("excelTableContainer");
+    const tabsBar = document.getElementById("sheetTabsBar");
+
+    try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error("Erreur de téléchargement: " + response.statusText);
+        
+        const arrayBuffer = await response.arrayBuffer();
+        const data = new Uint8Array(arrayBuffer);
+        
+        // Parse with SheetJS
+        currentWorkbook = XLSX.read(data, {
+            type: "array",
+            cellDates: true,
+            cellStyles: true,
+            cellNF: true
+        });
+
+        if (!currentWorkbook.SheetNames || currentWorkbook.SheetNames.length === 0) {
+            throw new Error("Classeur vide ou aucune feuille trouvée.");
+        }
+
+        // Render sheet tabs
+        tabsBar.innerHTML = "";
+        currentWorkbook.SheetNames.forEach((sheetName, index) => {
+            const btn = document.createElement("button");
+            btn.className = "sheet-tab" + (index === 0 ? " active" : "");
+            btn.innerHTML = `<i class="fa-solid fa-file-lines"></i> ${sheetName}`;
+            btn.onclick = () => switchSheet(sheetName);
+            tabsBar.appendChild(btn);
+        });
+
+        // Display first sheet
+        switchSheet(currentWorkbook.SheetNames[0]);
+
+        loadingEl.style.display = "none";
+        container.style.display = "block";
+    } catch (err) {
+        console.error("Erreur d'affichage Excel:", err);
+        loadingEl.innerHTML = `
+            <div style="font-size:36px; color:#EF4444;"><i class="fa-solid fa-triangle-exclamation"></i></div>
+            <div style="font-weight:700; color:#0F172A; font-size:14px;">Impossible d'afficher le classeur Excel</div>
+            <div style="font-size:12px; color:#64748B; max-width:400px; text-align:center;">${err.message}</div>
+            <a href="{{ url_for('document_download', doc_id=doc.id) }}" class="btn btn-primary btn-sm" style="margin-top:10px;">
+                <i class="fa-solid fa-download"></i> Télécharger le fichier à la place
+            </a>
+        `;
+    }
+}
+
+function switchSheet(sheetName) {
+    currentSheetName = sheetName;
+    const worksheet = currentWorkbook.Sheets[sheetName];
+    const container = document.getElementById("excelTableContainer");
+
+    // Update active tab styling
+    document.querySelectorAll(".sheet-tab").forEach(tab => {
+        tab.classList.toggle("active", tab.textContent.trim() === sheetName);
+    });
+
+    if (!worksheet || !worksheet['!ref']) {
+        container.innerHTML = `<div style="padding:40px; text-align:center; color:#94A3B8;">Feuille vide</div>`;
+        document.getElementById("statusSheetInfo").innerHTML = `<i class="fa-solid fa-table" style="color:#059669;"></i> ${sheetName}`;
+        document.getElementById("statusRowInfo").textContent = "0 lignes · 0 colonnes";
+        return;
+    }
+
+    // Convert sheet to 2D JSON array with headers
+    const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
+    if (rawData.length === 0) {
+        container.innerHTML = `<div style="padding:40px; text-align:center; color:#94A3B8;">Feuille vide</div>`;
+        return;
+    }
+
+    // Find max column count
+    let maxCols = 0;
+    rawData.forEach(row => { if (row.length > maxCols) maxCols = row.length; });
+
+    // Build interactive HTML Table
+    let html = `<table class="excel-table" id="activeExcelTable">`;
+    
+    // Generate Column Headers (A, B, C, ... or from row 0)
+    html += `<thead><tr><th class="row-num">#</th>`;
+    for (let c = 0; c < maxCols; c++) {
+        const colLetter = XLSX.utils.encode_col(c);
+        html += `<th>${colLetter}</th>`;
+    }
+    html += `</tr></thead><tbody>`;
+
+    // Generate Rows with Row Numbers
+    rawData.forEach((row, rIdx) => {
+        html += `<tr class="excel-row">`;
+        html += `<td class="row-num">${rIdx + 1}</td>`;
+        for (let c = 0; c < maxCols; c++) {
+            let val = row[c] !== undefined && row[c] !== null ? String(row[c]) : "";
+            // Format dates or currency if applicable
+            let align = !isNaN(Number(val)) && val.trim() !== "" ? "text-align:right;" : "";
+            html += `<td style="${align}" title="${escapeHtml(val)}">${escapeHtml(val)}</td>`;
+        }
+        html += `</tr>`;
+    });
+
+    html += `</tbody></table>`;
+    container.innerHTML = html;
+
+    // Update Status Bar
+    document.getElementById("statusSheetInfo").innerHTML = `<i class="fa-solid fa-table" style="color:#059669; margin-right:4px;"></i> Feuille: <strong>${escapeHtml(sheetName)}</strong>`;
+    document.getElementById("statusRowInfo").textContent = `${rawData.length} lignes · ${maxCols} colonnes`;
+
+    // Clear previous search filter
+    const searchInput = document.getElementById("excelSearch");
+    if (searchInput) searchInput.value = "";
+}
+
+function filterExcelTable() {
+    const q = document.getElementById("excelSearch").value.toLowerCase().trim();
+    const rows = document.querySelectorAll("#activeExcelTable tbody tr.excel-row");
+    let matchCount = 0;
+
+    rows.forEach(row => {
+        if (!q) {
+            row.style.display = "";
+            row.classList.remove("row-highlight");
+            return;
+        }
+        const text = row.textContent.toLowerCase();
+        if (text.includes(q)) {
+            row.style.display = "";
+            row.classList.add("row-highlight");
+            matchCount++;
+        } else {
+            row.style.display = "none";
+            row.classList.remove("row-highlight");
+        }
+    });
+
+    if (q) {
+        document.getElementById("statusRowInfo").textContent = `${matchCount} ligne(s) trouvée(s)`;
+    } else if (currentWorkbook && currentSheetName) {
+        const worksheet = currentWorkbook.Sheets[currentSheetName];
+        const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
+        document.getElementById("statusRowInfo").textContent = `${rawData.length} lignes`;
+    }
+}
+
+function zoomGrid(delta) {
+    currentScale = Math.min(Math.max(currentScale + delta, 0.7), 1.6);
+    const table = document.getElementById("activeExcelTable");
+    if (table) {
+        table.style.transform = `scale(${currentScale})`;
+        table.style.transformOrigin = "top left";
+    }
+    document.getElementById("zoomLevel").textContent = Math.round(currentScale * 100) + "%";
+}
+
+function toggleFullscreen() {
+    const el = document.getElementById("excelViewer");
+    if (!document.fullscreenElement) {
+        el.requestFullscreen().catch(err => alert("Erreur plein écran: " + err.message));
+    } else {
+        document.exitFullscreen();
+    }
+}
+
+function escapeHtml(text) {
+    if (!text) return "";
+    return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+</script>
+
+{% elif doc.file_type|lower in ['txt', 'log', 'json', 'sql'] %}
+<script>
+document.addEventListener("DOMContentLoaded", async () => {
+    const el = document.getElementById("textViewer");
+    try {
+        const res = await fetch("{{ url_for('document_view', doc_id=doc.id) }}?inline=1");
+        const txt = await res.text();
+        el.textContent = txt;
+    } catch (e) {
+        el.textContent = "Erreur de chargement: " + e.message;
+    }
+});
+</script>
+{% endif %}
+{% endblock %}

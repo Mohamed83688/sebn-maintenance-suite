@@ -1,0 +1,7 @@
+{
+    "owner_username": "owner",
+    "owner_password_hash": "scrypt:32768:8:1$9lg0WjZQpMenrUv0$f105b52597cb6069d891a1ed5fc63fdbbd060d32222a3d14167cde3bf932d3baaf22da31af55ead7604de96831f5a7363bc7a22c5565340d4546162c5d99b61f",
+    "admin_session_epoch": 1787524429.1061854,
+    "created_at": "2026-08-23 23:33:49",
+    "last_recovery": null
+}

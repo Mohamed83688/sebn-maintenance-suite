@@ -1,0 +1,204 @@
+{% extends 'base.html' %}
+{% block title %}Interventions — SEBN-TN Enterprise Maintenance{% endblock %}
+{% block page_title %}Interventions Curatives (IMA){% endblock %}
+{% block page_subtitle %}{{ total or interventions|length }} interventions enregistrées au total{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('intervention_form') }}" class="btn btn-danger btn-sm">
+    <i class="fa-solid fa-plus"></i> Déclarer une Panne
+</a>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.filter-bar {
+    display: flex; align-items: center; gap: 10px;
+    flex-wrap: wrap;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    background: #FFFFFF;
+}
+.search-input-wrap {
+    display: flex; align-items: center; gap: 8px;
+    background: #FFFFFF;
+    border: 1px solid #CBD5E1;
+    border-radius: var(--radius-sm);
+    padding: 7px 12px;
+    flex: 1; min-width: 200px; max-width: 320px;
+    transition: var(--transition);
+}
+.search-input-wrap:focus-within {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-glow);
+}
+.search-input-wrap i { color: var(--text-dim); font-size: 13px; flex-shrink:0; }
+.search-input-wrap input {
+    background: none; border: none; outline: none;
+    color: var(--text); font-size: 13px; font-family: inherit; flex: 1;
+}
+.filter-select, .date-input {
+    background: #FFFFFF;
+    border: 1px solid #CBD5E1;
+    border-radius: var(--radius-sm);
+    color: var(--text); font-family: inherit; font-size: 13px;
+    padding: 7px 12px; outline: none; cursor: pointer;
+    transition: var(--transition);
+}
+.filter-select:focus, .date-input:focus { border-color: var(--primary); }
+.filter-select option { background: #FFFFFF; color: var(--text); }
+
+.reset-link { font-size: 12px; color: var(--text-sec); text-decoration: none; font-weight: 500; }
+.reset-link:hover { color: var(--danger); }
+
+.pagination {
+    display: flex; align-items: center; gap: 4px;
+}
+.page-btn {
+    padding: 5px 11px; border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: #FFFFFF;
+    color: var(--text-sec); font-size: 12px; font-weight: 600;
+    text-decoration: none; transition: var(--transition);
+}
+.page-btn:hover { border-color: var(--border-h); color: var(--text); background: var(--bg-page); }
+.page-btn.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+.page-btn.disabled { opacity: 0.4; pointer-events: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="table-card animate-up">
+    <!-- Filter Bar -->
+    <div class="filter-bar">
+        <form method="GET" action="{{ url_for('interventions') }}"
+              style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; flex:1;">
+            <div class="search-input-wrap">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" name="search" value="{{ current_search }}"
+                       placeholder="Code, machine, description...">
+            </div>
+            <select name="status" class="filter-select">
+                <option value="All" {% if current_status=='All' %}selected{% endif %}>Tous les statuts</option>
+                <option value="OPEN"   {% if current_status=='OPEN'   %}selected{% endif %}>Ouvertes</option>
+                <option value="CLOSED" {% if current_status=='CLOSED' %}selected{% endif %}>Clôturées</option>
+            </select>
+            <input type="date" name="date_from" value="{{ date_from }}" class="date-input" title="Date de début">
+            <input type="date" name="date_to" value="{{ date_to }}" class="date-input" title="Date de fin">
+
+            <button type="submit" class="btn btn-primary btn-sm">
+                <i class="fa-solid fa-filter"></i> Filtrer
+            </button>
+            {% if current_search or current_status != 'All' or date_from or date_to %}
+            <a href="{{ url_for('interventions') }}" class="reset-link">
+                <i class="fa-solid fa-xmark"></i> Réinitialiser
+            </a>
+            {% endif %}
+        </form>
+    </div>
+
+    {% if interventions %}
+    <div style="overflow-x:auto;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Code</th>
+                    <th>Machine</th>
+                    <th>Groupe</th>
+                    <th>Description</th>
+                    <th>Technicien</th>
+                    <th>Type</th>
+                    <th>Début</th>
+                    <th>Arrêt</th>
+                    <th>Statut</th>
+                    <th style="text-align:right;">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for i in interventions %}
+                <tr>
+                    <td class="td-mono">{{ i.code }}</td>
+                    <td style="font-weight:600; color:var(--text);">{{ i.machine_name or i.machine_id }}</td>
+                    <td><span class="badge badge-info">{{ i.group_name }}</span></td>
+                    <td style="max-width:220px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--text-sec);">
+                        {{ (i.fault_description or '')[:45] }}{% if (i.fault_description or '')|length > 45 %}…{% endif %}
+                    </td>
+                    <td style="font-size:12px;">
+                        <div style="display:flex; align-items:center; gap:7px;">
+                            <div style="width:24px;height:24px;border-radius:50%;background:var(--primary-light);color:var(--primary);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;border:1px solid var(--primary-border);">
+                                {{ (i.technician_name or 'T')[0]|upper }}
+                            </div>
+                            <span style="color:var(--text); font-weight:500;">{{ i.technician_name }}</span>
+                        </div>
+                    </td>
+                    <td>
+                        {% if i.fault_type %}
+                        <span style="font-size:11px; color:var(--text-sec); font-weight:500;">{{ i.fault_type }}</span>
+                        {% else %}<span style="color:var(--text-dim);">—</span>{% endif %}
+                    </td>
+                    <td style="font-size:11px; color:var(--text-sec); white-space:nowrap;">
+                        {{ (i.start_time or '').replace('T',' ')[:16] }}
+                    </td>
+                    <td style="font-size:12px; font-weight:600;">
+                        {% if i.downtime_minutes %}
+                            {% set h = (i.downtime_minutes // 60)|int %}
+                            {% set m = (i.downtime_minutes % 60)|int %}
+                            <span style="color:var(--warning);">{{ h }}h {{ m }}m</span>
+                        {% else %}<span style="color:var(--text-dim);">—</span>{% endif %}
+                    </td>
+                    <td>
+                        <span class="badge {% if i.status=='OPEN' %}badge-danger{% else %}badge-success{% endif %}">
+                            {{ i.status }}
+                        </span>
+                    </td>
+                    <td style="text-align:right;">
+                        <a href="{{ url_for('intervention_detail', code=i.code) }}"
+                           class="btn btn-secondary btn-xs">
+                            <i class="fa-solid fa-arrow-up-right-from-square"></i> Voir
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination Footer -->
+    <div style="padding:12px 20px; border-top:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; background:#FFFFFF;">
+        <span style="font-size:12px; color:var(--text-sec);">
+            Affichage de {{ interventions|length }} sur {{ total or interventions|length }} interventions
+        </span>
+
+        {% if total_pages and total_pages > 1 %}
+        <div class="pagination">
+            <a href="{{ url_for('interventions', page=page-1, status=current_status, search=current_search, date_from=date_from, date_to=date_to) }}"
+               class="page-btn {% if page <= 1 %}disabled{% endif %}">
+                <i class="fa-solid fa-chevron-left"></i> Précédent
+            </a>
+
+            {% for p in range(1, total_pages + 1) %}
+            <a href="{{ url_for('interventions', page=p, status=current_status, search=current_search, date_from=date_from, date_to=date_to) }}"
+               class="page-btn {% if p == page %}active{% endif %}">
+                {{ p }}
+            </a>
+            {% endfor %}
+
+            <a href="{{ url_for('interventions', page=page+1, status=current_status, search=current_search, date_from=date_from, date_to=date_to) }}"
+               class="page-btn {% if page >= total_pages %}disabled{% endif %}">
+                Suivant <i class="fa-solid fa-chevron-right"></i>
+            </a>
+        </div>
+        {% endif %}
+    </div>
+
+    {% else %}
+    <div class="empty-state">
+        <i class="fa-solid fa-bolt empty-icon"></i>
+        <div class="empty-title">Aucune intervention trouvée</div>
+        <div class="empty-desc">Aucun résultat pour ces critères de recherche.</div>
+        <a href="{{ url_for('intervention_form') }}" class="btn btn-danger">
+            <i class="fa-solid fa-plus"></i> Déclarer une panne
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

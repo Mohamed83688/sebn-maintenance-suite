@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Owner Recovery — SEBN-TN Maintenance System</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <style>
+        *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+        
+        :root {
+            --primary:       #2E008B;
+            --primary-h:     #23006E;
+            --primary-light: #F3F0FF;
+            --primary-border:#DDD6FE;
+            --font-display:  'Montserrat', sans-serif;
+            --font-body:     'Inter', sans-serif;
+        }
+
+        body {
+            font-family: var(--font-body);
+            background: #F3F5F9;
+            color: #0F172A;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+
+        .recovery-card {
+            width: 100%;
+            max-width: 460px;
+            background: #FFFFFF;
+            border: 1px solid #E2E8F0;
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 12px 30px -5px rgba(46, 0, 139, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.02);
+            animation: fadeIn 0.4s ease;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .security-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 14px;
+            border-radius: 20px;
+            background: var(--primary-light);
+            border: 1px solid var(--primary-border);
+            color: var(--primary);
+            font-family: var(--font-display);
+            font-size: 11.5px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            margin-bottom: 20px;
+        }
+
+        .brand-header {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin-bottom: 24px;
+        }
+        .brand-icon {
+            width: 46px;
+            height: 46px;
+            background: linear-gradient(135deg, var(--primary) 0%, #4314A0 100%);
+            color: #FFFFFF;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            box-shadow: 0 4px 12px rgba(46, 0, 139, 0.25);
+        }
+        .brand-title {
+            font-family: var(--font-display);
+            font-size: 22px;
+            font-weight: 800;
+            color: var(--primary);
+            letter-spacing: -0.5px;
+        }
+        .brand-subtitle {
+            font-size: 13px;
+            color: #64748B;
+            font-weight: 500;
+            margin-top: 2px;
+        }
+
+        .info-notice {
+            background: #F8FAFC;
+            border-left: 4px solid var(--primary);
+            padding: 12px 14px;
+            border-radius: 6px;
+            font-size: 13px;
+            color: #334155;
+            line-height: 1.5;
+            margin-bottom: 24px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .field-label {
+            display: block;
+            font-family: var(--font-display);
+            font-size: 11.5px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: #334155;
+            margin-bottom: 8px;
+        }
+        .field-wrap {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+        .field-icon {
+            position: absolute;
+            left: 14px;
+            color: #94A3B8;
+            font-size: 15px;
+        }
+        .field-input {
+            width: 100%;
+            padding: 12px 14px 12px 42px;
+            background: #FFFFFF;
+            border: 1.5px solid #CBD5E1;
+            border-radius: 10px;
+            font-size: 14px;
+            font-family: var(--font-body);
+            color: #0F172A;
+            transition: all 0.2s;
+            outline: none;
+        }
+        .field-input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(46, 0, 139, 0.14);
+        }
+        .eye-toggle {
+            position: absolute;
+            right: 12px;
+            background: none;
+            border: none;
+            color: #94A3B8;
+            cursor: pointer;
+            padding: 4px;
+            font-size: 14px;
+        }
+        .eye-toggle:hover { color: var(--primary); }
+
+        .btn-authenticate {
+            width: 100%;
+            padding: 13px;
+            background: var(--primary);
+            color: #FFFFFF;
+            border: none;
+            border-radius: 10px;
+            font-family: var(--font-display);
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            box-shadow: 0 4px 12px rgba(46, 0, 139, 0.25);
+            transition: background 0.2s, transform 0.1s;
+        }
+        .btn-authenticate:hover {
+            background: var(--primary-h);
+            box-shadow: 0 6px 16px rgba(46, 0, 139, 0.35);
+        }
+        .btn-authenticate:active {
+            transform: scale(0.99);
+        }
+
+        .back-link {
+            display: block;
+            text-align: center;
+            margin-top: 24px;
+            font-size: 13px;
+            color: #64748B;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .back-link:hover {
+            color: var(--primary);
+            text-decoration: underline;
+        }
+
+        .error-banner {
+            background: #FEF2F2;
+            border: 1px solid #FECACA;
+            color: #B91C1C;
+            padding: 12px 14px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="recovery-card">
+    <div class="security-badge">
+        <i class="fa-solid fa-shield-halved"></i> Owner-Only Recovery
+    </div>
+
+    <div class="brand-header">
+        <div class="brand-icon">
+            <i class="fa-solid fa-user-lock"></i>
+        </div>
+        <div>
+            <h1 class="brand-title">Owner Recovery</h1>
+            <div class="brand-subtitle">Secure Administrator Account Recovery</div>
+        </div>
+    </div>
+
+    <div class="info-notice">
+        <i class="fa-solid fa-circle-info" style="color: var(--primary);"></i>
+        Cette interface est strictement réservée au <strong>Propriétaire du Système (Owner)</strong> pour réinitialiser le compte Administrateur en cas de perte d'accès.
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for cat, msg in messages %}
+            <div class="error-banner">
+                <i class="fa-solid fa-circle-exclamation"></i> {{ msg }}
+            </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <form method="POST" action="{{ url_for('recovery_verify') }}" autocomplete="off" id="recovery-form">
+        <div class="form-group">
+            <label class="field-label">Owner Username</label>
+            <div class="field-wrap">
+                <i class="fa-solid fa-user-gear field-icon"></i>
+                <input type="text" name="owner_username" class="field-input" placeholder="Identifiant propriétaire" required autofocus autocomplete="off">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="field-label">Owner Password</label>
+            <div class="field-wrap">
+                <i class="fa-solid fa-lock field-icon"></i>
+                <input type="password" name="owner_password" id="owner-pw" class="field-input" placeholder="••••••••••••" required autocomplete="new-password">
+                <button type="button" class="eye-toggle" onclick="togglePw('owner-pw', 'eye-icon')">
+                    <i class="fa-regular fa-eye" id="eye-icon"></i>
+                </button>
+            </div>
+        </div>
+
+        <button type="submit" class="btn-authenticate" id="submit-btn">
+            <i class="fa-solid fa-key"></i> S'authentifier
+        </button>
+    </form>
+
+    <a href="{{ url_for('login') }}" class="back-link">
+        <i class="fa-solid fa-arrow-left"></i> Retour à la page de connexion
+    </a>
+</div>
+
+<script>
+    function togglePw(fieldId, iconId) {
+        const field = document.getElementById(fieldId);
+        const icon = document.getElementById(iconId);
+        if (field.type === 'password') {
+            field.type = 'text';
+            icon.className = 'fa-regular fa-eye-slash';
+        } else {
+            field.type = 'password';
+            icon.className = 'fa-regular fa-eye';
+        }
+    }
+
+    document.getElementById('recovery-form').addEventListener('submit', function() {
+        const btn = document.getElementById('submit-btn');
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Authenticating...';
+        btn.disabled = true;
+    });
+</script>
+
+</body>
+</html>

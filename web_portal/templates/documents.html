@@ -1,0 +1,255 @@
+{% extends "base.html" %}
+{% block title %}Documents — SEBN-TN{% endblock %}
+{% block page_title %}Bibliothèque de Documents{% endblock %}
+{% block page_subtitle %}Accédez aux documents officiels SEBN-TN{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ── Document Launcher Grid ─────────────────────────── */
+.doc-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 18px;
+    margin-top: 8px;
+}
+
+.doc-card {
+    position: relative;
+    background: var(--bg-card, #FFFFFF);
+    border: 1px solid var(--border, #E2E8F0);
+    border-radius: 16px;
+    padding: 24px 20px 18px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.22s cubic-bezier(0.16,1,0.3,1);
+    box-shadow: 0 1px 3px rgba(15,23,42,0.05);
+    text-decoration: none;
+    overflow: hidden;
+}
+
+.doc-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: var(--card-accent, #2E008B);
+    transform: scaleX(0);
+    transition: transform 0.25s ease;
+    transform-origin: left;
+}
+
+.doc-card:hover {
+    transform: translateY(-4px);
+    border-color: var(--primary, #2E008B);
+    box-shadow:
+        0 0 0 2px rgba(46,0,139,0.08),
+        0 8px 24px rgba(15,23,42,0.10);
+}
+
+.doc-card:hover::before {
+    transform: scaleX(1);
+}
+
+.doc-card:active { transform: translateY(-1px); }
+
+.doc-icon-wrap {
+    width: 64px;
+    height: 64px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    transition: transform 0.22s ease;
+}
+.doc-card:hover .doc-icon-wrap { transform: scale(1.06); }
+
+.doc-icon-pdf   { background: #FEF2F2; color: #EF4444; }
+.doc-icon-excel { background: #ECFDF5; color: #059669; }
+.doc-icon-word  { background: #EFF6FF; color: #2563EB; }
+.doc-icon-ppt   { background: #FFF7ED; color: #EA580C; }
+.doc-icon-img   { background: #F5F3FF; color: #7C3AED; }
+.doc-icon-file  { background: #F8FAFC; color: #64748B; }
+
+.doc-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text, #0F172A);
+    line-height: 1.35;
+    word-break: break-word;
+}
+
+.doc-meta {
+    font-size: 11px;
+    color: var(--text-sec, #64748B);
+}
+
+.doc-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+    width: 100%;
+}
+
+.doc-btn-view {
+    flex: 1;
+    padding: 8px;
+    background: var(--primary, #2E008B);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    transition: background 0.18s;
+}
+.doc-btn-view:hover { background: #23006E; color: #fff; }
+
+.doc-btn-dl {
+    padding: 8px 10px;
+    background: #F1F5F9;
+    border: 1px solid #E2E8F0;
+    color: #475569;
+    border-radius: 8px;
+    font-size: 12px;
+    cursor: pointer;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    transition: all 0.18s;
+}
+.doc-btn-dl:hover { background: #E2E8F0; color: #0F172A; }
+
+/* Empty state */
+.doc-empty {
+    grid-column: 1/-1;
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-sec, #64748B);
+}
+.doc-empty-icon {
+    font-size: 48px;
+    opacity: 0.25;
+    margin-bottom: 16px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="animate-up">
+
+    <!-- Header -->
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:24px;">
+        <div>
+            <p style="font-size:13px; color:var(--text-sec); margin-top:4px;">
+                {{ documents|length }} document(s) disponible(s) — Cliquez pour ouvrir
+            </p>
+        </div>
+        {% if session.get('role') in ['OWNER','ADMIN','admin'] %}
+        <a href="{{ url_for('admin_documents') }}" class="btn btn-primary btn-sm">
+            <i class="fa-solid fa-file-circle-plus"></i> Gérer les documents
+        </a>
+        {% endif %}
+    </div>
+
+    <!-- Document Grid -->
+    <div class="doc-grid">
+        {% for doc in documents %}
+        {% set ft = doc.file_type|lower %}
+        {% if ft == 'pdf' %}
+            {% set icon_cls = 'doc-icon-pdf' %}
+            {% set icon_fa  = 'fa-file-pdf' %}
+            {% set accent   = '#EF4444' %}
+        {% elif ft in ['xlsx','xls','xlsm','csv'] %}
+            {% set icon_cls = 'doc-icon-excel' %}
+            {% set icon_fa  = 'fa-file-excel' %}
+            {% set accent   = '#059669' %}
+        {% elif ft in ['docx','doc'] %}
+            {% set icon_cls = 'doc-icon-word' %}
+            {% set icon_fa  = 'fa-file-word' %}
+            {% set accent   = '#2563EB' %}
+        {% elif ft in ['pptx','ppt'] %}
+            {% set icon_cls = 'doc-icon-ppt' %}
+            {% set icon_fa  = 'fa-file-powerpoint' %}
+            {% set accent   = '#EA580C' %}
+        {% elif ft in ['png','jpg','jpeg','gif'] %}
+            {% set icon_cls = 'doc-icon-img' %}
+            {% set icon_fa  = 'fa-file-image' %}
+            {% set accent   = '#7C3AED' %}
+        {% else %}
+            {% set icon_cls = 'doc-icon-file' %}
+            {% set icon_fa  = 'fa-file' %}
+            {% set accent   = '#64748B' %}
+        {% endif %}
+
+        <div class="doc-card" style="--card-accent:{{ accent }};">
+            <div class="doc-icon-wrap {{ icon_cls }}">
+                <i class="fa-solid {{ icon_fa }}"></i>
+            </div>
+            <div class="doc-name">{{ doc.display_name }}</div>
+            <div class="doc-meta">
+                {% if doc.file_exists %}
+                    <span class="badge badge-success" style="font-size:10px;">
+                        <i class="fa-solid fa-circle-check"></i>
+                        {{ doc.file_type|upper }} · {{ doc.file_size_kb }} Ko
+                    </span>
+                {% else %}
+                    <span class="badge badge-warning" style="font-size:10px;">
+                        <i class="fa-solid fa-triangle-exclamation"></i> Fichier manquant
+                    </span>
+                {% endif %}
+            </div>
+
+            {% if doc.file_exists %}
+            <div class="doc-actions">
+                <a href="{{ url_for('document_view', doc_id=doc.id) }}"
+                   class="doc-btn-view"
+                   title="Ouvrir le document">
+                    <i class="fa-solid fa-eye"></i> Ouvrir
+                </a>
+                <a href="{{ url_for('document_download', doc_id=doc.id) }}"
+                   class="doc-btn-dl"
+                   title="Télécharger"
+                   download>
+                    <i class="fa-solid fa-download"></i>
+                </a>
+            </div>
+            {% else %}
+            <div class="doc-actions">
+                <button class="doc-btn-view" disabled style="opacity:0.4;cursor:not-allowed;">
+                    <i class="fa-solid fa-eye"></i> Indisponible
+                </button>
+            </div>
+            {% endif %}
+        </div>
+        {% else %}
+        <div class="doc-empty">
+            <div class="doc-empty-icon"><i class="fa-solid fa-folder-open"></i></div>
+            <div style="font-size:16px; font-weight:700; color:var(--text); margin-bottom:8px;">
+                Aucun document disponible
+            </div>
+            <div style="font-size:13px;">
+                {% if session.get('role') in ['OWNER','ADMIN','admin'] %}
+                Ajoutez des documents depuis
+                <a href="{{ url_for('admin_documents') }}" style="color:var(--primary);">Administration → Gestion Documents</a>.
+                {% else %}
+                Les documents seront disponibles dès qu'un administrateur les aura configurés.
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+</div>
+{% endblock %}

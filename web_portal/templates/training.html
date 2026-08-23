@@ -1,0 +1,172 @@
+{% extends 'base.html' %}
+{% block title %}Formation — SEBN-TN{% endblock %}
+{% block page_title %}Formation & Compétences{% endblock %}
+{% block page_subtitle %}Habilitations et matrice de qualification du personnel{% endblock %}
+
+{% block topbar_actions %}
+{% if role == 'admin' %}
+<button class="btn btn-glass btn-sm" onclick="document.getElementById('import-modal').classList.add('open')">
+    <i class="fa-solid fa-file-excel"></i> Importer
+</button>
+{% endif %}
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.mvp-banner {
+    background: linear-gradient(135deg, rgba(99,102,241,0.15), rgba(139,92,246,0.1));
+    border: 1px solid rgba(139,92,246,0.3);
+    border-radius: var(--radius-lg);
+    padding: 20px 24px;
+    display: flex; align-items: center; gap: 20px;
+    margin-bottom: 24px;
+    animation: slideInDown 0.35s ease;
+    position: relative; overflow: hidden;
+}
+.mvp-banner::before {
+    content: '🏆';
+    position: absolute; right: 24px; top: 50%; transform: translateY(-50%);
+    font-size: 60px; opacity: 0.07;
+}
+.mvp-crown { font-size: 36px; }
+.mvp-body { flex: 1; }
+.mvp-label { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; color: var(--purple); margin-bottom: 4px; }
+.mvp-name  { font-size: 20px; font-weight: 900; color: var(--text); }
+.mvp-sub   { font-size: 12px; color: var(--text-sec); margin-top: 2px; }
+
+.level-dot {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 26px; height: 26px; border-radius: 50%;
+    font-size: 10px; font-weight: 800;
+}
+.level-dot.active-N1 { background: rgba(6,182,212,0.2); color: var(--cyan); }
+.level-dot.active-N2 { background: var(--success-bg); color: var(--success); }
+.level-dot.active-N3 { background: var(--warning-bg); color: var(--warning); }
+.level-dot.active-N4 { background: var(--danger-bg); color: var(--danger); }
+.level-dot.inactive  { background: rgba(255,255,255,0.04); color: var(--text-dim); border: 1px solid var(--border); }
+
+.prog-mini { height: 6px; background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden; width: 140px; }
+.prog-mini-inner { height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--primary), var(--purple)); }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- MVP Banner -->
+{% if mvp %}
+<div class="mvp-banner">
+    <div class="mvp-crown">🏆</div>
+    <div class="mvp-body">
+        <div class="mvp-label">MVP de l'Équipe</div>
+        <div class="mvp-name">{{ mvp.name }}</div>
+        <div class="mvp-sub">Matricule: {{ mvp.matricule }} &nbsp;·&nbsp; Équipe {{ mvp.shift or '?' }}</div>
+    </div>
+    <a href="{{ url_for('training_profile', matricule=mvp.matricule) }}" class="btn btn-primary btn-sm">
+        <i class="fa-solid fa-award"></i> Voir le Profil
+    </a>
+</div>
+{% endif %}
+
+<!-- Table -->
+<div class="table-card animate-up">
+    <div class="table-header">
+        <div class="table-title">
+            <i class="fa-solid fa-users" style="color:var(--primary);"></i> Liste des Techniciens
+        </div>
+        <span class="badge badge-info">{{ techs|length }} techniciens</span>
+    </div>
+
+    {% if techs %}
+    <div style="overflow-x:auto;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Technicien</th>
+                    <th>Matricule</th>
+                    <th style="text-align:center;">Équipe</th>
+                    <th>Niveaux Validés</th>
+                    <th>Progression</th>
+                    <th style="text-align:right;">Profil</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in techs %}
+                {% set validations = t.get('exams', []) | selectattr('type', 'equalto', 'Validation') | list %}
+                {% set v_levels = [] %}
+                {% for v in validations %}{% if v.exam_level %}{% set _ = v_levels.append(v.exam_level) %}{% endif %}{% endfor %}
+                {% set prog = [v_levels|length * 25, 100]|min %}
+                <tr style="animation-delay:{{ loop.index0 * 0.03 }}s;">
+                    <td>
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <div style="width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,var(--primary),var(--purple));display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:white;flex-shrink:0;">
+                                {{ t.name[0]|upper }}
+                            </div>
+                            <span style="font-weight:600;">{{ t.name }}</span>
+                        </div>
+                    </td>
+                    <td class="td-mono">{{ t.matricule }}</td>
+                    <td style="text-align:center;">
+                        <span class="badge badge-info">{{ t.shift or '—' }}</span>
+                    </td>
+                    <td>
+                        <div style="display:flex; gap:4px;">
+                            {% for level in ['N1','N2','N3','N4'] %}
+                            <span class="level-dot {% if level in v_levels %}active-{{ level }}{% else %}inactive{% endif %}">
+                                {{ level }}
+                            </span>
+                            {% endfor %}
+                        </div>
+                    </td>
+                    <td>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <div class="prog-mini">
+                                <div class="prog-mini-inner" style="width:{{ prog }}%;"></div>
+                            </div>
+                            <span style="font-size:11px; font-weight:700; color:var(--text-sec); width:32px;">{{ prog }}%</span>
+                        </div>
+                    </td>
+                    <td style="text-align:right;">
+                        <a href="{{ url_for('training_profile', matricule=t.matricule) }}" class="btn btn-glass btn-xs">
+                            <i class="fa-solid fa-arrow-up-right-from-square"></i> Profil
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <i class="fa-solid fa-user-graduate empty-icon"></i>
+        <div class="empty-title">Aucun technicien</div>
+        <div class="empty-desc">Importez la liste du personnel pour suivre leurs habilitations.</div>
+        {% if role == 'admin' %}
+        <button class="btn btn-primary" onclick="document.getElementById('import-modal').classList.add('open')">
+            <i class="fa-solid fa-upload"></i> Importer le personnel
+        </button>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+<!-- Modal -->
+{% if role == 'admin' %}
+<div class="modal-overlay" id="import-modal">
+    <div class="modal-box">
+        <div class="modal-close" onclick="document.getElementById('import-modal').classList.remove('open')">
+            <i class="fa-solid fa-xmark"></i>
+        </div>
+        <h3 style="margin-bottom:6px; font-size:17px; font-weight:800;">Importer le Personnel</h3>
+        <p style="font-size:12px; color:var(--text-sec); margin-bottom:20px;">Format: <code>Nom</code>, <code>Matricule</code>, <code>Equipe</code></p>
+        <form method="POST" action="{{ url_for('training_import') }}" enctype="multipart/form-data">
+            <div class="form-group">
+                <label class="form-label">Fichier Excel</label>
+                <input type="file" name="excel_file" accept=".xlsx,.xls" required class="form-control" style="padding:8px;">
+            </div>
+            <button type="submit" class="btn btn-primary w-full" style="justify-content:center;">
+                <i class="fa-solid fa-upload"></i> Lancer l'importation
+            </button>
+        </form>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

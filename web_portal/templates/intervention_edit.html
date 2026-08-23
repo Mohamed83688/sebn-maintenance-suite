@@ -1,0 +1,123 @@
+{% extends 'base.html' %}
+{% block title %}Modifier {{ intervention.code }} — SEBN-TN Enterprise Maintenance{% endblock %}
+{% block page_title %}Modifier l'Intervention {{ intervention.code }}{% endblock %}
+{% block page_subtitle %}Édition de la fiche d'intervention corrective{% endblock %}
+
+{% block extra_css %}
+<style>
+.form-card {
+    background: #FFFFFF;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px;
+    max-width: 840px;
+    box-shadow: var(--shadow-sm);
+}
+.form-section-title {
+    font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 1px;
+    color: var(--text-sec); margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 8px;
+}
+.form-section-title i { color: var(--primary); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="form-card animate-up">
+    <form method="POST" action="{{ url_for('intervention_edit', code=intervention.code) }}">
+        <!-- Machine Section -->
+        <div class="form-section-title">
+            <i class="fa-solid fa-industry"></i> Machine &amp; Localisation
+        </div>
+        <div class="grid-2" style="margin-bottom:18px;">
+            <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label">Groupe / Zone</label>
+                <div class="input-with-icon">
+                    <i class="input-icon fa-solid fa-layer-group"></i>
+                    <input type="text" name="group_name" class="form-control" value="{{ intervention.group_name }}" required>
+                </div>
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label">Machine ID</label>
+                <div class="input-with-icon">
+                    <i class="input-icon fa-solid fa-microchip"></i>
+                    <input type="text" name="machine_id" class="form-control" value="{{ intervention.machine_id }}" required>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status & ASP -->
+        <div class="form-section-title" style="margin-top:20px;">
+            <i class="fa-solid fa-sliders"></i> Statut &amp; Catégorisation
+        </div>
+        <div class="grid-3" style="margin-bottom:18px;">
+            <div class="form-group">
+                <label class="form-label">Statut</label>
+                <select name="status" class="form-control" required>
+                    <option value="OPEN" {% if intervention.status=='OPEN' %}selected{% endif %}>EN COURS (OPEN)</option>
+                    <option value="CLOSED" {% if intervention.status=='CLOSED' %}selected{% endif %}>CLÔTURÉE (CLOSED)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Code ASP</label>
+                <select name="asp_code" class="form-control">
+                    <option value="">Aucun code ASP</option>
+                    {% for c in asp_codes %}
+                    <option value="{{ c.code }}" {% if intervention.code_asp==c.code or intervention.asp_code==c.code %}selected{% endif %}>
+                        {{ c.code }} — {{ c.description }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Temps d'arrêt (minutes)</label>
+                <input type="number" step="0.1" name="downtime_minutes" class="form-control"
+                       value="{{ intervention.downtime_minutes or 0 }}">
+            </div>
+        </div>
+
+        <!-- Description -->
+        <div class="form-group">
+            <label class="form-label">Description de la Panne</label>
+            <textarea name="fault_description" class="form-control" rows="4" required>{{ intervention.fault_description }}</textarea>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Remarques / Actions Réalisées</label>
+            <textarea name="remarks" class="form-control" rows="3" placeholder="Notes complémentaires...">{{ intervention.remarks }}</textarea>
+        </div>
+
+        <!-- Technician & Timing -->
+        <div class="form-section-title" style="margin-top:20px;">
+            <i class="fa-solid fa-clock"></i> Technicien &amp; Horodatage
+        </div>
+        <div class="grid-3">
+            <div class="form-group">
+                <label class="form-label">Technicien</label>
+                <input type="text" name="technician_name" class="form-control" value="{{ intervention.technician_name }}" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Date Début</label>
+                <input type="datetime-local" name="start_time" class="form-control" value="{{ intervention.start_time }}" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Date Fin</label>
+                <input type="datetime-local" name="end_time" class="form-control" value="{{ intervention.end_time or '' }}">
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex justify-between items-center" style="margin-top:20px; padding-top:16px; border-top:1px solid var(--border);">
+            <a href="{{ url_for('intervention_detail', code=intervention.code) }}" class="btn btn-secondary">
+                <i class="fa-solid fa-arrow-left"></i> Annuler
+            </a>
+            <button type="submit" class="btn btn-primary">
+                <i class="fa-solid fa-floppy-disk"></i> Enregistrer les Modifications
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,164 @@
+{% extends 'base.html' %}
+{% block title %}Parc Machines — SEBN-TN Enterprise Maintenance{% endblock %}
+{% block page_title %}Parc Machines &amp; Équipements{% endblock %}
+{% block page_subtitle %}{{ machines|length }} machines référencées au total{% endblock %}
+
+{% block topbar_actions %}
+{% if role == 'admin' %}
+<button class="btn btn-secondary btn-sm" onclick="document.getElementById('import-modal').classList.add('open')">
+    <i class="fa-solid fa-file-excel"></i> Importer Machines
+</button>
+{% endif %}
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.machines-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; }
+@media(max-width:1100px) { .machines-grid { grid-template-columns: repeat(2,1fr); } }
+@media(max-width:680px)  { .machines-grid { grid-template-columns: 1fr; } }
+
+.machine-card {
+    background: #FFFFFF;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px;
+    display: flex; flex-direction: column; gap: 12px;
+    transition: var(--transition);
+    box-shadow: var(--shadow-sm);
+}
+.machine-card:hover {
+    border-color: var(--border-h);
+    box-shadow: var(--shadow);
+}
+.machine-card-top { display: flex; align-items: flex-start; justify-content: space-between; }
+.machine-id { font-family: monospace; font-size: 13px; font-weight: 800; color: var(--primary); }
+.machine-name { font-size: 15px; font-weight: 700; color: var(--text); margin-top: 2px; }
+.machine-desc { font-size: 12px; color: var(--text-sec); line-height: 1.5; flex:1; }
+.machine-stats { display: flex; gap: 12px; background: var(--bg-page); padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); }
+.machine-stat { text-align: center; flex:1; }
+.machine-stat-val { font-size: 16px; font-weight: 800; color: var(--text); }
+.machine-stat-lbl { font-size: 10px; color: var(--text-sec); text-transform: uppercase; letter-spacing: 0.6px; font-weight: 600; }
+.machine-actions { display: flex; gap: 8px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Filter Bar -->
+<div class="table-card animate-up" style="margin-bottom:20px; border-radius:var(--radius);">
+    <div style="padding:14px 20px; background:#FFFFFF;">
+        <form method="GET" action="{{ url_for('machines') }}"
+              style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+            <div style="display:flex; align-items:center; gap:8px; background:#FFFFFF; border:1px solid #CBD5E1; border-radius:var(--radius-sm); padding:7px 12px; flex:1; min-width:200px; max-width:360px;">
+                <i class="fa-solid fa-magnifying-glass" style="color:var(--text-dim); font-size:13px;"></i>
+                <input type="text" name="search" value="{{ current_search }}"
+                       placeholder="Rechercher par ID ou nom..."
+                       style="background:none; border:none; outline:none; color:var(--text); font-size:13px; font-family:inherit; flex:1;">
+            </div>
+            <select name="group" class="form-control" style="width:auto; min-width:160px;">
+                <option value="All" {% if current_group=='All' %}selected{% endif %}>Tous les groupes</option>
+                {% for g in groups %}
+                <option value="{{ g }}" {% if current_group==g %}selected{% endif %}>{{ g }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-primary btn-sm">
+                <i class="fa-solid fa-filter"></i> Filtrer
+            </button>
+            {% if current_search or current_group != 'All' %}
+            <a href="{{ url_for('machines') }}" style="font-size:12px; color:var(--text-sec); text-decoration:none; font-weight:500;">
+                <i class="fa-solid fa-xmark"></i> Réinitialiser
+            </a>
+            {% endif %}
+        </form>
+    </div>
+</div>
+
+<!-- Machine Grid -->
+{% if machines %}
+<div class="machines-grid stagger">
+    {% for m in machines %}
+    <div class="machine-card">
+        <div class="machine-card-top">
+            <div>
+                <div class="machine-name" style="font-size:15px; font-weight:800; color:var(--text); font-family:monospace;">
+                    {{ m.machine_id }}
+                </div>
+                {% if m.machine_name and not m.machine_name.isdigit() and m.machine_name != m.machine_id %}
+                <div style="font-size:12px; color:var(--text-sec); font-weight:500; margin-top:2px;">
+                    {{ m.machine_name }}
+                </div>
+                {% endif %}
+            </div>
+            <span class="badge badge-info">{{ m.group_name }}</span>
+        </div>
+
+        <div class="machine-desc">
+            {{ (m.description or 'Aucune description fournie.')[:80] }}{% if (m.description or '')|length > 80 %}…{% endif %}
+        </div>
+
+        <div class="machine-stats">
+            <div class="machine-stat">
+                <div class="machine-stat-val">{{ m.intervention_count or 0 }}</div>
+                <div class="machine-stat-lbl">Interventions</div>
+            </div>
+            <div style="width:1px; background:var(--border);"></div>
+            <div class="machine-stat">
+                <div class="machine-stat-val" style="font-size:12px;">
+                    {{ m.last_intervention_date[:10] if m.last_intervention_date else '—' }}
+                </div>
+                <div class="machine-stat-lbl">Dernière panne</div>
+            </div>
+        </div>
+
+        <div class="machine-actions">
+            <a href="{{ url_for('machine_detail', machine_id=m.machine_id) }}"
+               class="btn btn-secondary btn-sm" style="flex:1; justify-content:center;">
+                <i class="fa-solid fa-clock-rotate-left"></i> Historique
+            </a>
+            <a href="{{ url_for('intervention_form') }}"
+               class="btn btn-danger btn-sm" title="Déclarer une panne">
+                <i class="fa-solid fa-bolt"></i>
+            </a>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% else %}
+<div class="glass-card">
+    <div class="empty-state">
+        <i class="fa-solid fa-industry empty-icon"></i>
+        <div class="empty-title">Aucune machine trouvée</div>
+        <div class="empty-desc">Importez un fichier Excel pour renseigner le parc machine.</div>
+        {% if role == 'admin' %}
+        <button class="btn btn-primary" onclick="document.getElementById('import-modal').classList.add('open')">
+            <i class="fa-solid fa-file-excel"></i> Importer des machines
+        </button>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Import Modal -->
+{% if role == 'admin' %}
+<div class="modal-overlay" id="import-modal">
+    <div class="modal-box">
+        <div class="modal-close" onclick="document.getElementById('import-modal').classList.remove('open')">
+            <i class="fa-solid fa-xmark"></i>
+        </div>
+        <h3 style="margin-bottom:6px; font-size:16px; font-weight:700; color:var(--text);">Importer le Parc Machine</h3>
+        <p style="font-size:12px; color:var(--text-sec); margin-bottom:20px;">
+            Format: colonnes <code>Machine ID</code>, <code>Machine Name</code>, <code>Group</code>, <code>Location</code>, <code>Description</code>
+        </p>
+        <form method="POST" action="{{ url_for('machines_import') }}" enctype="multipart/form-data">
+            <div class="form-group">
+                <label class="form-label">Fichier Excel</label>
+                <input type="file" name="excel_file" accept=".xlsx,.xls" required class="form-control" style="padding:8px;">
+            </div>
+            <button type="submit" class="btn btn-primary w-full" style="justify-content:center;">
+                <i class="fa-solid fa-upload"></i> Importer
+            </button>
+        </form>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

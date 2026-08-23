@@ -1,0 +1,121 @@
+{% extends 'base.html' %}
+{% block title %}{{ machine.machine_id }} — SEBN-TN Enterprise Maintenance{% endblock %}
+{% block page_title %}{{ machine.machine_id }}{% if machine.machine_name and not machine.machine_name.isdigit() and machine.machine_name != machine.machine_id %} — {{ machine.machine_name }}{% endif %}{% endblock %}
+{% block page_subtitle %}Groupe / Zone: {{ machine.group_name }}{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('machines') }}" class="btn btn-secondary btn-sm">
+    <i class="fa-solid fa-arrow-left"></i> Parc Machines
+</a>
+<a href="{{ url_for('intervention_form') }}" class="btn btn-danger btn-sm">
+    <i class="fa-solid fa-bolt"></i> Déclarer Panne
+</a>
+{% endblock %}
+
+{% block content %}
+<!-- KPIs -->
+<div class="kpi-grid kpi-grid-3 stagger mb-6">
+    <div class="glass-card kpi-card">
+        <div class="kpi-top">
+            <div>
+                <div class="kpi-number">{{ history|length }}</div>
+                <div class="kpi-name">Total Interventions</div>
+            </div>
+            <div class="kpi-icon-bg" style="background:var(--purple-bg); color:var(--purple);">
+                <i class="fa-solid fa-bolt"></i>
+            </div>
+        </div>
+    </div>
+    <div class="glass-card kpi-card">
+        <div class="kpi-top">
+            <div>
+                <div class="kpi-number">{{ machine.open_interventions }}</div>
+                <div class="kpi-name">Interventions Ouvertes</div>
+            </div>
+            <div class="kpi-icon-bg" style="background:var(--danger-bg); color:var(--danger);">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+        </div>
+    </div>
+    <div class="glass-card kpi-card">
+        <div class="kpi-top">
+            <div>
+                <div class="kpi-number">{{ machine.total_downtime_hours }}h</div>
+                <div class="kpi-name">Arrêt Cumulé</div>
+            </div>
+            <div class="kpi-icon-bg" style="background:var(--warning-bg); color:var(--warning);">
+                <i class="fa-solid fa-clock"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- History Table -->
+<div class="table-card animate-up">
+    <div class="table-header">
+        <div class="table-title">
+            <i class="fa-solid fa-clock-rotate-left" style="color:var(--primary);"></i>
+            Historique des Interventions sur cette Machine
+        </div>
+    </div>
+    {% if history %}
+    <div style="overflow-x:auto;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Code</th>
+                    <th>Description</th>
+                    <th>Type</th>
+                    <th>Technicien</th>
+                    <th>Début</th>
+                    <th>Arrêt</th>
+                    <th>Statut</th>
+                    <th style="text-align:right;">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for i in history %}
+                <tr>
+                    <td class="td-mono">{{ i.code }}</td>
+                    <td style="max-width:240px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--text-sec);">
+                        {{ (i.fault_description or '')[:55] }}{% if (i.fault_description or '')|length > 55 %}…{% endif %}
+                    </td>
+                    <td>
+                        <span style="font-size:11px; color:var(--text-sec); font-weight:500;">{{ i.fault_type or '—' }}</span>
+                    </td>
+                    <td style="font-size:12px; font-weight:500;">{{ i.technician_name }}</td>
+                    <td style="font-size:11px; color:var(--text-sec); white-space:nowrap;">
+                        {{ (i.start_time or '').replace('T',' ')[:16] }}
+                    </td>
+                    <td style="font-size:12px; font-weight:600;">
+                        {% if i.downtime_minutes %}
+                        <span style="color:var(--warning);">
+                            {{ (i.downtime_minutes//60)|int }}h {{ (i.downtime_minutes%60)|int }}m
+                        </span>
+                        {% else %}—{% endif %}
+                    </td>
+                    <td>
+                        <span class="badge {% if i.status=='OPEN' %}badge-danger{% else %}badge-success{% endif %}">
+                            {{ i.status }}
+                        </span>
+                    </td>
+                    <td style="text-align:right;">
+                        <a href="{{ url_for('intervention_detail', code=i.code) }}"
+                           class="btn btn-secondary btn-xs">
+                            <i class="fa-solid fa-arrow-up-right-from-square"></i> Voir
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <i class="fa-solid fa-check-circle empty-icon" style="color:var(--success);"></i>
+        <div class="empty-title">Aucune intervention enregistrée</div>
+        <div class="empty-desc">Cette machine n'a subi aucune défaillance sur la période.</div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

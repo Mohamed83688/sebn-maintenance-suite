@@ -1,0 +1,371 @@
+{% extends 'base.html' %}
+{% block title %}Planning PMA — SEBN-TN Enterprise Maintenance{% endblock %}
+{% block page_title %}Planning Préventif (PMA){% endblock %}
+{% block page_subtitle %}Gestion et suivi des tâches de maintenance programmée{% endblock %}
+
+{% block topbar_actions %}
+{% if role == 'admin' %}
+<button class="btn btn-primary btn-sm" onclick="document.getElementById('upload-modal').classList.add('open')">
+    <i class="fa-solid fa-file-arrow-up"></i> Charger Excel
+</button>
+{% endif %}
+{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ── HERO SECTION ── */
+.pma-hero {
+    background: #FFFFFF;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 24px 30px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 36px;
+    flex-wrap: wrap;
+    position: relative;
+    box-shadow: var(--shadow-sm);
+}
+
+/* Progress Ring */
+.progress-ring-wrap {
+    position: relative;
+    flex-shrink: 0;
+}
+.progress-ring-wrap svg { display: block; transform: rotate(-90deg); }
+.progress-ring-bg { fill: none; stroke: #E2E8F0; stroke-width: 9; }
+.progress-ring-fill {
+    fill: none; stroke-width: 9;
+    stroke: var(--primary);
+    stroke-linecap: round;
+    stroke-dasharray: 502;
+    stroke-dashoffset: 502;
+    transition: stroke-dashoffset 1.2s cubic-bezier(0.4,0,0.2,1);
+}
+.progress-ring-text {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    text-align: center;
+}
+.progress-ring-pct {
+    font-size: 2.2rem; font-weight: 800; color: var(--text);
+    line-height: 1; letter-spacing: -1.5px;
+}
+.progress-ring-lbl { font-size: 10px; font-weight: 700; color: var(--text-sec); text-transform: uppercase; letter-spacing: 0.8px; margin-top: 4px; }
+
+/* Hero stats */
+.hero-stats { flex: 1; min-width: 260px; }
+.hero-title {
+    font-size: 1.4rem; font-weight: 800;
+    color: var(--text);
+    line-height: 1.2; margin-bottom: 6px;
+    letter-spacing: -0.4px;
+}
+.hero-sub { font-size: 13px; color: var(--text-sec); margin-bottom: 20px; }
+
+.hero-counters { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; }
+.hero-counter {
+    background: var(--bg-page);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+    text-align: center;
+    transition: var(--transition);
+}
+.hero-counter:hover { border-color: var(--border-h); background: #F1F5F9; }
+.hero-counter-val { font-size: 1.5rem; font-weight: 800; line-height: 1; margin-bottom: 4px; }
+.hero-counter-lbl { font-size: 10px; color: var(--text-sec); font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; }
+
+/* ── FILTER ROW ── */
+.filter-row {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 14px 20px; border-bottom: 1px solid var(--border);
+    background: #FFFFFF;
+}
+.filter-select {
+    background: #FFFFFF; border: 1px solid #CBD5E1;
+    border-radius: var(--radius-sm); color: var(--text); font-family: inherit;
+    font-size: 13px; padding: 7px 12px; outline: none; cursor: pointer;
+    transition: var(--transition-s);
+}
+.filter-select option { background: #FFFFFF; color: var(--text); }
+.filter-select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-glow); }
+
+/* ── TABLE OVERRIDES ── */
+.task-status-done { background: #F0FDF4 !important; }
+.task-status-done:hover { background: #DCFCE7 !important; }
+.action-cell { display: flex; gap: 6px; justify-content: flex-end; }
+
+.btn-complete { transition: all 0.2s ease; }
+.btn-complete.done {
+    background: var(--success-bg) !important; color: var(--success) !important;
+    border: 1px solid var(--success-border) !important; cursor: default;
+}
+
+/* Row count pill */
+.row-count-pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 4px 10px; border-radius: 6px;
+    font-size: 11px; font-weight: 700;
+    background: var(--bg-page); border: 1px solid var(--border);
+    color: var(--text-sec); margin-left: auto;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- HERO SECTION -->
+<div class="pma-hero animate-up">
+    <!-- Progress Ring -->
+    <div class="progress-ring-wrap">
+        <svg width="160" height="160" viewBox="0 0 180 180">
+            <circle class="progress-ring-bg" cx="90" cy="90" r="80"/>
+            <circle class="progress-ring-fill" id="ring-fill" cx="90" cy="90" r="80"/>
+        </svg>
+        <div class="progress-ring-text">
+            <div class="progress-ring-pct">{{ stats.rate }}<span style="font-size:0.9rem; font-weight:600; color:var(--text-sec);">%</span></div>
+            <div class="progress-ring-lbl">Taux Global</div>
+        </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="hero-stats">
+        <div class="hero-title">Planning Maintenance Préventive</div>
+        <div class="hero-sub">
+            <i class="fa-solid fa-calendar-check" style="color:var(--primary);"></i>
+            Suivi des ordres de travail préventifs — mise à jour en temps réel
+        </div>
+        <div class="hero-counters stagger">
+            <div class="hero-counter">
+                <div class="hero-counter-val" style="color:var(--primary);" data-count="{{ stats.total }}">0</div>
+                <div class="hero-counter-lbl">Total Tâches</div>
+            </div>
+            <div class="hero-counter">
+                <div class="hero-counter-val" style="color:var(--success);" data-count="{{ stats.done }}">0</div>
+                <div class="hero-counter-lbl">Complétées</div>
+            </div>
+            <div class="hero-counter">
+                <div class="hero-counter-val" style="color:var(--warning);" data-count="{{ stats.pending }}">0</div>
+                <div class="hero-counter-lbl">En Attente</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- TABLE CARD -->
+<div class="table-card animate-up" style="animation-delay:0.05s;">
+    <!-- Filters -->
+    <div class="filter-row">
+        <form method="GET" action="{{ url_for('pma_dashboard') }}"
+              style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; flex:1;">
+            <div style="display:flex; align-items:center; gap:8px; background:#FFFFFF; border:1px solid #CBD5E1; border-radius:var(--radius-sm); padding:7px 12px; min-width:200px; max-width:280px;">
+                <i class="fa-solid fa-magnifying-glass" style="color:var(--text-dim); font-size:12px;"></i>
+                <input type="text" name="search" value="{{ current_search }}" placeholder="Rechercher équipement..."
+                       style="background:none; border:none; outline:none; color:var(--text); font-size:13px; font-family:inherit; flex:1; min-width:100px;">
+            </div>
+
+            <select name="month" class="filter-select">
+                <option value="">Tous les mois</option>
+                {% for m in months %}<option value="{{ m }}" {% if current_month==m %}selected{% endif %}>{{ m }}</option>{% endfor %}
+            </select>
+            <select name="sheet" class="filter-select">
+                <option value="">Tous les groupes</option>
+                {% for s in sheets %}<option value="{{ s }}" {% if current_sheet==s %}selected{% endif %}>{{ s }}</option>{% endfor %}
+            </select>
+            <select name="week" class="filter-select">
+                <option value="" {% if not current_week %}selected{% endif %}>Toutes les semaines</option>
+                {% for w in weeks %}<option value="{{ w }}" {% if current_week and w.replace(' ','') == current_week.replace(' ','') %}selected{% endif %}>{{ w }}</option>{% endfor %}
+            </select>
+
+            <button type="submit" class="btn btn-primary btn-sm">
+                <i class="fa-solid fa-filter"></i> Filtrer
+            </button>
+            {% if current_search or current_month or current_sheet or current_week %}
+            <a href="{{ url_for('pma_dashboard', week='') }}" class="btn btn-secondary btn-sm">
+                <i class="fa-solid fa-xmark"></i> Réinitialiser
+            </a>
+            {% endif %}
+        </form>
+
+        {% if tasks %}
+        <span class="row-count-pill">
+            <i class="fa-solid fa-list-ol"></i>
+            {{ tasks|length }} tâche{% if tasks|length != 1 %}s{% endif %}
+        </span>
+        {% endif %}
+    </div>
+
+    {% if tasks %}
+    <div style="overflow-x:auto;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Équipement</th>
+                    <th>Zone / Ligne</th>
+                    <th>N° Carte</th>
+                    <th>Type</th>
+                    <th>Semaine</th>
+                    <th>Mois</th>
+                    <th>Statut</th>
+                    <th style="text-align:right; padding-right:20px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in tasks %}
+                {% set is_done = (t.status|string|upper|trim == 'COMPLÉTÉ') %}
+                <tr class="{% if is_done %}task-status-done{% endif %}">
+                    <td>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <span style="width:7px; height:7px; border-radius:50%; background:{% if is_done %}var(--success){% else %}var(--warning){% endif %}; flex-shrink:0;"></span>
+                            <div>
+                                <div style="font-weight:700; font-size:13px; color:var(--text); font-family:monospace;">{{ t.equipment }}</div>
+                                {% if t.machine_name and t.machine_name != t.equipment %}
+                                <div style="font-size:11px; color:var(--text-sec);">{{ t.machine_name }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </td>
+                    <td style="font-size:12px; color:var(--text-sec); font-weight:500;">
+                        {{ t.zone or t.sheet }}
+                    </td>
+                    <td>
+                        {% if t.carte %}
+                        <span class="badge badge-info" style="font-family:monospace; font-weight:700; font-size:10px;">{{ t.carte }}</span>
+                        {% else %}
+                        <span style="color:var(--text-dim); font-size:11px;">—</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="badge badge-info" style="font-size:10px;">
+                            <i class="fa-solid fa-tag"></i> {{ t.type }}
+                        </span>
+                    </td>
+                    <td style="font-size:12px; color:var(--text-sec); font-weight:700;">{{ t.week }}</td>
+                    <td style="font-size:12px; color:var(--text-sec);">{{ t.month }}</td>
+                    <td>
+                        <span class="badge {% if is_done %}badge-success{% else %}badge-warning{% endif %}">
+                            <i class="fa-solid {% if is_done %}fa-check-circle{% else %}fa-clock{% endif %}"></i>
+                            {{ 'COMPLÉTÉ' if is_done else 'EN ATTENTE' }}
+                        </span>
+                    </td>
+                    <td>
+                        <div class="action-cell">
+                            {% if is_done %}
+                            <button class="btn btn-complete done btn-xs" disabled>
+                                <i class="fa-solid fa-check"></i> Complété
+                            </button>
+                            {% else %}
+                            <a href="{{ url_for('checklist', sheet=t.sheet, idx=t.raw_index, type=t.type, equip=t.equipment, week=t.week) }}"
+                               class="btn btn-primary btn-xs" title="Exécuter la checklist préventive">
+                                <i class="fa-solid fa-clipboard-check"></i> Checklist
+                            </a>
+                            <button class="btn btn-success btn-xs btn-complete"
+                                    onclick="completeTask(this,'{{ t.sheet|replace("'","\\'") }}',{{ t.raw_index }},'{{ t.type }}')"
+                                    title="Valider la tâche">
+                                <i class="fa-solid fa-check"></i>
+                            </button>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <i class="fa-solid fa-calendar-check empty-icon"></i>
+        <div class="empty-title">Aucune tâche trouvée</div>
+        <div class="empty-desc">Chargez un fichier Excel de planning ou modifiez vos filtres de recherche.</div>
+        {% if role == 'admin' %}
+        <button class="btn btn-primary" onclick="document.getElementById('upload-modal').classList.add('open')">
+            <i class="fa-solid fa-file-arrow-up"></i> Charger un Planning Excel
+        </button>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+<!-- Upload Modal -->
+{% if role == 'admin' %}
+<div class="modal-overlay" id="upload-modal">
+    <div class="modal-box">
+        <div class="modal-close" onclick="document.getElementById('upload-modal').classList.remove('open')">
+            <i class="fa-solid fa-xmark"></i>
+        </div>
+        <div style="display:flex; align-items:center; gap:12px; margin-bottom:20px;">
+            <div style="width:40px; height:40px; border-radius:8px; background:var(--primary-light); display:flex; align-items:center; justify-content:center; font-size:18px; color:var(--primary);">
+                <i class="fa-solid fa-file-excel"></i>
+            </div>
+            <div>
+                <h3 style="font-size:16px; font-weight:700; margin-bottom:2px; color:var(--text);">Charger le Planning Excel</h3>
+                <p style="font-size:12px; color:var(--text-sec);">Format .xlsx — Feuille de planning mensuel</p>
+            </div>
+        </div>
+        <form method="POST" action="{{ url_for('pma_upload') }}" enctype="multipart/form-data">
+            <div class="form-group">
+                <label class="form-label">Fichier Excel (.xlsx)</label>
+                <input type="file" name="excel_file" accept=".xlsx,.xls" required class="form-control" style="padding:8px;">
+            </div>
+            <button type="submit" class="btn btn-primary w-full" style="justify-content:center;">
+                <i class="fa-solid fa-cloud-arrow-up"></i> Importer le planning
+            </button>
+        </form>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+    const rate = {{ stats.rate }};
+    const fill = document.getElementById('ring-fill');
+    if (!fill) return;
+    const circumference = 2 * Math.PI * 80;
+    fill.style.strokeDasharray = circumference;
+    fill.style.strokeDashoffset = circumference;
+    requestAnimationFrame(() => {
+        setTimeout(() => {
+            const offset = circumference - (rate / 100) * circumference;
+            fill.style.strokeDashoffset = offset;
+        }, 80);
+    });
+})();
+
+async function completeTask(btn, sheet, rawIndex, taskType) {
+    btn.disabled = true;
+    const originalHTML = btn.innerHTML;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+    try {
+        const res = await fetch('{{ url_for("complete_task") }}', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({sheet, raw_index: rawIndex, type: taskType})
+        });
+        if (res.ok) {
+            const tr = btn.closest('tr');
+            tr.classList.add('task-status-done');
+            const badge = tr.querySelector('.badge');
+            if (badge) {
+                badge.className = 'badge badge-success';
+                badge.innerHTML = '<i class="fa-solid fa-check-circle"></i> COMPLÉTÉ';
+            }
+            const cell = btn.closest('.action-cell');
+            if (cell) {
+                cell.innerHTML = '<button class="btn btn-complete done btn-xs" disabled><i class="fa-solid fa-check"></i> Complété</button>';
+            }
+        } else {
+            btn.disabled = false;
+            btn.innerHTML = originalHTML;
+        }
+    } catch {
+        btn.disabled = false;
+        btn.innerHTML = originalHTML;
+    }
+}
+</script>
+{% endblock %}

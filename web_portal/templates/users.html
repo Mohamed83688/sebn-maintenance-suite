@@ -1,0 +1,518 @@
+{% extends "base.html" %}
+
+{% block title %}Gestion des Utilisateurs & Techniciens — SEBN-TN{% endblock %}
+{% block page_title %}Gestion des Utilisateurs & Techniciens{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ── Modal overlay ───────────────────────────────── */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.55);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: 9999;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    overflow-y: auto;
+    animation: overlayIn 0.2s ease;
+}
+@keyframes overlayIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+.modal-overlay.open { display: flex; }
+
+.modal-card {
+    background: #FFFFFF;
+    border-radius: 16px;
+    box-shadow: 0 8px 32px -4px rgba(15,23,42,0.18), 0 24px 64px -8px rgba(15,23,42,0.12);
+    width: 100%;
+    max-width: 500px;
+    padding: 28px 28px 24px;
+    position: relative;
+    animation: modalIn 0.25s cubic-bezier(0.16,1,0.3,1);
+    margin: auto;
+}
+@keyframes modalIn {
+    from { opacity: 0; transform: translateY(16px) scale(0.97); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.modal-card.sm { max-width: 420px; }
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 22px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #F1F5F9;
+}
+.modal-header h3 {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text, #0F172A);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+}
+.modal-close-btn {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    background: #F1F5F9;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #64748B;
+    font-size: 13px;
+    transition: background 0.15s, color 0.15s;
+    flex-shrink: 0;
+}
+.modal-close-btn:hover { background: #E2E8F0; color: #0F172A; }
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 24px;
+    padding-top: 18px;
+    border-top: 1px solid #F1F5F9;
+}
+
+/* Inline password field with eye toggle */
+.pw-wrap {
+    position: relative;
+}
+.pw-wrap input { padding-right: 42px !important; }
+.pw-eye {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #94A3B8;
+    font-size: 14px;
+    padding: 4px;
+    transition: color 0.15s;
+}
+.pw-eye:hover { color: var(--primary, #2E008B); }
+
+/* Grid helper */
+.form-grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+}
+@media (max-width: 480px) {
+    .form-grid-2 { grid-template-columns: 1fr; }
+    .modal-card { padding: 20px 18px 18px; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="animate-up">
+    <!-- Header Controls -->
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; margin-bottom:24px;">
+        <div>
+            <h2 style="font-size:20px; font-weight:700; color:var(--text); margin-bottom:4px;">
+                <i class="fa-solid fa-users-gear" style="color:var(--primary); margin-right:8px;"></i>
+                Comptes Utilisateurs &amp; Techniciens
+            </h2>
+            <p style="font-size:13px; color:var(--text-sec);">
+                Gestion centralisée des accès, rôles et mots de passe (Réservé au Propriétaire).
+            </p>
+        </div>
+        <button class="btn btn-primary" onclick="openCreateModal()">
+            <i class="fa-solid fa-user-plus"></i> Ajouter un utilisateur / technicien
+        </button>
+    </div>
+
+    <!-- KPI Summary Row -->
+    <div class="grid-4" style="margin-bottom:24px;">
+        <div class="card kpi-card">
+            <div class="kpi-icon" style="background:#EFF6FF; color:#2563EB;">
+                <i class="fa-solid fa-users"></i>
+            </div>
+            <div class="kpi-data">
+                <div class="kpi-value">{{ users|length }}</div>
+                <div class="kpi-label">Total Utilisateurs</div>
+            </div>
+        </div>
+        <div class="card kpi-card">
+            <div class="kpi-icon" style="background:#F5F3FF; color:#7C3AED;">
+                <i class="fa-solid fa-crown"></i>
+            </div>
+            <div class="kpi-data">
+                <div class="kpi-value">{{ users|selectattr('role', 'equalto', 'OWNER')|list|length }}</div>
+                <div class="kpi-label">Propriétaires (Owner)</div>
+            </div>
+        </div>
+        <div class="card kpi-card">
+            <div class="kpi-icon" style="background:#ECFDF5; color:#059669;">
+                <i class="fa-solid fa-user-shield"></i>
+            </div>
+            <div class="kpi-data">
+                <div class="kpi-value">{{ users|selectattr('role', 'equalto', 'ADMIN')|list|length }}</div>
+                <div class="kpi-label">Administrateurs</div>
+            </div>
+        </div>
+        <div class="card kpi-card">
+            <div class="kpi-icon" style="background:#FEF3C7; color:#D97706;">
+                <i class="fa-solid fa-wrench"></i>
+            </div>
+            <div class="kpi-data">
+                <div class="kpi-value">{{ users|selectattr('role', 'equalto', 'TECHNICIAN')|list|length }}</div>
+                <div class="kpi-label">Techniciens</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Users Table -->
+    <div class="card" style="padding:0; overflow:hidden;">
+        <div style="padding:16px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; background:#FAFAFA;">
+            <div style="font-weight:600; font-size:14px; color:var(--text);">
+                <i class="fa-solid fa-list" style="color:var(--text-sec); margin-right:6px;"></i> Liste des comptes enregistrés
+            </div>
+            <input type="text" id="user-filter" placeholder="Rechercher par nom, username, matricule..." 
+                   class="form-control" style="max-width:320px; font-size:12px; padding:6px 12px;" onkeyup="filterUsers()">
+        </div>
+
+        <div style="overflow-x:auto;">
+            <table class="data-table" id="users-table">
+                <thead>
+                    <tr>
+                        <th style="width:50px; text-align:center;">#</th>
+                        <th>Nom &amp; Prénom</th>
+                        <th>Nom d'utilisateur</th>
+                        <th>Matricule</th>
+                        <th>Rôle</th>
+                        <th>Équipe (Shift)</th>
+                        <th>Statut</th>
+                        <th>Dernière connexion</th>
+                        <th style="text-align:right; width:180px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for u in users %}
+                    <tr class="user-row" data-search="{{ u.name|lower }} {{ u.username|lower }} {{ (u.matricule or '')|lower }}">
+                        <td style="text-align:center; color:var(--text-sec); font-size:12px;">{{ u.id }}</td>
+                        <td>
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                <div style="width:34px; height:34px; border-radius:50%; background:
+                                    {% if u.role == 'OWNER' %}#F5F3FF; color:#7C3AED; border:1px solid #DDD6FE;
+                                    {% elif u.role == 'ADMIN' %}#EFF6FF; color:#2563EB; border:1px solid #BFDBFE;
+                                    {% elif u.role == 'TECHNICIAN' %}#FEF3C7; color:#D97706; border:1px solid #FDE68A;
+                                    {% else %}#F1F5F9; color:#64748B; border:1px solid #E2E8F0;{% endif %}
+                                    display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px;">
+                                    {% if u.role == 'OWNER' %}<i class="fa-solid fa-crown"></i>
+                                    {% elif u.role == 'ADMIN' %}<i class="fa-solid fa-user-shield"></i>
+                                    {% elif u.role == 'TECHNICIAN' %}<i class="fa-solid fa-wrench"></i>
+                                    {% else %}<i class="fa-solid fa-user"></i>{% endif %}
+                                </div>
+                                <div>
+                                    <div style="font-weight:600; color:var(--text);">{{ u.name }}</div>
+                                    <div style="font-size:11px; color:var(--text-sec);">Créé le {{ u.created_at[:10] if u.created_at else '–' }}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td><code style="font-weight:600; color:#1E3A8A; background:#EFF6FF; padding:3px 8px; border-radius:4px;">{{ u.username }}</code></td>
+                        <td>
+                            {% if u.matricule %}
+                            <span class="badge badge-secondary">{{ u.matricule }}</span>
+                            {% else %}
+                            <span style="color:var(--text-sec); font-size:12px;">–</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if u.role == 'OWNER' %}
+                            <span class="badge" style="background:#F5F3FF; color:#7C3AED; border:1px solid #DDD6FE; font-weight:700;">PROPRIÉTAIRE</span>
+                            {% elif u.role == 'ADMIN' %}
+                            <span class="badge badge-primary">ADMIN</span>
+                            {% elif u.role == 'TECHNICIAN' %}
+                            <span class="badge badge-warning">TECHNICIEN</span>
+                            {% else %}
+                            <span class="badge badge-secondary">{{ u.role }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge badge-secondary" style="font-weight:600;">Shift {{ u.shift or 'A' }}</span>
+                        </td>
+                        <td>
+                            {% if u.is_active == 1 %}
+                            <span class="badge badge-success"><i class="fa-solid fa-circle-check"></i> Actif</span>
+                            {% else %}
+                            <span class="badge badge-danger"><i class="fa-solid fa-circle-xmark"></i> Inactif</span>
+                            {% endif %}
+                        </td>
+                        <td style="font-size:12px; color:var(--text-sec);">
+                            {{ u.last_login or 'Jamais connecté' }}
+                        </td>
+                        <td style="text-align:right;">
+                            <div style="display:flex; justify-content:flex-end; gap:6px;">
+                                <button class="btn btn-secondary btn-xs" title="Modifier" 
+                                        onclick="openEditModal({{ u.id }}, '{{ u.name|replace("'", "\\'") }}', '{{ u.username }}', '{{ u.matricule or '' }}', '{{ u.role }}', '{{ u.shift or 'A' }}')">
+                                    <i class="fa-solid fa-pen-to-square"></i>
+                                </button>
+                                <button class="btn btn-warning btn-xs" title="Réinitialiser mot de passe" 
+                                        onclick="openResetModal({{ u.id }}, '{{ u.name|replace("'", "\\'") }}', '{{ u.username }}')">
+                                    <i class="fa-solid fa-key"></i>
+                                </button>
+                                {% if u.role != 'OWNER' %}
+                                <form method="POST" action="{{ url_for('admin_users_toggle', user_id=u.id) }}" style="display:inline;" onsubmit="return confirm('Confirmer la modification du statut de ce compte ?');">
+                                    <button type="submit" class="btn {% if u.is_active == 1 %}btn-danger{% else %}btn-success{% endif %} btn-xs" title="{% if u.is_active == 1 %}Désactiver{% else %}Activer{% endif %}">
+                                        <i class="fa-solid {% if u.is_active == 1 %}fa-user-slash{% else %}fa-user-check{% endif %}"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ─── Modal: Create User ─────────────────────────── -->
+<div id="createModal" class="modal-overlay">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3>
+                <i class="fa-solid fa-user-plus" style="color:var(--primary);"></i>
+                Nouveau Compte Utilisateur
+            </h3>
+            <button class="modal-close-btn" onclick="closeModal('createModal')" title="Fermer">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <form method="POST" action="{{ url_for('admin_users_create') }}" autocomplete="off">
+            <div class="form-group">
+                <label class="form-label">Nom complet *</label>
+                <input type="text" name="name" class="form-control" required
+                       placeholder="Ex: Mohamed Ben Ali" autocomplete="off">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Nom d'utilisateur (Username) *</label>
+                <input type="text" name="username" class="form-control" required
+                       placeholder="Ex: mohamed.benali" autocomplete="off">
+            </div>
+            <div class="form-grid-2">
+                <div class="form-group">
+                    <label class="form-label">Matricule <small style="font-weight:400;color:#94A3B8;">(optionnel)</small></label>
+                    <input type="text" name="matricule" class="form-control" placeholder="Ex: TN12345">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Équipe (Shift)</label>
+                    <select name="shift" class="form-control">
+                        <option value="A">Shift A</option>
+                        <option value="B">Shift B</option>
+                        <option value="C">Shift C</option>
+                        <option value="ALL">Tous les shifts</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-grid-2">
+                <div class="form-group">
+                    <label class="form-label">Rôle *</label>
+                    <select name="role" class="form-control" required>
+                        <option value="TECHNICIAN" selected>TECHNICIEN</option>
+                        <option value="ADMIN">ADMINISTRATEUR</option>
+                        <option value="USER">UTILISATEUR</option>
+                        <option value="OWNER">PROPRIÉTAIRE</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Mot de passe initial *</label>
+                    <div class="pw-wrap">
+                        <input type="password" name="password" id="create_pwd" class="form-control" required
+                               placeholder="Min 6 caractères" autocomplete="new-password">
+                        <button type="button" class="pw-eye" onclick="togglePwd('create_pwd','create_eye')">
+                            <i class="fa-solid fa-eye" id="create_eye"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('createModal')">Annuler</button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fa-solid fa-user-plus"></i> Créer le compte
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ─── Modal: Edit User ────────────────────────────── -->
+<div id="editModal" class="modal-overlay">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3>
+                <i class="fa-solid fa-user-pen" style="color:var(--primary);"></i>
+                Modifier le Compte
+            </h3>
+            <button class="modal-close-btn" onclick="closeModal('editModal')" title="Fermer">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <form id="editForm" method="POST" action="" autocomplete="off">
+            <div class="form-group">
+                <label class="form-label">Nom complet *</label>
+                <input type="text" name="name" id="edit_name" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Nom d'utilisateur *</label>
+                <input type="text" name="username" id="edit_username" class="form-control" required>
+            </div>
+            <div class="form-grid-2">
+                <div class="form-group">
+                    <label class="form-label">Matricule <small style="font-weight:400;color:#94A3B8;">(optionnel)</small></label>
+                    <input type="text" name="matricule" id="edit_matricule" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Équipe (Shift)</label>
+                    <select name="shift" id="edit_shift" class="form-control">
+                        <option value="A">Shift A</option>
+                        <option value="B">Shift B</option>
+                        <option value="C">Shift C</option>
+                        <option value="ALL">Tous les shifts</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Rôle *</label>
+                <select name="role" id="edit_role" class="form-control" required>
+                    <option value="TECHNICIAN">TECHNICIEN</option>
+                    <option value="ADMIN">ADMINISTRATEUR</option>
+                    <option value="USER">UTILISATEUR STANDARD</option>
+                    <option value="OWNER">PROPRIÉTAIRE (OWNER)</option>
+                </select>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('editModal')">Annuler</button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fa-solid fa-floppy-disk"></i> Enregistrer
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ─── Modal: Reset Password ───────────────────────── -->
+<div id="resetModal" class="modal-overlay">
+    <div class="modal-card sm">
+        <div class="modal-header">
+            <h3>
+                <i class="fa-solid fa-key" style="color:#D97706;"></i>
+                Réinitialiser le Mot de Passe
+            </h3>
+            <button class="modal-close-btn" onclick="closeModal('resetModal')" title="Fermer">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <div id="reset-user-label"
+             style="font-size:13px; color:var(--text-sec); margin-bottom:18px;
+                    background:#FEF3C7; border:1px solid #FDE68A; border-radius:8px; padding:10px 13px;"></div>
+
+        <form id="resetForm" method="POST" action="" autocomplete="off">
+            <div class="form-group">
+                <label class="form-label">Nouveau mot de passe *</label>
+                <div class="pw-wrap">
+                    <input type="password" name="new_password" id="reset_pwd" class="form-control" required
+                           placeholder="Min 6 caractères" autocomplete="new-password">
+                    <button type="button" class="pw-eye" onclick="togglePwd('reset_pwd','reset_eye')">
+                        <i class="fa-solid fa-eye" id="reset_eye"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('resetModal')">Annuler</button>
+                <button type="submit" class="btn btn-warning">
+                    <i class="fa-solid fa-lock-open"></i> Changer le mot de passe
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function openCreateModal() {
+    openModal('createModal');
+}
+function openModal(id) {
+    const el = document.getElementById(id);
+    el.classList.add('open');
+    document.body.style.overflow = 'hidden';
+    // Focus first input after animation
+    setTimeout(() => {
+        const first = el.querySelector('input:not([type=hidden])') || el.querySelector('select');
+        if (first) first.focus();
+    }, 100);
+}
+function closeModal(id) {
+    const el = document.getElementById(id);
+    el.classList.remove('open');
+    document.body.style.overflow = '';
+}
+// Close on backdrop click
+document.querySelectorAll('.modal-overlay').forEach(el => {
+    el.addEventListener('click', function(e) {
+        if (e.target === this) closeModal(this.id);
+    });
+});
+// Close on Escape key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        document.querySelectorAll('.modal-overlay.open').forEach(el => closeModal(el.id));
+    }
+});
+function openEditModal(id, name, username, matricule, role, shift) {
+    document.getElementById('editForm').action = `/admin/users/edit/${id}`;
+    document.getElementById('edit_name').value = name;
+    document.getElementById('edit_username').value = username;
+    document.getElementById('edit_matricule').value = matricule;
+    document.getElementById('edit_role').value = role;
+    document.getElementById('edit_shift').value = shift;
+    openModal('editModal');
+}
+function openResetModal(id, name, username) {
+    document.getElementById('resetForm').action = `/admin/users/reset-password/${id}`;
+    document.getElementById('reset-user-label').innerHTML =
+        `<i class="fa-solid fa-user" style="margin-right:6px;color:#D97706;"></i>Compte&nbsp;: <strong>${name}</strong> &nbsp;<code style="font-size:11px;background:#FDE68A;padding:2px 6px;border-radius:4px;">${username}</code>`;
+    openModal('resetModal');
+}
+function filterUsers() {
+    const q = document.getElementById('user-filter').value.toLowerCase();
+    document.querySelectorAll('.user-row').forEach(row => {
+        const txt = row.getAttribute('data-search') || '';
+        row.style.display = txt.includes(q) ? '' : 'none';
+    });
+}
+function togglePwd(inputId, iconId) {
+    const inp = document.getElementById(inputId);
+    const ico = document.getElementById(iconId);
+    if (inp.type === 'password') {
+        inp.type = 'text';
+        ico.classList.replace('fa-eye', 'fa-eye-slash');
+    } else {
+        inp.type = 'password';
+        ico.classList.replace('fa-eye-slash', 'fa-eye');
+    }
+}
+</script>
+{% endblock %}

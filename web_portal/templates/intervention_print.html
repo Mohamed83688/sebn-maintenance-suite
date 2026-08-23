@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Fiche d'Intervention {{ intervention.code }} — SEBN-TN</title>
+    <style>
+        @page { size: A4; margin: 15mm; }
+        body {
+            font-family: Arial, sans-serif;
+            color: #111;
+            background: #fff;
+            margin: 0; padding: 20px;
+            font-size: 13px; line-height: 1.5;
+        }
+        .header-box {
+            display: flex; justify-content: space-between; align-items: center;
+            border-bottom: 3px solid #0f172a;
+            padding-bottom: 12px; margin-bottom: 20px;
+        }
+        .logo-title h1 { margin: 0; font-size: 20px; color: #0f172a; text-transform: uppercase; }
+        .logo-title p { margin: 2px 0 0 0; font-size: 11px; color: #64748b; }
+        .code-badge {
+            font-size: 18px; font-weight: bold; font-family: monospace;
+            background: #f1f5f9; padding: 8px 16px; border-radius: 6px;
+            border: 1px solid #cbd5e1;
+        }
+        .section-header {
+            background: #0f172a; color: #fff;
+            font-size: 12px; font-weight: bold; text-transform: uppercase;
+            padding: 6px 10px; margin-top: 18px; margin-bottom: 10px;
+            letter-spacing: 1px;
+        }
+        table.grid-table {
+            width: 100%; border-collapse: collapse; margin-bottom: 15px;
+        }
+        table.grid-table td {
+            padding: 8px 10px; border: 1px solid #e2e8f0; font-size: 12px;
+        }
+        table.grid-table td.label {
+            background: #f8fafc; font-weight: bold; color: #475569; width: 25%;
+        }
+        .text-box {
+            border: 1px solid #cbd5e1; padding: 12px; min-height: 70px;
+            border-radius: 4px; background: #fafafa; font-size: 12px; white-space: pre-wrap;
+        }
+        .signatures {
+            display: flex; justify-content: space-between; margin-top: 40px;
+            padding-top: 20px; border-top: 1px dashed #cbd5e1;
+        }
+        .sig-box {
+            width: 45%; text-align: center; border: 1px solid #cbd5e1;
+            padding: 15px; border-radius: 6px; min-height: 80px;
+        }
+        .sig-box h4 { margin: 0 0 40px 0; font-size: 12px; color: #475569; }
+        @media print {
+            .no-print { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="no-print" style="margin-bottom: 20px; text-align: right;">
+        <button onclick="window.print()" style="padding: 10px 20px; font-weight: bold; background: #0f172a; color: #fff; border: none; border-radius: 4px; cursor: pointer;">
+            🖨️ Imprimer la Fiche
+        </button>
+    </div>
+
+    <div class="header-box">
+        <div class="logo-title">
+            <h1>SEBN-TN Maintenance</h1>
+            <p>Fiche d'Intervention Corrective & Curative</p>
+        </div>
+        <div class="code-badge">{{ intervention.code }}</div>
+    </div>
+
+    <div class="section-header">Informations Générales</div>
+    <table class="grid-table">
+        <tr>
+            <td class="label">Machine / Équipement</td>
+            <td>{{ intervention.machine_id }} — {{ intervention.machine_name or intervention.machine_id }}</td>
+            <td class="label">Groupe / Zone</td>
+            <td>{{ intervention.group_name or '—' }}</td>
+        </tr>
+        <tr>
+            <td class="label">Technicien Rédacteur</td>
+            <td>{{ intervention.technician_name }} ({{ intervention.technician_mat }})</td>
+            <td class="label">Statut</td>
+            <td><strong>{{ intervention.status }}</strong></td>
+        </tr>
+        <tr>
+            <td class="label">Code ASP / Défaut</td>
+            <td>{{ intervention.asp_code or intervention.code_asp or '—' }}</td>
+            <td class="label">Temps d'Arrêt Total</td>
+            <td>
+                {% if intervention.downtime_minutes %}
+                    <strong>{{ (intervention.downtime_minutes//60)|int }}h {{ (intervention.downtime_minutes%60)|int }}m</strong> ({{ intervention.downtime_minutes }} min)
+                {% else %}—{% endif %}
+            </td>
+        </tr>
+        <tr>
+            <td class="label">Date/Heure Début</td>
+            <td>{{ (intervention.start_time or '').replace('T',' ')[:16] }}</td>
+            <td class="label">Date/Heure Fin</td>
+            <td>{{ (intervention.end_time or '—').replace('T',' ')[:16] }}</td>
+        </tr>
+    </table>
+
+    <div class="section-header">Description de la Panne & Symptômes</div>
+    <div class="text-box">{{ intervention.fault_description or '—' }}</div>
+
+    <div class="section-header">Actions Réalisées / Remarques de Clôture</div>
+    <div class="text-box">{{ intervention.remarks or '—' }}</div>
+
+    <div class="signatures">
+        <div class="sig-box">
+            <h4>Signature Technicien Maintenance</h4>
+            <p style="margin:0; font-size:11px; color:#64748b;">{{ intervention.technician_name }}</p>
+        </div>
+        <div class="sig-box">
+            <h4>Signature / Validation Chef d'Équipe</h4>
+            <p style="margin:0; font-size:11px; color:#64748b;">Visa & Approbation</p>
+        </div>
+    </div>
+</body>
+</html>

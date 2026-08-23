@@ -1,0 +1,45 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.bak
+
+# Environments & Virtualenv
+.venv/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Environment Variables & Secrets
+.env
+*.key
+*.pem
+*.secret
+
+# SQLite Databases & Local Storage
+*.db
+*.sqlite
+*.sqlite3
+data/*.db
+data/documents/*
+data/Archives/*
+data/PPE_Filled/*
+data/EBM_uploads/*
+
+# Keep directory structure in git
+!data/**/.gitkeep
+
+# Operating System & IDE Files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+*.log.*
+logs/

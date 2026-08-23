@@ -1,0 +1,307 @@
+{% extends "base.html" %}
+
+{% block title %}EBM — Analyse Budgétaire Avancée — SEBN-TN{% endblock %}
+{% block page_title %}EBM — Analyse Budgétaire &amp; Projets (Owner){% endblock %}
+
+{% block extra_css %}
+<style>
+.chart-box-analytics {
+    position: relative;
+    height: 300px;
+    width: 100%;
+}
+.kpi-stat-card {
+    border-radius: 14px;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="animate-up">
+    <!-- Top Bar -->
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; margin-bottom:20px;">
+        <div style="display:flex; align-items:center; gap:8px;">
+            <a href="{{ url_for('ebm_dashboard') }}" class="btn btn-secondary btn-sm">
+                <i class="fa-solid fa-arrow-left"></i> Tableau de bord EBM
+            </a>
+            <span class="badge" style="background:#F5F3FF; color:#7C3AED; border:1px solid #DDD6FE; font-weight:700;">
+                <i class="fa-solid fa-chart-line"></i> ANALYTICS &amp; STATISTIQUES EBM
+            </span>
+        </div>
+        <div style="display:flex; gap:8px;">
+            <a href="{{ url_for('ebm_validation') }}" class="btn btn-secondary btn-sm">
+                <i class="fa-solid fa-clipboard-check"></i> Validation
+            </a>
+            <a href="{{ url_for('ebm_plan_action') }}" class="btn btn-secondary btn-sm">
+                <i class="fa-solid fa-list-check"></i> Plan d'Action
+            </a>
+        </div>
+    </div>
+
+    <!-- Analytics KPI Row -->
+    <div class="grid-4" style="margin-bottom:24px;">
+        <div class="card kpi-card">
+            <div class="kpi-icon" style="background:#ECFDF5; color:#059669;">
+                <i class="fa-solid fa-percent"></i>
+            </div>
+            <div class="kpi-data">
+                <div class="kpi-value" style="color:#059669;">
+                    {% if kpis.total_items > 0 %}
+                    {{ "%.1f"|format((kpis.validated_count / kpis.total_items) * 100) }}%
+                    {% else %}0.0%{% endif %}
+                </div>
+                <div class="kpi-label">Taux d'Approbation</div>
+                <div style="font-size:11px; color:var(--text-sec); margin-top:2px;">{{ kpis.validated_count }}/{{ kpis.total_items }} équipements</div>
+            </div>
+        </div>
+
+        <div class="card kpi-card">
+            <div class="kpi-icon" style="background:#EFF6FF; color:#2563EB;">
+                <i class="fa-solid fa-file-invoice-dollar"></i>
+            </div>
+            <div class="kpi-data">
+                <div class="kpi-value" style="color:#2563EB;">
+                    {{ "{:,.0f}".format(kpis.validated_amount) }} €
+                </div>
+                <div class="kpi-label">Budget Engagé</div>
+                <div style="font-size:11px; color:var(--text-sec); margin-top:2px;">Sur {{ "{:,.0f}".format(kpis.total_budget) }} € total</div>
+            </div>
+        </div>
+
+        <div class="card kpi-card">
+            <div class="kpi-icon" style="background:#FEF3C7; color:#D97706;">
+                <i class="fa-solid fa-clock-rotate-left"></i>
+            </div>
+            <div class="kpi-data">
+                <div class="kpi-value" style="color:#D97706;">
+                    {{ "{:,.0f}".format(kpis.pending_amount) }} €
+                </div>
+                <div class="kpi-label">En Arbitrage</div>
+                <div style="font-size:11px; color:var(--text-sec); margin-top:2px;">{{ kpis.pending_count }} items en cours</div>
+            </div>
+        </div>
+
+        <div class="card kpi-card">
+            <div class="kpi-icon" style="background:#F5F3FF; color:#7C3AED;">
+                <i class="fa-solid fa-calculator"></i>
+            </div>
+            <div class="kpi-data">
+                <div class="kpi-value" style="color:#7C3AED;">
+                    {% if kpis.total_items > 0 %}
+                    {{ "{:,.0f}".format(kpis.total_budget / kpis.total_items) }} €
+                    {% else %}0 €{% endif %}
+                </div>
+                <div class="kpi-label">Coût Moyen / Item</div>
+                <div style="font-size:11px; color:var(--text-sec); margin-top:2px;">Moyenne par équipement</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Grid -->
+    <div style="display:grid; grid-template-columns:1.5fr 1fr; gap:20px; margin-bottom:24px;">
+        <!-- Distribution par projet (Bar chart) -->
+        <div class="card">
+            <h3 style="font-size:15px; font-weight:700; color:var(--text); margin-bottom:14px; display:flex; align-items:center; gap:8px;">
+                <i class="fa-solid fa-chart-column" style="color:var(--primary);"></i>
+                Courbe &amp; Distribution Budgétaire par Projet EBM
+            </h3>
+            <div class="chart-box-analytics">
+                <canvas id="projectDistributionChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Répartition Statuts / Donut -->
+        <div class="card">
+            <h3 style="font-size:15px; font-weight:700; color:var(--text); margin-bottom:14px; display:flex; align-items:center; gap:8px;">
+                <i class="fa-solid fa-chart-pie" style="color:var(--primary);"></i>
+                Répartition Budgétaire (€) par Statut
+            </h3>
+            <div class="chart-box-analytics">
+                <canvas id="budgetStatusPieChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detailed Projects Table -->
+    <div class="card" style="padding:0; overflow:hidden;">
+        <div style="padding:16px 20px; border-bottom:1px solid var(--border); background:#FAFAFA; display:flex; justify-content:space-between; align-items:center;">
+            <div style="font-weight:700; font-size:14px; color:var(--text);">
+                <i class="fa-solid fa-list-check" style="color:var(--primary); margin-right:6px;"></i> 
+                Analyse &amp; Détail par Projet EBM ({{ kpis.projects_breakdown|length }} projets)
+            </div>
+            <input type="text" id="project-filter" placeholder="Filtrer projet..." class="form-control"
+                   style="max-width:220px; font-size:12px; padding:5px 12px;" onkeyup="filterProjectTable()">
+        </div>
+        <div style="overflow-x:auto;">
+            <table class="data-table" id="project-table">
+                <thead>
+                    <tr>
+                        <th style="width:50px; text-align:center;">#</th>
+                        <th>Nom / Code Projet</th>
+                        <th style="text-align:center;">Nombre d'Équipements</th>
+                        <th style="text-align:right;">Budget Total (€)</th>
+                        <th style="text-align:right;">% du Budget Global</th>
+                        <th style="text-align:right;">Barre Relative</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% set max_amt = kpis.projects_breakdown[0].amount if kpis.projects_breakdown else 1 %}
+                    {% for p in kpis.projects_breakdown %}
+                    {% set pct_global = (p.amount / kpis.total_budget * 100) if kpis.total_budget > 0 else 0 %}
+                    {% set bar_pct = (p.amount / max_amt * 100)|round(0)|int if max_amt > 0 else 0 %}
+                    <tr class="project-row" data-search="{{ p.project|lower }}">
+                        <td style="text-align:center; color:var(--text-sec); font-size:12px;">{{ loop.index }}</td>
+                        <td style="font-weight:700; color:var(--text);">{{ p.project }}</td>
+                        <td style="text-align:center;"><span class="badge badge-secondary">{{ p.count }}</span></td>
+                        <td style="text-align:right; font-weight:700; color:#1E3A8A;">{{ "{:,.2f}".format(p.amount) }} €</td>
+                        <td style="text-align:right; font-weight:600; color:#059669;">
+                            {{ "%.1f"|format(pct_global) }}%
+                        </td>
+                        <td style="text-align:right; min-width:140px;">
+                            <div style="display:flex; align-items:center; gap:8px; justify-content:flex-end;">
+                                <div style="flex:1; max-width:100px; height:6px; background:#F1F5F9; border-radius:10px; overflow:hidden;">
+                                    <div style="width:{{ bar_pct }}%; height:100%; background:var(--primary); border-radius:10px;"></div>
+                                </div>
+                                <span style="font-size:11px; color:var(--text-sec); min-width:30px;">{{ bar_pct }}%</span>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="6" style="text-align:center; color:var(--text-sec); padding:30px;">Aucune donnée de projet trouvée.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>
+const KPI_DATA = {
+    projects: {{ kpis.projects_breakdown | map(attribute='project') | list | tojson }},
+    amounts:  {{ kpis.projects_breakdown | map(attribute='amount') | list | tojson }},
+    counts:   {{ kpis.projects_breakdown | map(attribute='count') | list | tojson }},
+    valAmt:   {{ kpis.validated_amount }},
+    pendAmt:  {{ kpis.pending_amount }},
+    delivAmt: {{ kpis.delivered_amount }},
+    rejAmt:   {{ kpis.rejected_amount }}
+};
+
+Chart.defaults.font.family = "'Inter', sans-serif";
+Chart.defaults.font.size   = 11;
+Chart.defaults.color       = '#64748B';
+
+// 1. Project Distribution Chart (Combo Bar + Line)
+{
+    const ctx = document.getElementById('projectDistributionChart');
+    if (ctx) {
+        const topProjects = KPI_DATA.projects.slice(0, 10);
+        const topAmounts  = KPI_DATA.amounts.slice(0, 10);
+        const topCounts   = KPI_DATA.counts.slice(0, 10);
+
+        new Chart(ctx, {
+            data: {
+                labels: topProjects.map(p => p.length > 12 ? p.slice(0, 12) + '…' : p),
+                datasets: [
+                    {
+                        type: 'bar',
+                        label: 'Budget (€)',
+                        data: topAmounts,
+                        backgroundColor: 'rgba(46, 0, 139, 0.75)',
+                        borderColor: '#2E008B',
+                        borderWidth: 1,
+                        borderRadius: 6,
+                        yAxisID: 'y'
+                    },
+                    {
+                        type: 'line',
+                        label: 'Nb Équipements',
+                        data: topCounts,
+                        borderColor: '#10B981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        pointBackgroundColor: '#10B981',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        tension: 0.3,
+                        yAxisID: 'y1'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'top' },
+                    tooltip: {
+                        callbacks: {
+                            label: ctx => ctx.dataset.type === 'bar' 
+                                ? ` Budget: ${Number(ctx.parsed.y).toLocaleString('fr-FR')} €`
+                                : ` Équipements: ${ctx.parsed.y}`
+                        }
+                    }
+                },
+                scales: {
+                    x: { grid: { color: '#F1F5F9' } },
+                    y: {
+                        position: 'left',
+                        grid: { color: '#F1F5F9' },
+                        ticks: {
+                            callback: v => v >= 1000 ? (v/1000).toFixed(0) + 'k €' : v + ' €'
+                        }
+                    },
+                    y1: {
+                        position: 'right',
+                        grid: { drawOnChartArea: false },
+                        ticks: { precision: 0 }
+                    }
+                }
+            }
+        });
+    }
+}
+
+// 2. Budget Status Pie Chart
+{
+    const ctx = document.getElementById('budgetStatusPieChart');
+    if (ctx) {
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Validé (€)', 'En cours (€)', 'Livré (€)', 'Refusé (€)'],
+                datasets: [{
+                    data: [KPI_DATA.valAmt, KPI_DATA.pendAmt, KPI_DATA.delivAmt, KPI_DATA.rejAmt],
+                    backgroundColor: ['#10B981', '#F59E0B', '#3B82F6', '#EF4444'],
+                    borderWidth: 2,
+                    borderColor: '#fff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom', labels: { boxWidth: 12, padding: 12 } },
+                    tooltip: {
+                        callbacks: {
+                            label: ctx => ` ${ctx.label}: ${Number(ctx.parsed).toLocaleString('fr-FR')} €`
+                        }
+                    }
+                }
+            }
+        });
+    }
+}
+
+function filterProjectTable() {
+    const q = document.getElementById('project-filter').value.toLowerCase();
+    document.querySelectorAll('#project-table .project-row').forEach(row => {
+        const txt = row.getAttribute('data-search') || '';
+        row.style.display = txt.includes(q) ? '' : 'none';
+    });
+}
+</script>
+{% endblock %}

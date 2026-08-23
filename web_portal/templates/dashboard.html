@@ -1,0 +1,460 @@
+{% extends 'base.html' %}
+{% block title %}Tableau de bord — SEBN-TN Maintenance Management{% endblock %}
+{% block page_title %}Tableau de Bord Général{% endblock %}
+{% block page_subtitle %}Supervision en temps réel des opérations de maintenance (IMA &amp; PMA){% endblock %}
+
+{% block extra_css %}
+<style>
+/* ── WELCOME HERO BANNER ── */
+.welcome-banner {
+    background: linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 100%);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--primary);
+    border-radius: var(--radius);
+    padding: 22px 28px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: var(--shadow-sm);
+    gap: 20px;
+}
+
+.welcome-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--font-display);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--primary);
+    margin-bottom: 6px;
+}
+
+.welcome-title {
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--text);
+    letter-spacing: -0.5px;
+    line-height: 1.2;
+}
+
+.welcome-subtitle {
+    font-size: 13px;
+    color: var(--text-sec);
+    margin-top: 4px;
+}
+
+.welcome-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+.live-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    background: var(--success-bg);
+    border: 1px solid var(--success-border);
+    color: var(--success);
+    font-family: var(--font-display);
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.pulse-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--success);
+    box-shadow: 0 0 0 rgba(4, 120, 87, 0.4);
+    animation: pulse 1.8s infinite;
+}
+@keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(4, 120, 87, 0.4); }
+    70% { box-shadow: 0 0 0 6px rgba(4, 120, 87, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(4, 120, 87, 0); }
+}
+
+.kpi-card {
+    padding: 20px 22px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 126px;
+    transition: transform var(--transition), box-shadow var(--transition);
+}
+.kpi-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow);
+}
+
+.kpi-top { display: flex; align-items: flex-start; justify-content: space-between; }
+.kpi-icon-bg {
+    width: 42px; height: 42px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 17px;
+}
+.kpi-number {
+    font-family: var(--font-display);
+    font-size: 2rem;
+    font-weight: 900;
+    color: var(--text);
+    letter-spacing: -1px;
+    line-height: 1;
+}
+.kpi-name {
+    font-family: var(--font-display);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-sec);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    margin-top: 6px;
+}
+
+.chart-card { padding: 22px; }
+.chart-label { font-family: var(--font-display); font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 2px; }
+.chart-sub   { font-size: 12px; color: var(--text-sec); margin-bottom: 18px; }
+.chart-wrap  { height: 220px; position: relative; }
+
+.feed-list { display: flex; flex-direction: column; gap: 8px; }
+.feed-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 11px 14px;
+    background: #F8FAFC;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    transition: var(--transition-s);
+}
+.feed-item:hover { background: #FFFFFF; border-color: var(--primary-border); transform: translateX(2px); }
+.feed-avatar {
+    width: 34px; height: 34px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; flex-shrink: 0;
+}
+.feed-body { flex: 1; min-width: 0; }
+.feed-title { font-family: var(--font-display); font-size: 13px; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.feed-meta  { font-size: 11.5px; color: var(--text-sec); margin-top: 2px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- WELCOME BANNER -->
+<div class="welcome-banner animate-fade">
+    <div class="welcome-left">
+        <div class="welcome-badge">
+            <i class="fa-solid fa-industry"></i> Usine SEBN-TN &nbsp;·&nbsp; Supervision Globale
+        </div>
+        <h1 class="welcome-title">Bonjour, {{ name }}</h1>
+        <p class="welcome-subtitle">Vue globale des opérations de maintenance industrielle et des indicateurs de performance</p>
+    </div>
+    <div class="welcome-right">
+        <div class="live-pill">
+            <span class="pulse-dot"></span> Système Opérationnel
+        </div>
+        <div class="flex gap-2">
+            <a href="{{ url_for('intervention_form') }}" class="btn btn-primary btn-sm">
+                <i class="fa-solid fa-plus"></i> Nouvelle Déclaration
+            </a>
+            <a href="{{ url_for('pma_dashboard') }}" class="btn btn-secondary btn-sm">
+                <i class="fa-solid fa-calendar-check"></i> Planning PMA
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- IMA SECTION -->
+<div class="section-heading"><i class="fa-solid fa-bolt"></i> Maintenance Curative (IMA) <span></span></div>
+<div class="kpi-grid kpi-grid-4 stagger">
+
+    <div class="glass-card kpi-card accent-danger">
+        <div class="kpi-top">
+            <div>
+                <div class="kpi-number" data-count="{{ ima.open_interventions }}">0</div>
+                <div class="kpi-name">Interventions Ouvertes</div>
+                <span class="badge badge-danger mt-2">
+                    <i class="fa-solid fa-circle-dot"></i> En cours
+                </span>
+            </div>
+            <div class="kpi-icon-bg" style="background:var(--danger-bg); color:var(--danger);">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+        </div>
+    </div>
+
+    <div class="glass-card kpi-card accent-success">
+        <div class="kpi-top">
+            <div>
+                <div class="kpi-number" data-count="{{ ima.closed_interventions }}">0</div>
+                <div class="kpi-name">Interventions Clôturées</div>
+                <span class="badge badge-success mt-2">
+                    <i class="fa-solid fa-check"></i> Résolues
+                </span>
+            </div>
+            <div class="kpi-icon-bg" style="background:var(--success-bg); color:var(--success);">
+                <i class="fa-solid fa-circle-check"></i>
+            </div>
+        </div>
+    </div>
+
+    <div class="glass-card kpi-card accent-warning">
+        <div class="kpi-top">
+            <div>
+                <div class="kpi-number">{{ ima.total_downtime_hours|int }}h</div>
+                <div class="kpi-name">Temps d'Arrêt Cumulé</div>
+                <span class="badge badge-warning mt-2">
+                    <i class="fa-solid fa-clock"></i> Cumul
+                </span>
+            </div>
+            <div class="kpi-icon-bg" style="background:var(--warning-bg); color:var(--warning);">
+                <i class="fa-solid fa-clock"></i>
+            </div>
+        </div>
+    </div>
+
+    <div class="glass-card kpi-card accent-primary">
+        <div class="kpi-top">
+            <div>
+                <div class="kpi-number" data-count="{{ ima.total_interventions }}">0</div>
+                <div class="kpi-name">Total Déclarations IMA</div>
+                <span class="badge badge-primary mt-2">
+                    <i class="fa-solid fa-bolt"></i> Global
+                </span>
+            </div>
+            <div class="kpi-icon-bg" style="background:var(--primary-light); color:var(--primary);">
+                <i class="fa-solid fa-bolt"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- PMA SECTION -->
+<div class="section-heading"><i class="fa-solid fa-calendar-check"></i> Maintenance Préventive (PMA) <span></span></div>
+<div class="kpi-grid kpi-grid-4 stagger">
+
+    <div class="glass-card kpi-card accent-info">
+        <div class="kpi-top">
+            <div>
+                <div class="kpi-number" data-count="{{ pma.total }}">0</div>
+                <div class="kpi-name">Tâches Planifiées</div>
+                <span class="badge badge-info mt-2">
+                    <i class="fa-solid fa-list-check"></i> Planifié
+                </span>
+            </div>
+            <div class="kpi-icon-bg" style="background:var(--info-bg); color:var(--info);">
+                <i class="fa-solid fa-list-check"></i>
+            </div>
+        </div>
+    </div>
+
+    <div class="glass-card kpi-card accent-success">
+        <div class="kpi-top">
+            <div>
+                <div class="kpi-number" data-count="{{ pma.done }}">0</div>
+                <div class="kpi-name">Tâches Complétées</div>
+                <span class="badge badge-success mt-2">
+                    <i class="fa-solid fa-check-double"></i> Exécutées
+                </span>
+            </div>
+            <div class="kpi-icon-bg" style="background:var(--success-bg); color:var(--success);">
+                <i class="fa-solid fa-check-double"></i>
+            </div>
+        </div>
+    </div>
+
+    <div class="glass-card kpi-card accent-warning">
+        <div class="kpi-top">
+            <div>
+                <div class="kpi-number" data-count="{{ pma.pending }}">0</div>
+                <div class="kpi-name">Tâches En Attente</div>
+                <span class="badge badge-warning mt-2">
+                    <i class="fa-solid fa-hourglass-half"></i> À faire
+                </span>
+            </div>
+            <div class="kpi-icon-bg" style="background:var(--warning-bg); color:var(--warning);">
+                <i class="fa-solid fa-hourglass-half"></i>
+            </div>
+        </div>
+    </div>
+
+    <div class="glass-card kpi-card accent-primary">
+        <div class="kpi-top">
+            <div>
+                <div class="kpi-number">{{ pma.rate }}%</div>
+                <div class="kpi-name">Taux de Réalisation</div>
+                <span class="badge badge-primary mt-2">
+                    <i class="fa-solid fa-chart-pie"></i> KPI
+                </span>
+            </div>
+            <div class="kpi-icon-bg" style="background:var(--primary-light); color:var(--primary);">
+                <i class="fa-solid fa-chart-pie"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- CHARTS ROW -->
+<div class="grid-2 mt-6">
+    <div class="glass-card chart-card animate-up">
+        <div class="chart-label">Interventions Curatives par Mois</div>
+        <div class="chart-sub">Historique IMA des déclarations et résolutions</div>
+        <div class="chart-wrap"><canvas id="imaBarChart"></canvas></div>
+    </div>
+    <div class="glass-card chart-card animate-up" style="animation-delay:0.05s;">
+        <div class="chart-label">Taux de Complétion Préventive</div>
+        <div class="chart-sub">Progression mensuelle du planning de maintenance PMA</div>
+        <div class="chart-wrap"><canvas id="pmaLineChart"></canvas></div>
+    </div>
+</div>
+
+<!-- ACTIVITY FEEDS -->
+<div class="grid-2 mt-6">
+    <div class="glass-card animate-up" style="animation-delay:0.1s; padding:22px;">
+        <div class="flex items-center justify-between mb-4">
+            <div class="chart-label" style="margin:0;">Activité IMA Récente</div>
+            <a href="{{ url_for('interventions') }}" class="btn btn-secondary btn-xs">Voir tout <i class="fa-solid fa-arrow-right"></i></a>
+        </div>
+        <div class="feed-list">
+            {% for item in ima.recent[:5] %}
+            <div class="feed-item">
+                <div class="feed-avatar" style="background:{% if item.status=='OPEN' %}var(--danger-bg){% else %}var(--success-bg){% endif %}; color:{% if item.status=='OPEN' %}var(--danger){% else %}var(--success){% endif %};">
+                    <i class="fa-solid fa-bolt"></i>
+                </div>
+                <div class="feed-body">
+                    <div class="feed-title">{{ item.machine_name or item.machine_id }}</div>
+                    <div class="feed-meta"><span class="td-mono">{{ item.code }}</span> &nbsp;·&nbsp; {{ item.fault_type or 'Autre anomalie' }}</div>
+                </div>
+                <span class="badge {% if item.status=='OPEN' %}badge-danger{% else %}badge-success{% endif %}">
+                    {{ item.status }}
+                </span>
+            </div>
+            {% else %}
+            <div class="empty-state" style="padding:24px;">
+                <i class="fa-solid fa-inbox empty-icon"></i>
+                <div class="empty-title">Aucune activité récente</div>
+                <div class="empty-desc">Toutes les interventions déclarées sont à jour.</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="glass-card animate-up" style="animation-delay:0.15s; padding:22px;">
+        <div class="flex items-center justify-between mb-4">
+            <div class="chart-label" style="margin:0;">Résumé du Planning PMA</div>
+            <a href="{{ url_for('pma_dashboard') }}" class="btn btn-secondary btn-xs">Planning <i class="fa-solid fa-arrow-right"></i></a>
+        </div>
+        <div>
+            <!-- Progress summary -->
+            <div style="margin-bottom: 18px;">
+                <div class="flex justify-between" style="margin-bottom:8px;">
+                    <span style="font-family:var(--font-display); font-size:12px; color:var(--text-sec); font-weight:600;">Avancement global annuel</span>
+                    <span style="font-family:var(--font-display); font-size:13px; font-weight:800; color:var(--success);">{{ pma.rate }}%</span>
+                </div>
+                <div style="height:8px; background:var(--bg-page); border-radius:4px; overflow:hidden; border:1px solid var(--border);">
+                    <div style="height:100%; width:{{ pma.rate }}%; background:linear-gradient(90deg, var(--primary), var(--success)); border-radius:4px; transition:width 0.8s ease;"></div>
+                </div>
+            </div>
+
+            {% for td in pma.type_data.items() %}
+            <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--border);">
+                <span style="font-size:13px; font-weight:500; color:var(--text-sec);">{{ td[0] }}</span>
+                <span style="font-family:var(--font-display); font-size:13px; font-weight:700; color:var(--text);">{{ td[1] }} tâches</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const imaData = {{ ima.by_month | tojson | safe }};
+const pmaData = {{ pma.monthly_data | tojson | safe }};
+
+// IMA Bar Chart
+const imaSlice = imaData.slice(-6);
+if (imaSlice.length && document.getElementById('imaBarChart')) {
+    new Chart(document.getElementById('imaBarChart'), {
+        type: 'bar',
+        data: {
+            labels: imaSlice.map(d => d.month),
+            datasets: [{
+                label: 'Interventions',
+                data: imaSlice.map(d => d.count),
+                backgroundColor: '#2E008B',
+                hoverBackgroundColor: '#4314A0',
+                borderRadius: 5,
+                borderSkipped: false,
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: '#0F172A',
+                    titleFont: { family: "'Montserrat', sans-serif", weight: '700' },
+                    bodyFont: { family: "'Inter', sans-serif" },
+                    padding: 10,
+                    cornerRadius: 6
+                }
+            },
+            scales: {
+                x: { grid: { color: CHART_COLORS.grid }, ticks: { color: CHART_COLORS.tick, font: { family: "'Montserrat', sans-serif", weight: '600' } } },
+                y: { grid: { color: CHART_COLORS.grid }, ticks: { color: CHART_COLORS.tick }, beginAtZero: true }
+            }
+        }
+    });
+}
+
+// PMA Line Chart
+const pmaSlice = pmaData.slice(-6);
+if (pmaSlice.length && document.getElementById('pmaLineChart')) {
+    new Chart(document.getElementById('pmaLineChart'), {
+        type: 'line',
+        data: {
+            labels: pmaSlice.map(d => d.month),
+            datasets: [{
+                label: 'Taux (%)',
+                data: pmaSlice.map(d => d.rate),
+                borderColor: '#047857',
+                backgroundColor: (ctx) => {
+                    const g = ctx.chart.ctx.createLinearGradient(0,0,0,200);
+                    g.addColorStop(0, 'rgba(4, 120, 87, 0.2)');
+                    g.addColorStop(1, 'rgba(4, 120, 87, 0)');
+                    return g;
+                },
+                fill: true, tension: 0.35, borderWidth: 2.5,
+                pointBackgroundColor: '#047857', pointBorderColor: '#FFFFFF', pointBorderWidth: 2, pointRadius: 4.5
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: '#0F172A',
+                    titleFont: { family: "'Montserrat', sans-serif", weight: '700' },
+                    bodyFont: { family: "'Inter', sans-serif" },
+                    padding: 10,
+                    cornerRadius: 6
+                }
+            },
+            scales: {
+                x: { grid: { color: CHART_COLORS.grid }, ticks: { color: CHART_COLORS.tick, font: { family: "'Montserrat', sans-serif", weight: '600' } } },
+                y: { grid: { color: CHART_COLORS.grid }, ticks: { color: CHART_COLORS.tick }, min: 0, max: 100 }
+            }
+        }
+    });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+
+{% block title %}EBM — Plan d'Action — SEBN-TN{% endblock %}
+{% block page_title %}EBM — Plan d'Action &amp; Suivi des Tâches (Owner){% endblock %}
+
+{% block content %}
+<div class="animate-up">
+    <!-- Top Bar -->
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; margin-bottom:20px;">
+        <div style="display:flex; align-items:center; gap:8px;">
+            <a href="{{ url_for('ebm_dashboard') }}" class="btn btn-secondary btn-sm">
+                <i class="fa-solid fa-arrow-left"></i> Tableau de bord EBM
+            </a>
+            <span class="badge" style="background:#EFF6FF; color:#2563EB; border:1px solid #BFDBFE; font-weight:700;">
+                <i class="fa-solid fa-list-check"></i> PLAN D'ACTION EBM
+            </span>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="openPlanModal()">
+            <i class="fa-solid fa-plus"></i> Nouvelle Action
+        </button>
+    </div>
+
+    <!-- Action Plans Grid / List -->
+    <div class="card" style="padding:0; overflow:hidden;">
+        <div style="overflow-x:auto;">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th style="width:40px; text-align:center;">#</th>
+                        <th>Action / Tâche</th>
+                        <th>Responsable</th>
+                        <th>Échéance</th>
+                        <th>Priorité</th>
+                        <th>Statut</th>
+                        <th style="text-align:right; width:120px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for plan in plans %}
+                    <tr>
+                        <td style="text-align:center; color:var(--text-sec);">{{ plan.id }}</td>
+                        <td>
+                            <div style="font-weight:700; color:var(--text);">{{ plan.title }}</div>
+                            <div style="font-size:12px; color:var(--text-sec);">{{ plan.description }}</div>
+                        </td>
+                        <td><span class="badge badge-secondary">{{ plan.responsible or 'Non assigné' }}</span></td>
+                        <td><i class="fa-regular fa-calendar" style="color:var(--text-sec); margin-right:4px;"></i> {{ plan.due_date or '–' }}</td>
+                        <td>
+                            {% if plan.priority == 'High' %}<span class="badge badge-danger">Haute</span>
+                            {% elif plan.priority == 'Low' %}<span class="badge badge-secondary">Basse</span>
+                            {% else %}<span class="badge badge-warning">Moyenne</span>{% endif %}
+                        </td>
+                        <td>
+                            {% if plan.status == 'Completed' %}
+                            <span class="badge badge-success"><i class="fa-solid fa-check"></i> Clôturée</span>
+                            {% else %}
+                            <span class="badge badge-warning"><i class="fa-solid fa-clock"></i> En cours</span>
+                            {% endif %}
+                        </td>
+                        <td style="text-align:right;">
+                            <div style="display:flex; justify-content:flex-end; gap:6px;">
+                                <form method="POST" action="{{ url_for('ebm_plan_action_toggle', plan_id=plan.id) }}" style="display:inline;">
+                                    <button type="submit" class="btn btn-secondary btn-xs" title="Changer statut">
+                                        <i class="fa-solid fa-rotate"></i>
+                                    </button>
+                                </form>
+                                <form method="POST" action="{{ url_for('ebm_plan_action_delete', plan_id=plan.id) }}" style="display:inline;" onsubmit="return confirm('Supprimer cette action ?');">
+                                    <button type="submit" class="btn btn-danger btn-xs" title="Supprimer">
+                                        <i class="fa-solid fa-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="7" style="text-align:center; color:var(--text-sec); padding:30px;">Aucun plan d'action enregistré.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Add Action Plan -->
+<div id="planModal" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center;">
+    <div class="card animate-scale" style="width:100%; max-width:480px; margin:20px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+            <h3 style="font-size:16px; font-weight:700; color:var(--text); margin:0;">
+                <i class="fa-solid fa-plus" style="color:var(--primary); margin-right:8px;"></i> Nouvelle Action EBM
+            </h3>
+            <button class="btn btn-secondary btn-xs" onclick="closePlanModal()"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <form method="POST" action="{{ url_for('ebm_plan_action_add') }}">
+            <div class="form-group">
+                <label class="form-label">Titre de l'action *</label>
+                <input type="text" name="title" class="form-control" required placeholder="Ex: Relancer fournisseur pour machine KSM">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Description détaillée</label>
+                <textarea name="description" class="form-control" rows="3" placeholder="Détails de l'action à mener..."></textarea>
+            </div>
+            <div class="grid-2">
+                <div class="form-group">
+                    <label class="form-label">Responsable</label>
+                    <input type="text" name="responsible" class="form-control" placeholder="Ex: Mohamed Issaoui">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Date d'échéance</label>
+                    <input type="date" name="due_date" class="form-control">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Priorité</label>
+                <select name="priority" class="form-control">
+                    <option value="Medium">Moyenne</option>
+                    <option value="High">Haute</option>
+                    <option value="Low">Basse</option>
+                </select>
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:20px;">
+                <button type="button" class="btn btn-secondary" onclick="closePlanModal()">Annuler</button>
+                <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check"></i> Enregistrer</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function openPlanModal() {
+    document.getElementById('planModal').style.display = 'flex';
+}
+function closePlanModal() {
+    document.getElementById('planModal').style.display = 'none';
+}
+</script>
+{% endblock %}

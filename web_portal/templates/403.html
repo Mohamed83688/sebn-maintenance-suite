@@ -1,0 +1,101 @@
+{% extends 'base.html' %}
+{% block title %}Accès Refusé — SEBN-TN{% endblock %}
+{% block page_title %}Accès Refusé{% endblock %}
+{% block page_subtitle %}Erreur 403 — Privilèges insuffisants{% endblock %}
+
+{% block extra_css %}
+<style>
+.access-denied-container {
+    max-width: 600px;
+    margin: 60px auto;
+    text-align: center;
+    background: var(--bg-card);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: var(--radius-lg);
+    padding: 48px 36px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35), 0 0 60px rgba(239, 68, 68, 0.06);
+    animation: scaleIn 0.3s ease;
+}
+.denied-icon {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 24px;
+    border-radius: 50%;
+    background: rgba(239, 68, 68, 0.12);
+    border: 2px solid rgba(239, 68, 68, 0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 36px;
+    color: var(--danger);
+    animation: pulse 2.5s infinite;
+}
+@keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.3); }
+    50%       { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+}
+.denied-badge {
+    display: inline-block;
+    background: rgba(239, 68, 68, 0.12);
+    color: var(--danger);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    padding: 4px 12px;
+    border-radius: 20px;
+    border: 1px solid rgba(239, 68, 68, 0.25);
+    margin-bottom: 16px;
+}
+.denied-title {
+    font-size: 26px;
+    font-weight: 900;
+    color: var(--text);
+    margin-bottom: 12px;
+    line-height: 1.2;
+}
+.denied-message {
+    font-size: 14px;
+    color: var(--text-sec);
+    line-height: 1.7;
+    margin-bottom: 32px;
+    max-width: 420px;
+    margin-left: auto;
+    margin-right: auto;
+}
+.denied-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+.denied-actions .btn {
+    min-width: 180px;
+    justify-content: center;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="access-denied-container">
+    <div class="denied-icon">
+        <i class="fa-solid fa-user-shield"></i>
+    </div>
+    <div class="denied-badge">Erreur 403</div>
+    <div class="denied-title">Accès Refusé</div>
+    <div class="denied-message">
+        Vous n'avez pas les autorisations nécessaires pour accéder à cette page.<br>
+        Cette fonctionnalité est réservée aux <strong>Administrateurs</strong>.
+        <br><br>
+        Si vous pensez qu'il s'agit d'une erreur, contactez votre responsable.
+    </div>
+    <div class="denied-actions">
+        <a href="{{ url_for('pma_dashboard') }}" class="btn btn-primary">
+            <i class="fa-solid fa-calendar-check"></i> Planning Préventif
+        </a>
+        <a href="{{ url_for('interventions') }}" class="btn btn-glass">
+            <i class="fa-solid fa-bolt"></i> Mes Interventions
+        </a>
+    </div>
+</div>
+{% endblock %}

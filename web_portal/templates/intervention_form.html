@@ -1,0 +1,245 @@
+{% extends 'base.html' %}
+{% block title %}Nouvelle Intervention — SEBN-TN Enterprise Maintenance{% endblock %}
+{% block page_title %}Déclarer une Panne (IMA){% endblock %}
+{% block page_subtitle %}Enregistrement d'une nouvelle intervention corrective sur un équipement{% endblock %}
+
+{% block extra_css %}
+<style>
+.form-card {
+    background: #FFFFFF;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px;
+    max-width: 840px;
+    box-shadow: var(--shadow-sm);
+}
+.form-section-title {
+    font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 1px;
+    color: var(--text-sec); margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 8px;
+}
+.form-section-title i { color: var(--primary); }
+
+.fault-type-grid { display: grid; grid-template-columns: repeat(5,1fr); gap: 8px; }
+.fault-type-btn {
+    padding: 10px 8px; border-radius: var(--radius-sm);
+    border: 1px solid #CBD5E1;
+    background: #FFFFFF;
+    color: var(--text-sec); font-size: 11px; font-weight: 700;
+    cursor: pointer; text-align: center; transition: var(--transition-s);
+    font-family: inherit;
+}
+.fault-type-btn:hover { border-color: var(--border-h); color: var(--text); background: var(--bg-page); }
+.fault-type-btn.active {
+    border-color: var(--primary);
+    background: var(--primary-light);
+    color: var(--primary);
+}
+.fault-type-btn i { display: block; font-size: 15px; margin-bottom: 4px; }
+
+.readonly-field {
+    background: var(--bg-page) !important;
+    color: var(--text-sec) !important;
+    cursor: not-allowed;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="form-card animate-up">
+    <form method="POST" action="{{ url_for('intervention_form') }}">
+        <!-- Machine Section -->
+        <div class="form-section-title">
+            <i class="fa-solid fa-industry"></i> Machine &amp; Localisation
+        </div>
+        <div class="grid-2" style="margin-bottom:18px;">
+            <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label">Groupe / Zone</label>
+                <div class="input-with-icon">
+                    <i class="input-icon fa-solid fa-layer-group"></i>
+                    <select name="group_name" id="group-select" class="form-control" required>
+                        <option value="">Sélectionner un groupe...</option>
+                        {% for g in groups %}
+                        <option value="{{ g }}">{{ g }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label">Machine</label>
+                <div class="input-with-icon">
+                    <i class="input-icon fa-solid fa-microchip"></i>
+                    <select name="machine_id" id="machine-select" class="form-control" required disabled>
+                        <option value="">Sélectionnez d'abord un groupe</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Fault Type -->
+        <div class="form-section-title" style="margin-top:20px;">
+            <i class="fa-solid fa-triangle-exclamation"></i> Type de Défaillance
+        </div>
+        <input type="hidden" name="fault_type" id="fault_type_input" value="">
+        <div class="fault-type-grid" style="margin-bottom:18px;">
+            <button type="button" class="fault-type-btn" onclick="selectFault('Électrique',this)">
+                <i class="fa-solid fa-bolt"></i>Électrique
+            </button>
+            <button type="button" class="fault-type-btn" onclick="selectFault('Mécanique',this)">
+                <i class="fa-solid fa-gears"></i>Mécanique
+            </button>
+            <button type="button" class="fault-type-btn" onclick="selectFault('Pneumatique',this)">
+                <i class="fa-solid fa-wind"></i>Pneumatique
+            </button>
+            <button type="button" class="fault-type-btn" onclick="selectFault('Hydraulique',this)">
+                <i class="fa-solid fa-droplet"></i>Hydraulique
+            </button>
+            <button type="button" class="fault-type-btn" onclick="selectFault('Autre',this)">
+                <i class="fa-solid fa-circle-question"></i>Autre
+            </button>
+        </div>
+
+        <!-- Description -->
+        <div class="form-group">
+            <label class="form-label">Description de la Panne</label>
+            <div class="input-with-icon">
+                <i class="input-icon fa-solid fa-align-left" style="top:14px; transform:none;"></i>
+                <textarea name="fault_description" class="form-control" rows="4"
+                          style="padding-left:36px;"
+                          placeholder="Décrivez le problème constaté (symptômes, zone affectée, impact...)" required></textarea>
+            </div>
+        </div>
+
+        <!-- Code ASP -->
+        <div class="form-group">
+            <label class="form-label">Code ASP (Optionnel)</label>
+            <div class="input-with-icon">
+                <i class="input-icon fa-solid fa-tag"></i>
+                <select name="asp_code" class="form-control">
+                    <option value="">Aucun code ASP</option>
+                    {% for c in asp_codes %}
+                    <option value="{{ c.code }}">{{ c.code }} — {{ c.description }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <!-- Technician & Time -->
+        <div class="form-section-title" style="margin-top:20px;">
+            <i class="fa-solid fa-user-gear"></i> Technicien &amp; Timing
+        </div>
+        <div class="grid-2">
+            <div class="form-group">
+                <label class="form-label">Technicien</label>
+                <div class="input-with-icon">
+                    <i class="input-icon fa-solid fa-user"></i>
+                    <input type="text" name="technician_name" class="form-control {% if role != 'admin' %}readonly-field{% endif %}"
+                           value="{{ session.get('name','') }}" {% if role != 'admin' %}readonly{% endif %} required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Matricule</label>
+                <div class="input-with-icon">
+                    <i class="input-icon fa-solid fa-id-card"></i>
+                    <input type="text" name="technician_mat" class="form-control {% if role != 'admin' %}readonly-field{% endif %}"
+                           value="{{ session.get('matricule','') }}" {% if role != 'admin' %}readonly{% endif %} required>
+                </div>
+            </div>
+        </div>
+        <div class="grid-2">
+            <div class="form-group">
+                <label class="form-label">Date &amp; Heure Début</label>
+                <div class="input-with-icon">
+                    <i class="input-icon fa-solid fa-clock"></i>
+                    <input type="datetime-local" name="start_time" class="form-control" value="{{ now }}" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Date &amp; Heure Fin (si déjà résolu)</label>
+                <div class="input-with-icon">
+                    <i class="input-icon fa-solid fa-flag-checkered"></i>
+                    <input type="datetime-local" name="end_time" class="form-control">
+                </div>
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex justify-between items-center" style="margin-top:20px; padding-top:16px; border-top:1px solid var(--border);">
+            <a href="{{ url_for('interventions') }}" class="btn btn-secondary">
+                <i class="fa-solid fa-arrow-left"></i> Annuler
+            </a>
+            <button type="submit" class="btn btn-danger btn-lg">
+                <i class="fa-solid fa-bolt"></i> Enregistrer l'Intervention
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function selectFault(type, btn) {
+    document.querySelectorAll('.fault-type-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('fault_type_input').value = type;
+}
+
+const groupSelect = document.getElementById('group-select');
+const machineSelect = document.getElementById('machine-select');
+const preselectedMachine = "{{ form_data.get('machine_id', '') }}";
+
+async function loadMachinesForGroup(grp, targetMachine = '') {
+    if (!grp) {
+        machineSelect.innerHTML = '<option value="">Choisissez d\'abord un groupe</option>';
+        machineSelect.disabled = true;
+        return;
+    }
+
+    machineSelect.innerHTML = '<option value="">Chargement des machines...</option>';
+    machineSelect.disabled = true;
+
+    try {
+        const res = await fetch(`{{ url_for('api_machines_by_group') }}?group=${encodeURIComponent(grp)}`);
+        if (!res.ok) {
+            throw new Error(`HTTP ${res.status}`);
+        }
+        const machines = await res.json();
+        
+        if (!Array.isArray(machines) || machines.length === 0) {
+            machineSelect.innerHTML = '<option value="">Aucune machine disponible pour ce groupe</option>';
+            machineSelect.disabled = true;
+            return;
+        }
+
+        machineSelect.innerHTML = '<option value="">Choisir une machine...</option>';
+        machines.forEach(m => {
+            const opt = document.createElement('option');
+            opt.value = m.machine_id;
+            const hasName = m.machine_name && m.machine_name !== m.machine_id && m.machine_name.trim() !== '';
+            opt.textContent = hasName ? `${m.machine_id} — ${m.machine_name}` : m.machine_id;
+            if (targetMachine && m.machine_id === targetMachine) {
+                opt.selected = true;
+            }
+            machineSelect.appendChild(opt);
+        });
+        machineSelect.disabled = false;
+    } catch (err) {
+        console.error('Erreur de chargement des machines:', err);
+        machineSelect.innerHTML = '<option value="">Impossible de charger les machines</option>';
+        machineSelect.disabled = true;
+    }
+}
+
+groupSelect.addEventListener('change', function() {
+    loadMachinesForGroup(this.value.trim());
+});
+
+// Auto-load if group is preselected
+if (groupSelect.value.trim()) {
+    loadMachinesForGroup(groupSelect.value.trim(), preselectedMachine);
+}
+</script>
+{% endblock %}

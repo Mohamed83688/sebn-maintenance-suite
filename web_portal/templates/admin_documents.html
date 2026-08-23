@@ -1,0 +1,556 @@
+{% extends "base.html" %}
+{% block title %}Gestion Documents — Administration SEBN-TN{% endblock %}
+{% block page_title %}Gestion des Documents{% endblock %}
+{% block page_subtitle %}Bibliothèque documentaire — Administration{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ── Admin Documents Styles ──────────────────────────── */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15,23,42,0.55);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: 9999;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    animation: overlayIn 0.2s ease;
+}
+@keyframes overlayIn { from { opacity:0; } to { opacity:1; } }
+.modal-overlay.open { display: flex; }
+
+.modal-card {
+    background: #FFFFFF;
+    border-radius: 16px;
+    box-shadow: 0 8px 32px -4px rgba(15,23,42,0.18), 0 24px 64px -8px rgba(15,23,42,0.12);
+    width: 100%;
+    max-width: 520px;
+    padding: 28px 28px 24px;
+    animation: modalIn 0.25s cubic-bezier(0.16,1,0.3,1);
+    margin: auto;
+}
+@keyframes modalIn {
+    from { opacity:0; transform:translateY(16px) scale(0.97); }
+    to   { opacity:1; transform:translateY(0) scale(1); }
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 22px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #F1F5F9;
+}
+.modal-header h3 {
+    font-size: 16px;
+    font-weight: 700;
+    color: #0F172A;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+}
+.modal-close-btn {
+    width: 30px; height: 30px;
+    border-radius: 8px;
+    background: #F1F5F9;
+    border: none;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    color: #64748B;
+    font-size: 13px;
+    transition: background 0.15s, color 0.15s;
+}
+.modal-close-btn:hover { background: #E2E8F0; color: #0F172A; }
+.modal-footer {
+    display: flex; justify-content: flex-end; gap: 10px;
+    margin-top: 24px; padding-top: 18px;
+    border-top: 1px solid #F1F5F9;
+}
+
+/* File drop zone */
+.drop-zone {
+    border: 2px dashed var(--border, #E2E8F0);
+    border-radius: 12px;
+    padding: 28px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: #F8FAFC;
+}
+.drop-zone:hover, .drop-zone.drag-over {
+    border-color: var(--primary, #2E008B);
+    background: #F5F3FF;
+}
+.drop-zone input[type=file] {
+    display: none;
+}
+.drop-zone-label {
+    font-size: 13px;
+    color: var(--text-sec, #64748B);
+    margin-top: 8px;
+}
+.drop-zone-icon { font-size: 32px; color: var(--primary, #2E008B); opacity: 0.5; }
+
+/* Status badge helpers */
+.status-active   { background:#ECFDF5; color:#059669; border:1px solid #BBF7D0; }
+.status-inactive { background:#F8FAFC; color:#94A3B8; border:1px solid #E2E8F0; }
+
+/* Table action buttons */
+.tbl-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px; height: 30px;
+    border-radius: 7px;
+    border: 1px solid var(--border, #E2E8F0);
+    background: var(--bg-card, #FFFFFF);
+    color: var(--text-sec, #64748B);
+    font-size: 12px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.15s;
+}
+.tbl-action:hover { background: #F1F5F9; color: #0F172A; }
+.tbl-action.danger:hover { background: #FEF2F2; color: #EF4444; border-color: #FECDD3; }
+.tbl-action.success:hover { background: #ECFDF5; color: #059669; border-color: #BBF7D0; }
+
+/* Sort order input */
+.order-input {
+    width: 56px;
+    padding: 4px 6px;
+    border: 1px solid var(--border, #E2E8F0);
+    border-radius: 6px;
+    font-size: 12px;
+    text-align: center;
+    background: #F8FAFC;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="animate-up">
+
+    <!-- Header -->
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:24px;">
+        <div>
+            <p style="font-size:13px; color:var(--text-sec);">
+                {{ docs|length }} document(s) enregistré(s) ·
+                {{ docs|selectattr('is_active','equalto',1)|list|length }} actif(s)
+            </p>
+        </div>
+        <div style="display:flex; gap:8px;">
+            <a href="{{ url_for('documents_page') }}" class="btn btn-secondary btn-sm">
+                <i class="fa-solid fa-eye"></i> Voir page Documents
+            </a>
+            <button class="btn btn-primary btn-sm" onclick="openModal('addModal')">
+                <i class="fa-solid fa-plus"></i> Ajouter un document
+            </button>
+        </div>
+    </div>
+
+    <!-- KPI row -->
+    <div class="grid-4" style="margin-bottom:24px;">
+        <div class="card kpi-card">
+            <div class="kpi-icon" style="background:#EFF6FF; color:#2563EB;">
+                <i class="fa-solid fa-folder-open"></i>
+            </div>
+            <div class="kpi-data">
+                <div class="kpi-value">{{ docs|length }}</div>
+                <div class="kpi-label">Documents enregistrés</div>
+            </div>
+        </div>
+        <div class="card kpi-card">
+            <div class="kpi-icon" style="background:#ECFDF5; color:#059669;">
+                <i class="fa-solid fa-circle-check"></i>
+            </div>
+            <div class="kpi-data">
+                <div class="kpi-value">{{ docs|selectattr('is_active','equalto',1)|list|length }}</div>
+                <div class="kpi-label">Actifs (visibles)</div>
+            </div>
+        </div>
+        <div class="card kpi-card">
+            <div class="kpi-icon" style="background:#FEE2E2; color:#DC2626;">
+                <i class="fa-solid fa-file-circle-xmark"></i>
+            </div>
+            <div class="kpi-data">
+                <div class="kpi-value">{{ docs|selectattr('file_exists','equalto',false)|list|length }}</div>
+                <div class="kpi-label">Fichiers manquants</div>
+            </div>
+        </div>
+        <div class="card kpi-card">
+            <div class="kpi-icon" style="background:#F5F3FF; color:#7C3AED;">
+                <i class="fa-solid fa-database"></i>
+            </div>
+            <div class="kpi-data">
+                <div class="kpi-value">
+                    {% set total_kb = docs|sum(attribute='file_size_kb') %}
+                    {% if total_kb > 1024 %}
+                        {{ "%.1f"|format(total_kb/1024) }} Mo
+                    {% else %}
+                        {{ "%.0f"|format(total_kb) }} Ko
+                    {% endif %}
+                </div>
+                <div class="kpi-label">Espace total utilisé</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Documents Table -->
+    <div class="card" style="padding:0; overflow:hidden;">
+        <div style="padding:16px 20px; border-bottom:1px solid var(--border); background:#FAFAFA;
+                    display:flex; justify-content:space-between; align-items:center;">
+            <div style="font-weight:600; font-size:14px; color:var(--text);">
+                <i class="fa-solid fa-list" style="color:var(--text-sec); margin-right:6px;"></i>
+                Liste des documents
+            </div>
+            <input type="text" id="doc-filter" placeholder="Filtrer..." class="form-control"
+                   style="max-width:220px; font-size:12px; padding:5px 12px;" onkeyup="filterDocs()">
+        </div>
+        <div style="overflow-x:auto;">
+            <table class="data-table" id="doc-table">
+                <thead>
+                    <tr>
+                        <th style="width:40px; text-align:center;">#</th>
+                        <th>Nom du bouton</th>
+                        <th>Fichier</th>
+                        <th style="text-align:center;">Type</th>
+                        <th style="text-align:center;">Taille</th>
+                        <th style="text-align:center;">Ordre</th>
+                        <th style="text-align:center;">Statut</th>
+                        <th style="text-align:right; width:160px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for doc in docs %}
+                    <tr class="doc-row" data-search="{{ doc.display_name|lower }} {{ doc.file_name|lower }}">
+                        <td style="text-align:center; color:var(--text-sec); font-size:12px;">{{ doc.id }}</td>
+                        <td>
+                            <div style="font-weight:600; color:var(--text);">{{ doc.display_name }}</div>
+                            <div style="font-size:11px; color:var(--text-sec); margin-top:2px;">
+                                Ajouté le {{ doc.created_at[:10] if doc.created_at else '–' }}
+                            </div>
+                        </td>
+                        <td>
+                            {% if doc.file_exists %}
+                            <code style="font-size:11px; color:#1E3A8A; background:#EFF6FF; padding:2px 6px; border-radius:4px;">
+                                {{ doc.file_name }}
+                            </code>
+                            {% else %}
+                            <span style="font-size:12px; color:#DC2626;">
+                                <i class="fa-solid fa-triangle-exclamation"></i> Manquant
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td style="text-align:center;">
+                            <span class="badge badge-secondary" style="font-size:10px; text-transform:uppercase;">
+                                {{ doc.file_type or '–' }}
+                            </span>
+                        </td>
+                        <td style="text-align:center; font-size:12px; color:var(--text-sec);">
+                            {% if doc.file_size_kb > 0 %}{{ doc.file_size_kb }} Ko{% else %}–{% endif %}
+                        </td>
+                        <td style="text-align:center;">
+                            <form method="POST" action="{{ url_for('admin_documents_reorder', doc_id=doc.id) }}"
+                                  style="display:inline-flex; align-items:center; gap:5px;"
+                                  onsubmit="return true;">
+                                <input type="number" name="display_order" value="{{ doc.display_order }}"
+                                       class="order-input" min="0" max="999"
+                                       onchange="this.form.submit()" title="Ordre d'affichage">
+                            </form>
+                        </td>
+                        <td style="text-align:center;">
+                            {% if doc.is_active == 1 %}
+                            <span class="badge status-active">
+                                <i class="fa-solid fa-circle" style="font-size:7px;"></i> Actif
+                            </span>
+                            {% else %}
+                            <span class="badge status-inactive">
+                                <i class="fa-regular fa-circle" style="font-size:7px;"></i> Inactif
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td style="text-align:right;">
+                            <div style="display:flex; justify-content:flex-end; gap:5px;">
+
+                                <!-- Preview -->
+                                {% if doc.file_exists %}
+                                <a href="{{ url_for('document_view', doc_id=doc.id) }}"
+                                   class="tbl-action success" title="Ouvrir" target="_blank">
+                                    <i class="fa-solid fa-eye"></i>
+                                </a>
+                                {% endif %}
+
+                                <!-- Replace file -->
+                                <button class="tbl-action"
+                                        onclick="openReplaceModal({{ doc.id }}, '{{ doc.display_name|replace("'","\\'")|e }}', '{{ doc.file_name|replace("'","\\'")|e }}')"
+                                        title="Remplacer le fichier">
+                                    <i class="fa-solid fa-arrow-up-from-bracket"></i>
+                                </button>
+
+                                <!-- Edit name -->
+                                <button class="tbl-action"
+                                        onclick="openEditModal({{ doc.id }}, '{{ doc.display_name|replace("'","\\'")|e }}')"
+                                        title="Modifier le nom">
+                                    <i class="fa-solid fa-pen"></i>
+                                </button>
+
+                                <!-- Toggle active -->
+                                <form method="POST" action="{{ url_for('admin_documents_toggle', doc_id=doc.id) }}"
+                                      style="display:inline;">
+                                    <button type="submit" class="tbl-action"
+                                            title="{{ 'Désactiver' if doc.is_active == 1 else 'Activer' }}"
+                                            style="color:{{ '#D97706' if doc.is_active == 1 else '#059669' }};">
+                                        <i class="fa-solid {{ 'fa-eye-slash' if doc.is_active == 1 else 'fa-eye' }}"></i>
+                                    </button>
+                                </form>
+
+                                <!-- Delete (soft) -->
+                                <button class="tbl-action danger"
+                                        onclick="confirmDelete({{ doc.id }}, '{{ doc.display_name|replace("'","\\'")|e }}')"
+                                        title="Supprimer (archiver)">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="8" style="text-align:center; color:var(--text-sec); padding:40px;">
+                            <i class="fa-solid fa-folder-open" style="font-size:28px; opacity:0.3; display:block; margin-bottom:10px;"></i>
+                            Aucun document. Cliquez <strong>"Ajouter un document"</strong> pour commencer.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div><!-- /animate-up -->
+
+<!-- ══════════════════════════════════════════════════
+     MODAL: ADD DOCUMENT
+══════════════════════════════════════════════════ -->
+<div id="addModal" class="modal-overlay">
+    <div class="modal-card" style="max-width:540px;">
+        <div class="modal-header">
+            <h3><i class="fa-solid fa-file-circle-plus" style="color:var(--primary);"></i> Ajouter un Document</h3>
+            <button class="modal-close-btn" onclick="closeModal('addModal')"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <form method="POST" action="{{ url_for('admin_documents_add') }}" enctype="multipart/form-data" autocomplete="off">
+            <div class="form-group">
+                <label class="form-label">Nom du bouton (libellé affiché) *</label>
+                <input type="text" name="display_name" class="form-control" required
+                       placeholder="Ex: 13 — INDICATEURS KPIs">
+                <div style="font-size:11px; color:var(--text-sec); margin-top:4px;">
+                    Ce texte apparaît comme libellé du raccourci dans la page Documents.
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Fichier *</label>
+                <div class="drop-zone" id="addDropZone" onclick="document.getElementById('addFile').click();">
+                    <div class="drop-zone-icon"><i class="fa-solid fa-cloud-arrow-up"></i></div>
+                    <div style="font-size:13px; font-weight:600; color:var(--text); margin-top:8px;" id="addFileName">
+                        Cliquez pour choisir un fichier
+                    </div>
+                    <div class="drop-zone-label">PDF, Excel (.xlsx/.xls), Word (.docx), PowerPoint, Image</div>
+                    <input type="file" name="file" id="addFile" required
+                           accept=".pdf,.xlsx,.xls,.xlsm,.docx,.doc,.pptx,.ppt,.png,.jpg,.jpeg,.gif,.csv,.txt"
+                           onchange="updateFileName('addFileName', this)">
+                </div>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+                <div class="form-group">
+                    <label class="form-label">Ordre d'affichage</label>
+                    <input type="number" name="display_order" class="form-control"
+                           value="0" min="0" max="999" placeholder="0">
+                    <div style="font-size:11px; color:var(--text-sec); margin-top:3px;">
+                        Plus petit = affiché en premier
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Statut</label>
+                    <select name="is_active" class="form-control">
+                        <option value="1" selected>Actif (visible)</option>
+                        <option value="0">Inactif (masqué)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('addModal')">Annuler</button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fa-solid fa-floppy-disk"></i> Enregistrer
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     MODAL: REPLACE FILE
+══════════════════════════════════════════════════ -->
+<div id="replaceModal" class="modal-overlay">
+    <div class="modal-card" style="max-width:480px;">
+        <div class="modal-header">
+            <h3><i class="fa-solid fa-arrow-up-from-bracket" style="color:#D97706;"></i> Remplacer le Fichier</h3>
+            <button class="modal-close-btn" onclick="closeModal('replaceModal')"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div id="replace-doc-info"
+             style="background:#FEF3C7; border:1px solid #FDE68A; border-radius:8px; padding:12px 14px; margin-bottom:18px; font-size:13px;">
+        </div>
+        <form id="replaceForm" method="POST" action="" enctype="multipart/form-data">
+            <div class="form-group">
+                <label class="form-label">Nouveau fichier *</label>
+                <div class="drop-zone" onclick="document.getElementById('replaceFile').click();">
+                    <div class="drop-zone-icon"><i class="fa-solid fa-arrow-up-from-bracket" style="color:#D97706;"></i></div>
+                    <div style="font-size:13px; font-weight:600; color:var(--text); margin-top:8px;" id="replaceFileName">
+                        Choisir le nouveau fichier
+                    </div>
+                    <div class="drop-zone-label">Le bouton restera identique — seul le fichier change</div>
+                    <input type="file" name="file" id="replaceFile" required
+                           accept=".pdf,.xlsx,.xls,.xlsm,.docx,.doc,.pptx,.ppt,.png,.jpg,.jpeg,.gif,.csv,.txt"
+                           onchange="updateFileName('replaceFileName', this)">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('replaceModal')">Annuler</button>
+                <button type="submit" class="btn btn-warning">
+                    <i class="fa-solid fa-arrow-up-from-bracket"></i> Remplacer
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     MODAL: EDIT NAME
+══════════════════════════════════════════════════ -->
+<div id="editModal" class="modal-overlay">
+    <div class="modal-card" style="max-width:420px;">
+        <div class="modal-header">
+            <h3><i class="fa-solid fa-pen" style="color:var(--primary);"></i> Modifier le Nom</h3>
+            <button class="modal-close-btn" onclick="closeModal('editModal')"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <form id="editForm" method="POST" action="">
+            <div class="form-group">
+                <label class="form-label">Nouveau nom du bouton *</label>
+                <input type="text" name="display_name" id="editNameInput" class="form-control" required>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('editModal')">Annuler</button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fa-solid fa-floppy-disk"></i> Enregistrer
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Hidden confirm-delete form -->
+<form id="deleteForm" method="POST" action="" style="display:none;">
+    <input type="hidden" name="_confirm" value="yes">
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+/* ── Modal helpers ──────────────────────────────── */
+function openModal(id) {
+    const el = document.getElementById(id);
+    el.classList.add('open');
+    document.body.style.overflow = 'hidden';
+    setTimeout(() => {
+        const first = el.querySelector('input:not([type=hidden]):not([type=file]),select');
+        if (first) first.focus();
+    }, 120);
+}
+function closeModal(id) {
+    document.getElementById(id).classList.remove('open');
+    document.body.style.overflow = '';
+}
+document.querySelectorAll('.modal-overlay').forEach(el => {
+    el.addEventListener('click', function(e) {
+        if (e.target === this) closeModal(this.id);
+    });
+});
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+        document.querySelectorAll('.modal-overlay.open').forEach(el => closeModal(el.id));
+    }
+});
+
+/* ── File name display update ───────────────────── */
+function updateFileName(labelId, input) {
+    const label = document.getElementById(labelId);
+    if (input.files && input.files[0]) {
+        const f = input.files[0];
+        const sizeKb = (f.size / 1024).toFixed(1);
+        label.innerHTML = `<strong>${f.name}</strong> <span style="color:#64748B;">(${sizeKb} Ko)</span>`;
+        label.style.color = 'var(--primary)';
+    }
+}
+
+/* ── Replace modal ──────────────────────────────── */
+function openReplaceModal(docId, displayName, currentFile) {
+    document.getElementById('replaceForm').action = `/admin/documents/${docId}/replace`;
+    document.getElementById('replace-doc-info').innerHTML =
+        `<i class="fa-solid fa-file" style="color:#D97706; margin-right:6px;"></i>
+         <strong>${displayName}</strong><br>
+         <span style="color:#92400E;">Fichier actuel: <code style="background:#FDE68A; padding:1px 5px; border-radius:4px;">${currentFile || 'aucun'}</code></span>`;
+    document.getElementById('replaceFileName').textContent = 'Choisir le nouveau fichier';
+    openModal('replaceModal');
+}
+
+/* ── Edit name modal ────────────────────────────── */
+function openEditModal(docId, currentName) {
+    document.getElementById('editForm').action = `/admin/documents/${docId}/rename`;
+    document.getElementById('editNameInput').value = currentName;
+    openModal('editModal');
+}
+
+/* ── Soft delete confirmation ───────────────────── */
+function confirmDelete(docId, displayName) {
+    if (confirm(`Voulez-vous supprimer (archiver) le document :\n\n"${displayName}" ?\n\nLe fichier sera archivé et le bouton retiré de la page Documents.\nCette action peut être annulée par un administrateur.`)) {
+        const form = document.getElementById('deleteForm');
+        form.action = `/admin/documents/${docId}/delete`;
+        form.submit();
+    }
+}
+
+/* ── Filter table ───────────────────────────────── */
+function filterDocs() {
+    const q = document.getElementById('doc-filter').value.toLowerCase();
+    document.querySelectorAll('#doc-table .doc-row').forEach(row => {
+        const txt = row.getAttribute('data-search') || '';
+        row.style.display = txt.includes(q) ? '' : 'none';
+    });
+}
+
+/* ── Drag-and-drop on drop zones ────────────────── */
+document.querySelectorAll('.drop-zone').forEach(zone => {
+    zone.addEventListener('dragover', e => {
+        e.preventDefault();
+        zone.classList.add('drag-over');
+    });
+    zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+    zone.addEventListener('drop', e => {
+        e.preventDefault();
+        zone.classList.remove('drag-over');
+        const input = zone.querySelector('input[type=file]');
+        const labelId = zone.querySelector('[id]') ? zone.querySelector('[id]').id : null;
+        if (input && e.dataTransfer.files.length > 0) {
+            const dt = new DataTransfer();
+            dt.items.add(e.dataTransfer.files[0]);
+            input.files = dt.files;
+            if (labelId) updateFileName(labelId, input);
+        }
+    });
+});
+</script>
+{% endblock %}

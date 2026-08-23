@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}Passation de Consignes — SEBN-TN{% endblock %}
+{% block page_title %}Journal des Passations de Consignes{% endblock %}
+
+{% block content %}
+<div class="animate-up">
+    <!-- Top Bar -->
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; margin-bottom:20px;">
+        <div style="display:flex; align-items:center; gap:10px;">
+            <span class="badge badge-primary">
+                <i class="fa-solid fa-handshake"></i> Passation de Shift
+            </span>
+            <span class="badge badge-neutral">
+                {{ passations|length }} passations enregistrées
+            </span>
+        </div>
+        <div style="display:flex; gap:8px;">
+            {% if session.get('role') in ['OWNER', 'ADMIN', 'admin'] %}
+            <a href="{{ url_for('passation_questions') }}" class="btn btn-secondary btn-sm">
+                <i class="fa-solid fa-sliders"></i> Questions de Passation
+            </a>
+            {% endif %}
+            <a href="{{ url_for('passation_new') }}" class="btn btn-primary btn-sm">
+                <i class="fa-solid fa-plus"></i> Nouvelle Passation de Shift
+            </a>
+        </div>
+    </div>
+
+    <!-- Feed / Table of Passations -->
+    <div class="card" style="padding:0; overflow:hidden;">
+        <div style="padding:16px 20px; border-bottom:1px solid var(--border); background:#FAFAFA; font-weight:700; font-size:14px;">
+            <i class="fa-solid fa-clock-rotate-left" style="color:var(--primary); margin-right:6px;"></i> Historique Récent des Passations
+        </div>
+        <div style="overflow-x:auto;">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th style="width:50px; text-align:center;">#</th>
+                        <th>Date &amp; Heure</th>
+                        <th>Shift Sortant → Montant</th>
+                        <th>Responsable / Technicien</th>
+                        <th>Zone / Lignes</th>
+                        <th>Remarques / Pannes</th>
+                        <th style="text-align:center;">Points Répondus</th>
+                        <th style="text-align:right; width:140px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in passations %}
+                    <tr>
+                        <td style="text-align:center; color:var(--text-sec);">{{ p.id }}</td>
+                        <td>
+                            <div style="font-weight:700; color:var(--text);">{{ p.created_at[:10] }}</div>
+                            <div style="font-size:11px; color:var(--text-sec);">{{ p.created_at[11:16] }}</div>
+                        </td>
+                        <td>
+                            <span class="badge badge-primary">{{ p.shift }}</span>
+                            <i class="fa-solid fa-arrow-right" style="font-size:10px; color:var(--text-sec); margin:0 4px;"></i>
+                            <span class="badge badge-secondary">{{ p.target_shift or 'Équipe suivante' }}</span>
+                        </td>
+                        <td>
+                            <div style="font-weight:600; color:var(--text);">{{ p.technician_name }}</div>
+                            <div style="font-size:11px; color:var(--text-sec);">Matricule: {{ p.technician_matricule or '–' }}</div>
+                        </td>
+                        <td><span class="badge badge-secondary">{{ p.zone_name or 'Toute l\'usine' }}</span></td>
+                        <td style="max-width:280px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                            {{ p.remarks or 'Aucune consigne particulière' }}
+                        </td>
+                        <td style="text-align:center;">
+                            <span class="badge badge-success">{{ p.response_count }} points</span>
+                        </td>
+                        <td style="text-align:right;">
+                            <div style="display:flex; justify-content:flex-end; gap:6px;">
+                                <a href="{{ url_for('passation_detail', pass_id=p.id) }}" class="btn btn-secondary btn-xs" title="Consulter">
+                                    <i class="fa-solid fa-eye"></i>
+                                </a>
+                                <a href="{{ url_for('passation_export', pass_id=p.id) }}" class="btn btn-primary btn-xs" title="Télécharger Excel">
+                                    <i class="fa-solid fa-file-excel"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="8" style="text-align:center; color:var(--text-sec); padding:30px;">Aucune passation enregistrée. Cliquez sur "Nouvelle Passation de Shift".</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

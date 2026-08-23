@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}EBM — Paramètres &amp; Import — SEBN-TN{% endblock %}
+{% block page_title %}EBM — Configuration &amp; Fichier Excel (Owner){% endblock %}
+
+{% block content %}
+<div class="animate-up">
+    <!-- Top Bar -->
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; margin-bottom:20px;">
+        <div style="display:flex; align-items:center; gap:8px;">
+            <a href="{{ url_for('ebm_dashboard') }}" class="btn btn-secondary btn-sm">
+                <i class="fa-solid fa-arrow-left"></i> Tableau de bord EBM
+            </a>
+            <span class="badge" style="background:#F5F3FF; color:#7C3AED; border:1px solid #DDD6FE; font-weight:700;">
+                <i class="fa-solid fa-gear"></i> CONFIGURATION EBM
+            </span>
+        </div>
+    </div>
+
+    <!-- Settings Grid -->
+    <div class="grid-2">
+        <!-- Card 1: Active File & Upload -->
+        <div class="card">
+            <h3 style="font-size:15px; font-weight:700; color:var(--text); margin-bottom:14px;">
+                <i class="fa-solid fa-file-excel" style="color:var(--primary); margin-right:6px;"></i> Fichier Master EBM Actif
+            </h3>
+            <p style="font-size:13px; color:var(--text-sec); margin-bottom:16px;">
+                Téléversez votre classeur Excel de suivi budgétaire EBM (ex: <code>dashboard_ebm.xlsx</code>).
+            </p>
+
+            <div style="padding:14px; background:#F8FAFC; border:1px solid var(--border); border-radius:8px; margin-bottom:18px;">
+                <div style="font-size:12px; color:var(--text-sec); text-transform:uppercase; font-weight:700;">Fichier Actuellement Chargé</div>
+                <div style="font-weight:700; color:#1E3A8A; margin-top:4px; word-break:break-all;">
+                    {{ active_file or 'Aucun fichier configuré' }}
+                </div>
+            </div>
+
+            <form method="POST" action="{{ url_for('ebm_settings_upload') }}" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label class="form-label">Sélectionner un nouveau fichier Excel EBM (.xlsx, .xls, .xlsm)</label>
+                    <input type="file" name="ebm_file" class="form-control" accept=".xlsx,.xls,.xlsm" required>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width:100%; margin-top:10px;">
+                    <i class="fa-solid fa-cloud-arrow-up"></i> Importer &amp; Actualiser les Données EBM
+                </button>
+            </form>
+        </div>
+
+        <!-- Card 2: Module Information -->
+        <div class="card">
+            <h3 style="font-size:15px; font-weight:700; color:var(--text); margin-bottom:14px;">
+                <i class="fa-solid fa-circle-info" style="color:var(--primary); margin-right:6px;"></i> À Propos du Module EBM
+            </h3>
+            <p style="font-size:13px; color:var(--text); line-height:1.6;">
+                Le module <strong>EBM (Equipment Budget Management)</strong> permet au Propriétaire (Owner) de :
+            </p>
+            <ul style="font-size:13px; color:var(--text-sec); line-height:1.8; margin-left:18px; margin-top:10px;">
+                <li>Suivre en temps réel les budgets alloués et consommés par projet.</li>
+                <li>Détecter automatiquement les colonnes et montants depuis les fichiers Excel industriels.</li>
+                <li>Valider ou refuser les lignes d'équipements et commandes (PO).</li>
+                <li>Assurer le suivi des réceptions et piloter les plans d'actions budgétaires.</li>
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}

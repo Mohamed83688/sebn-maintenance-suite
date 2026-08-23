@@ -1,0 +1,353 @@
+{% extends 'base.html' %}
+{% block title %}Checklist PPE — SEBN-TN Enterprise Maintenance{% endblock %}
+{% block page_title %}Checklist d'Inspection Préventive{% endblock %}
+{% block page_subtitle %}{{ equip }} · {{ type }}{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('pma_dashboard') }}" class="btn btn-secondary btn-sm">
+    <i class="fa-solid fa-arrow-left"></i> Retour au Planning
+</a>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.checklist-card {
+    background: #FFFFFF;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    max-width: 1140px;
+    box-shadow: var(--shadow-sm);
+}
+.checklist-header {
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    background: #FFFFFF;
+    flex-wrap: wrap;
+}
+.checklist-info h3 { font-size: 16px; font-weight: 800; color: var(--text); }
+.checklist-info p  { font-size: 12px; color: var(--text-sec); margin-top: 3px; }
+
+.template-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px; border-radius: 6px;
+    font-size: 11px; font-weight: 700;
+}
+.template-real    { background: var(--success-bg); color: var(--success); border: 1px solid var(--success-border); }
+.template-generic { background: var(--info-bg);    color: var(--info);    border: 1px solid var(--info-border); }
+
+/* Template Select Box */
+.template-select-box {
+    display: flex; align-items: center; gap: 8px;
+    background: #FFFFFF;
+    border: 1px solid #CBD5E1;
+    border-radius: var(--radius-sm);
+    padding: 5px 10px;
+    max-width: 380px;
+}
+.template-select-input {
+    background: none; border: none;
+    color: var(--text); font-size: 12px; font-weight: 700;
+    font-family: inherit; outline: none; cursor: pointer;
+    flex: 1; min-width: 140px;
+    text-overflow: ellipsis; overflow: hidden; white-space: nowrap;
+}
+
+/* Status + / - / N/A buttons */
+.status-btns {
+    display: inline-flex; gap: 4px;
+    background: #F8FAFC;
+    border: 1px solid #CBD5E1;
+    border-radius: 6px;
+    padding: 2px;
+}
+.status-radio { display: none; }
+.status-label {
+    padding: 5px 12px; border-radius: 5px;
+    font-size: 13px; font-weight: 800;
+    cursor: pointer; color: var(--text-sec);
+    transition: var(--transition-s);
+    user-select: none; white-space: nowrap;
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 30px; height: 28px;
+}
+.status-radio:checked + .status-label { font-weight: 800; }
+[id$="OK"]:checked  + .status-label { background: var(--success-bg); color: var(--success); border: 1px solid var(--success-border); }
+[id$="NOK"]:checked + .status-label { background: var(--danger-bg);  color: var(--danger);  border: 1px solid var(--danger-border); }
+[id$="NA"]:checked  + .status-label { background: var(--info-bg);    color: var(--info);    border: 1px solid var(--info-border); font-size: 11px; }
+
+.cl-row:nth-child(even) { background: #FAFAFA; }
+.cl-num {
+    width: 30px; height: 30px; border-radius: 50%;
+    background: var(--primary-light);
+    border: 1px solid var(--primary-border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; color: var(--primary);
+    flex-shrink: 0;
+}
+
+.val-input, .obs-input {
+    background: #FFFFFF;
+    border: 1px solid #CBD5E1; border-radius: 6px;
+    color: var(--text); font-size: 12px; font-family: inherit;
+    padding: 6px 10px; width: 100%; outline: none; transition: var(--transition-s);
+}
+.val-input:focus, .obs-input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-glow); }
+.val-input { text-align: center; font-weight: 700; color: var(--primary); }
+
+/* Progress bar at the top */
+.cl-progress-bar { height: 4px; background: #E2E8F0; }
+.cl-progress-fill {
+    height: 100%;
+    background: var(--primary);
+    width: 0%; transition: width 0.3s ease;
+}
+
+/* Fullscreen Loading Overlay */
+#checklist-loading-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(8px);
+    z-index: 9999;
+    flex-direction: column;
+    align-items: center; justify-content: center;
+    color: var(--text);
+    animation: fadeIn 0.25s ease;
+}
+#checklist-loading-overlay.active { display: flex; }
+
+.loading-spinner-wrap {
+    position: relative; width: 64px; height: 64px; margin-bottom: 20px;
+}
+.loading-ring {
+    position: absolute; inset: 0;
+    border: 4px solid #E2E8F0;
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin 0.9s linear infinite;
+}
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+.loading-icon {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-size: 24px; color: var(--primary);
+}
+.loading-title { font-size: 17px; font-weight: 800; margin-bottom: 6px; color: var(--text); }
+.loading-desc  { font-size: 13px; color: var(--text-sec); max-width: 380px; text-align: center; }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Loading Screen Overlay -->
+<div id="checklist-loading-overlay">
+    <div class="loading-spinner-wrap">
+        <div class="loading-ring"></div>
+        <div class="loading-icon"><i class="fa-solid fa-file-signature"></i></div>
+    </div>
+    <div class="loading-title">Enregistrement en cours...</div>
+    <div class="loading-desc">Mise à jour du fichier Excel, signature numérique et validation de l'ordre de travail préventif.</div>
+</div>
+
+<div class="checklist-card animate-up">
+    <div class="cl-progress-bar">
+        <div class="cl-progress-fill" id="cl-progress"></div>
+    </div>
+
+    <div class="checklist-header">
+        <div class="checklist-info">
+            <h3><i class="fa-solid fa-clipboard-list" style="color:var(--primary);"></i> Ordre de Travail Préventif</h3>
+            <p>Équipement: <strong>{{ equip }}</strong> &nbsp;·&nbsp; Type: <strong>{{ type }}</strong>
+               {% if week %}&nbsp;·&nbsp; Semaine: <strong>{{ week }}</strong>{% endif %}</p>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+            {% if all_templates %}
+            <div class="template-select-box">
+                <i class="fa-solid fa-file-excel" style="color:var(--success); font-size:13px; flex-shrink:0;"></i>
+                <label for="template-select" style="font-size:11px; font-weight:700; color:var(--text-sec); white-space:nowrap;">Modèle :</label>
+                <select id="template-select" class="template-select-input" onchange="switchTemplate(this.value)">
+                    {% for tpl in all_templates %}
+                    <option value="{{ tpl.version_id }}" {% if tpl.version_id == active_version_id %}selected{% endif %}>
+                        {{ tpl.name }}
+                    </option>
+                    {% endfor %}
+                    <option value="" {% if not template_found %}selected{% endif %}>
+                        Checklist Générique (8 points)
+                    </option>
+                </select>
+            </div>
+            {% elif template_found %}
+            <span class="template-badge template-real">
+                <i class="fa-solid fa-file-excel"></i> Template actif chargé
+            </span>
+            {% else %}
+            <span class="template-badge template-generic">
+                <i class="fa-solid fa-list-check"></i> Checklist générique
+            </span>
+            {% endif %}
+
+            <span class="badge badge-info">
+                <i class="fa-solid fa-tasks"></i>
+                <span id="cl-count-label">0 / {{ tasks|length }} points</span>
+            </span>
+        </div>
+    </div>
+
+    <form method="POST" action="{{ url_for('checklist_save') }}" id="checklist-form">
+        <input type="hidden" name="sheet"             value="{{ sheet }}">
+        <input type="hidden" name="idx"               value="{{ idx }}">
+        <input type="hidden" name="type"              value="{{ type }}">
+        <input type="hidden" name="equip"             value="{{ equip }}">
+        <input type="hidden" name="week"              value="{{ week }}">
+        <input type="hidden" name="version_id"        value="{{ active_version_id or '' }}">
+        <input type="hidden" name="task_count"        value="{{ tasks|length }}">
+
+        <div style="overflow-x:auto;">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th style="text-align:center; width:45px;">#</th>
+                        <th>Tâche / Point de contrôle</th>
+                        <th style="width:160px;">Méthode</th>
+                        <th style="text-align:center; width:140px; white-space:nowrap;">Résultat (+ / -)</th>
+                        <th style="width:130px;">Valeur (V)</th>
+                        <th>Observations</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for task in tasks %}
+                    {% set t_num = task.number or task.item_number or loop.index %}
+                    <tr class="cl-row" data-task="{{ t_num }}">
+                        <td style="text-align:center;">
+                            <div class="cl-num">{{ t_num }}</div>
+                        </td>
+                        <td>
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                <i class="fa-solid {{ task.icon }}" style="color:var(--text-sec); font-size:13px; flex-shrink:0;"></i>
+                                <span style="font-size:13px; font-weight:500; color:var(--text); white-space:pre-line;">{{ task.description }}</span>
+                            </div>
+                        </td>
+                        <td>
+                            <span style="font-size:12px; color:var(--text-sec);">{{ task.method }}</span>
+                        </td>
+                        <td style="text-align:center;">
+                            <div class="status-btns" style="justify-content:center;">
+                                <input type="radio" class="status-radio cl-radio" name="status_{{ t_num }}"
+                                       id="s{{ t_num }}OK" value="OK">
+                                <label class="status-label" for="s{{ t_num }}OK" title="Conforme (+)">+</label>
+
+                                <input type="radio" class="status-radio cl-radio" name="status_{{ t_num }}"
+                                       id="s{{ t_num }}NOK" value="NOK">
+                                <label class="status-label" for="s{{ t_num }}NOK" title="Non conforme (-)">-</label>
+
+                                <input type="radio" class="status-radio cl-radio" name="status_{{ t_num }}"
+                                       id="s{{ t_num }}NA" value="N/A">
+                                <label class="status-label" for="s{{ t_num }}NA" title="Non applicable">N/A</label>
+                            </div>
+                        </td>
+                        <td>
+                            <input type="text" name="val_{{ t_num }}" id="val_{{ t_num }}" class="val-input cl-val"
+                                   placeholder="V (ex: 6 bar)" value="">
+                        </td>
+                        <td>
+                            <input type="text" name="obs_{{ t_num }}" id="obs_{{ t_num }}" class="obs-input"
+                                   placeholder="Remarque / observation..." value="">
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div style="padding:16px 24px; border-top:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; background:#FFFFFF;">
+            <p style="font-size:11px; color:var(--text-sec); max-width:500px;">
+                Je certifie avoir effectué ces vérifications conformément aux procédures standard.
+                Signataire: <strong style="color:var(--text);">{{ name }}</strong>
+                ({{ matricule }})
+            </p>
+            <div style="display:flex; gap:8px;">
+                <a href="{{ url_for('pma_dashboard') }}" class="btn btn-secondary btn-sm">
+                    <i class="fa-solid fa-xmark"></i> Annuler
+                </a>
+                <button type="submit" class="btn btn-success btn-sm" id="submit-btn">
+                    <i class="fa-solid fa-file-signature"></i> Enregistrer &amp; Valider
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function switchTemplate(versionId) {
+    const overlay = document.getElementById('checklist-loading-overlay');
+    if (overlay) overlay.classList.add('active');
+    const url = new URL(window.location.href);
+    if (!versionId) {
+        url.searchParams.delete('version_id');
+        url.searchParams.set('template', '__generic__');
+    } else {
+        url.searchParams.set('version_id', versionId);
+        url.searchParams.delete('template');
+    }
+    window.location.href = url.toString();
+}
+
+(function() {
+    const total     = {{ tasks|length }};
+    const radios    = document.querySelectorAll('.cl-radio');
+    const valInputs = document.querySelectorAll('.cl-val');
+    const obsInputs = document.querySelectorAll('.obs-input');
+    const progress  = document.getElementById('cl-progress');
+    const label     = document.getElementById('cl-count-label');
+    const form      = document.getElementById('checklist-form');
+    const submitBtn = document.getElementById('submit-btn');
+    const overlay   = document.getElementById('checklist-loading-overlay');
+
+    function updateProgress() {
+        const answered = new Set();
+        radios.forEach(r => { 
+            if (r.checked) {
+                const num = r.name.replace('status_', '');
+                answered.add(num);
+            }
+        });
+
+        const cnt = answered.size;
+        const pct = total > 0 ? Math.round(cnt / total * 100) : 0;
+        if (progress) progress.style.width = pct + '%';
+        if (label) label.textContent = cnt + ' / ' + total + ' points';
+
+        radios.forEach(r => {
+            const row = r.closest('tr');
+            if (r.checked && r.value === 'NOK') {
+                if (row) row.style.background = '#FEF2F2';
+            } else if (r.checked && (r.value === 'OK' || r.value === 'N/A')) {
+                if (row) row.style.background = '';
+            }
+        });
+    }
+
+    radios.forEach(r => r.addEventListener('change', updateProgress));
+
+    // Initialize progress display (starts at 0 / total)
+    updateProgress();
+
+    form.addEventListener('submit', function(e) {
+        const nokCount = [...radios].filter(r => r.checked && r.value === 'NOK').length;
+        if (nokCount > 0) {
+            if (!confirm(`⚠️ ${nokCount} point(s) marqué(s) NOK (-). Voulez-vous quand même valider la checklist ?`)) {
+                e.preventDefault();
+                return;
+            }
+        }
+        if (overlay) overlay.classList.add('active');
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Enregistrement...';
+        }
+    });
+})();
+</script>
+{% endblock %}

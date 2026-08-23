@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block title %}Nouvelle Passation de Shift — SEBN-TN{% endblock %}
+{% block page_title %}Nouvelle Passation de Consignes (Shift Handover){% endblock %}
+
+{% block content %}
+<div class="animate-up" style="max-width:960px; margin:0 auto;">
+    <!-- Top Bar -->
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+        <a href="{{ url_for('passation_dashboard') }}" class="btn btn-secondary btn-sm">
+            <i class="fa-solid fa-arrow-left"></i> Retour au Journal
+        </a>
+        <span class="badge badge-primary">
+            <i class="fa-solid fa-handshake"></i> Passation de Shift
+        </span>
+    </div>
+
+    <form method="POST" action="{{ url_for('passation_save') }}">
+        <!-- Shift & Header Info Card -->
+        <div class="card" style="margin-bottom:20px;">
+            <h3 style="font-size:15px; font-weight:700; color:var(--text); margin-bottom:14px;">
+                <i class="fa-solid fa-calendar-day" style="color:var(--primary); margin-right:6px;"></i> Informations Générales du Shift
+            </h3>
+            <div class="grid-3">
+                <div class="form-group">
+                    <label class="form-label">Shift Sortant *</label>
+                    <select name="shift" class="form-control" required>
+                        <option value="SHIFT 1 (06:00 - 14:00)">SHIFT 1 (06:00 - 14:00)</option>
+                        <option value="SHIFT 2 (14:00 - 22:00)">SHIFT 2 (14:00 - 22:00)</option>
+                        <option value="SHIFT 3 (22:00 - 06:00)">SHIFT 3 (22:00 - 06:00)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Shift Montant (Équipe Suivante)</label>
+                    <select name="target_shift" class="form-control">
+                        <option value="SHIFT 2 (14:00 - 22:00)">SHIFT 2 (14:00 - 22:00)</option>
+                        <option value="SHIFT 3 (22:00 - 06:00)">SHIFT 3 (22:00 - 06:00)</option>
+                        <option value="SHIFT 1 (06:00 - 14:00)">SHIFT 1 (06:00 - 14:00)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Zone / Lignes</label>
+                    <input type="text" name="zone_name" class="form-control" value="Toutes les zones" placeholder="Ex: KSM MMA / Zone Coupe">
+                </div>
+            </div>
+            <div class="grid-2">
+                <div class="form-group">
+                    <label class="form-label">Technicien / Responsable Sortant *</label>
+                    <input type="text" name="technician_name" class="form-control" value="{{ session.get('name', '') }}" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Matricule</label>
+                    <input type="text" name="technician_matricule" class="form-control" value="{{ session.get('matricule', '') }}">
+                </div>
+            </div>
+        </div>
+
+        <!-- Checklist Questions Card -->
+        <div class="card" style="margin-bottom:20px;">
+            <h3 style="font-size:15px; font-weight:700; color:var(--text); margin-bottom:16px;">
+                <i class="fa-solid fa-list-check" style="color:var(--primary); margin-right:6px;"></i> Points de Contrôle &amp; Consignes de Passation
+            </h3>
+            <div style="display:flex; flex-direction:column; gap:16px;">
+                {% for q in questions %}
+                <div style="padding:14px 16px; background:#F8FAFC; border:1px solid var(--border); border-radius:8px;">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">
+                        <div style="font-weight:600; font-size:13.5px; color:var(--text);">
+                            <span style="display:inline-block; width:22px; height:22px; border-radius:50%; background:#EFF6FF; color:#2563EB; text-align:center; line-height:22px; font-size:11px; font-weight:700; margin-right:6px;">{{ loop.index }}</span>
+                            {{ q.text }}
+                        </div>
+                        <span class="badge badge-secondary" style="font-size:10px;">{{ q.category }}</span>
+                    </div>
+
+                    {% if q.type == 'CHOICE' and q.options %}
+                    <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:8px;">
+                        {% for opt in q.options.split(',') %}
+                        <label style="display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer; background:#FFFFFF; padding:6px 12px; border:1px solid var(--border); border-radius:6px;">
+                            <input type="radio" name="question_{{ q.id }}" value="{{ opt.strip() }}" required>
+                            {{ opt.strip() }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <textarea name="question_{{ q.id }}" class="form-control" rows="2" placeholder="Saisir vos remarques ou détails pour ce point..."></textarea>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Remarks & Pannes Card -->
+        <div class="card" style="margin-bottom:24px;">
+            <h3 style="font-size:15px; font-weight:700; color:var(--text); margin-bottom:12px;">
+                <i class="fa-solid fa-triangle-exclamation" style="color:var(--warning); margin-right:6px;"></i> Remarques Générales, Pannes en Cours &amp; Consignes Particulières
+            </h3>
+            <div class="form-group">
+                <textarea name="remarks" class="form-control" rows="4" placeholder="Mentionnez les pannes critiques non clôturées, pièces en attente, interventions à poursuivre par le shift montant..."></textarea>
+            </div>
+        </div>
+
+        <!-- Submit Buttons -->
+        <div style="display:flex; justify-content:flex-end; gap:10px;">
+            <a href="{{ url_for('passation_dashboard') }}" class="btn btn-secondary">Annuler</a>
+            <button type="submit" class="btn btn-primary" style="padding:10px 24px;">
+                <i class="fa-solid fa-check"></i> Enregistrer &amp; Valider la Passation
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

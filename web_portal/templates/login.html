@@ -1,0 +1,1004 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connexion — SEBN-TN Maintenance System</title>
+    <meta name="description" content="SEBN-TN — Système Unifié de Maintenance Industrielle & Automobile">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Montserrat:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            /* SEBN Official Brand Palette */
+            --sebn-deep:        #160042;
+            --sebn-purple:      #2E008B;
+            --sebn-purple-mid:  #3D00B3;
+            --sebn-purple-h:    #23006E;
+            --sebn-cyan:        #6EC1E4;
+            --sebn-cyan-bright: #00D4FF;
+            --sebn-light:       #F3F0FF;
+            --sebn-glow:        rgba(46,0,139,0.2);
+
+            /* Surfaces */
+            --white:            #FFFFFF;
+            --gray-50:          #F8FAFC;
+            --gray-100:         #F1F5F9;
+            --gray-200:         #E2E8F0;
+            --gray-400:         #94A3B8;
+            --gray-600:         #475569;
+            --gray-900:         #0F172A;
+
+            --font-display:  'Montserrat', sans-serif;
+            --font-body:     'Inter', sans-serif;
+            --ease-smooth:   cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        /* ─────────────────────────────────────────────
+           PAGE CANVAS
+        ───────────────────────────────────────────── */
+        html, body {
+            height: 100%;
+            font-family: var(--font-body);
+            background: var(--gray-100);
+            color: var(--gray-900);
+            overflow-x: hidden;
+        }
+
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 24px;
+            position: relative;
+        }
+
+        /* Subtle canvas texture */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background:
+                radial-gradient(ellipse 60% 50% at 20% 30%, rgba(46,0,139,0.06) 0%, transparent 60%),
+                radial-gradient(ellipse 50% 40% at 80% 70%, rgba(110,193,228,0.05) 0%, transparent 55%),
+                linear-gradient(135deg, #F0F4FF 0%, #F8FAFC 50%, #F0F9FF 100%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* ─────────────────────────────────────────────
+           MAIN CARD
+        ───────────────────────────────────────────── */
+        .card {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            max-width: 1060px;
+            background: var(--white);
+            border-radius: 24px;
+            box-shadow:
+                0 0 0 1px rgba(46,0,139,0.07),
+                0 4px 6px -1px rgba(15,23,42,0.04),
+                0 24px 48px -8px rgba(15,23,42,0.12),
+                0 48px 80px -16px rgba(46,0,139,0.08);
+            display: grid;
+            grid-template-columns: 1.1fr 0.9fr;
+            min-height: 640px;
+            overflow: hidden;
+            animation: cardIn 0.6s var(--ease-smooth) both;
+        }
+
+        @keyframes cardIn {
+            from { opacity: 0; transform: translateY(20px) scale(0.97); }
+            to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        /* ─────────────────────────────────────────────
+           LEFT — BRAND PANEL
+        ───────────────────────────────────────────── */
+        .brand {
+            position: relative;
+            background: linear-gradient(150deg,
+                var(--sebn-deep) 0%,
+                #200060 30%,
+                var(--sebn-purple) 65%,
+                #1E0060 100%);
+            padding: 52px 48px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            overflow: hidden;
+        }
+
+        /* Noise-like grain texture */
+        .brand::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
+        /* Glowing orbs */
+        .orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(60px);
+            pointer-events: none;
+        }
+        .orb-1 {
+            width: 300px; height: 300px;
+            background: radial-gradient(circle, rgba(110,193,228,0.18) 0%, transparent 70%);
+            top: -60px; left: -60px;
+            animation: orbFloat 8s ease-in-out infinite alternate;
+        }
+        .orb-2 {
+            width: 250px; height: 250px;
+            background: radial-gradient(circle, rgba(61,0,179,0.35) 0%, transparent 70%);
+            bottom: -40px; right: -40px;
+            animation: orbFloat 10s ease-in-out infinite alternate-reverse;
+        }
+        .orb-3 {
+            width: 180px; height: 180px;
+            background: radial-gradient(circle, rgba(110,193,228,0.12) 0%, transparent 70%);
+            bottom: 30%; right: 10%;
+            animation: orbFloat 12s ease-in-out infinite alternate;
+        }
+
+        @keyframes orbFloat {
+            from { transform: translate(0, 0) scale(1); }
+            to   { transform: translate(20px, 20px) scale(1.08); }
+        }
+
+        /* SVG Wire Harness */
+        .harness-svg {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .harness-path {
+            stroke-dasharray: 2000;
+            stroke-dashoffset: 2000;
+            animation: drawPath 4s var(--ease-smooth) 0.4s forwards;
+        }
+        .harness-path-2 {
+            stroke-dasharray: 1500;
+            stroke-dashoffset: 1500;
+            animation: drawPath 3.5s var(--ease-smooth) 0.8s forwards;
+        }
+        .harness-path-3 {
+            stroke-dasharray: 1200;
+            stroke-dashoffset: 1200;
+            animation: drawPath 3s var(--ease-smooth) 1.2s forwards;
+        }
+
+        @keyframes drawPath {
+            to { stroke-dashoffset: 0; }
+        }
+
+        .harness-dot {
+            animation: dotPulse 2.5s ease-in-out infinite;
+        }
+        .harness-dot-2 { animation-delay: 0.8s; }
+        .harness-dot-3 { animation-delay: 1.6s; }
+
+        @keyframes dotPulse {
+            0%, 100% { opacity: 0.4; r: 3; }
+            50%       { opacity: 1; r: 5; }
+        }
+
+        /* Brand Content */
+        .brand-content { position: relative; z-index: 2; }
+        .brand-bottom  { position: relative; z-index: 2; }
+
+        .sumitomo-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.16);
+            backdrop-filter: blur(12px);
+            border-radius: 100px;
+            padding: 6px 14px 6px 10px;
+            font-family: var(--font-display);
+            font-size: 9.5px;
+            font-weight: 700;
+            letter-spacing: 1.4px;
+            text-transform: uppercase;
+            color: rgba(255,255,255,0.85);
+            margin-bottom: 28px;
+            width: fit-content;
+        }
+
+        .sumitomo-badge .dot {
+            width: 6px; height: 6px;
+            background: var(--sebn-cyan);
+            border-radius: 50%;
+            flex-shrink: 0;
+            animation: blinkDot 2s ease-in-out infinite;
+        }
+
+        @keyframes blinkDot {
+            0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(110,193,228,0.4); }
+            50%       { opacity: 0.6; box-shadow: 0 0 0 5px rgba(110,193,228,0); }
+        }
+
+        .brand-logo-row {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin-bottom: 14px;
+        }
+
+        .brand-name {
+            font-family: var(--font-display);
+            font-size: 56px;
+            font-weight: 900;
+            color: var(--white);
+            letter-spacing: 5px;
+            line-height: 1;
+            text-shadow: 0 0 40px rgba(110,193,228,0.2);
+        }
+
+        .brand-tn {
+            background: linear-gradient(135deg, var(--sebn-cyan) 0%, #4DBADF 100%);
+            color: var(--sebn-deep);
+            font-family: var(--font-display);
+            font-size: 18px;
+            font-weight: 900;
+            letter-spacing: 2px;
+            padding: 6px 13px;
+            border-radius: 8px;
+            box-shadow: 0 4px 16px rgba(110,193,228,0.4);
+        }
+
+        .brand-headline {
+            font-family: var(--font-display);
+            font-size: 20px;
+            font-weight: 700;
+            color: rgba(255,255,255,0.95);
+            letter-spacing: 0.2px;
+            line-height: 1.4;
+            margin-bottom: 8px;
+        }
+
+        .brand-subline {
+            font-size: 13px;
+            color: rgba(203,213,225,0.85);
+            line-height: 1.6;
+            max-width: 340px;
+            font-weight: 400;
+        }
+
+        /* Feature Pills */
+        .features {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin: 34px 0;
+        }
+
+        .feature {
+            display: flex;
+            align-items: center;
+            gap: 13px;
+            background: rgba(255,255,255,0.055);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 14px;
+            padding: 13px 16px;
+            backdrop-filter: blur(8px);
+            transition: all 0.25s ease;
+            cursor: default;
+            animation: featureIn 0.5s var(--ease-smooth) both;
+        }
+        .feature:nth-child(1) { animation-delay: 0.2s; }
+        .feature:nth-child(2) { animation-delay: 0.35s; }
+        .feature:nth-child(3) { animation-delay: 0.5s; }
+
+        @keyframes featureIn {
+            from { opacity: 0; transform: translateX(-14px); }
+            to   { opacity: 1; transform: translateX(0); }
+        }
+
+        .feature:hover {
+            background: rgba(255,255,255,0.1);
+            border-color: rgba(110,193,228,0.35);
+            transform: translateX(4px);
+        }
+
+        .feature-icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 15px;
+            flex-shrink: 0;
+        }
+        .fi-blue  { background: rgba(59,130,246,0.25);  color: #93C5FD; }
+        .fi-green { background: rgba(16,185,129,0.25);  color: #6EE7B7; }
+        .fi-amber { background: rgba(245,158,11,0.2);   color: #FCD34D; }
+
+        .feature-text {
+            flex: 1;
+        }
+        .feature-text strong {
+            display: block;
+            font-size: 12.5px;
+            font-weight: 700;
+            color: rgba(255,255,255,0.95);
+            margin-bottom: 2px;
+        }
+        .feature-text span {
+            font-size: 11.5px;
+            color: rgba(203,213,225,0.7);
+            font-weight: 400;
+        }
+
+        .feature-check {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: rgba(110,193,228,0.18);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--sebn-cyan);
+            font-size: 10px;
+        }
+
+        /* Brand footer */
+        .brand-footer-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 11px;
+            color: rgba(148,163,184,0.7);
+        }
+        .brand-footer-row i { color: var(--sebn-cyan); opacity: 0.7; }
+
+        .brand-divider {
+            width: 1px;
+            height: 12px;
+            background: rgba(148,163,184,0.3);
+        }
+
+        /* ─────────────────────────────────────────────
+           RIGHT — LOGIN PANEL
+        ───────────────────────────────────────────── */
+        .login-panel {
+            padding: 52px 48px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            background: var(--white);
+            animation: panelIn 0.6s var(--ease-smooth) 0.1s both;
+        }
+
+        @keyframes panelIn {
+            from { opacity: 0; transform: translateX(16px); }
+            to   { opacity: 1; transform: translateX(0); }
+        }
+
+        .login-top {}
+
+        .secured-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-family: var(--font-display);
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: var(--sebn-purple);
+            background: var(--sebn-light);
+            border: 1px solid rgba(46,0,139,0.15);
+            padding: 5px 12px;
+            border-radius: 100px;
+            margin-bottom: 20px;
+        }
+        .secured-badge i { font-size: 10px; }
+
+        .login-title {
+            font-family: var(--font-display);
+            font-size: 30px;
+            font-weight: 800;
+            color: var(--gray-900);
+            letter-spacing: -0.5px;
+            margin-bottom: 5px;
+        }
+
+        .login-subtitle {
+            font-size: 13.5px;
+            color: var(--gray-400);
+            line-height: 1.5;
+            margin-bottom: 30px;
+        }
+
+        /* Error Banner */
+        .error-banner {
+            display: flex;
+            align-items: flex-start;
+            gap: 11px;
+            background: #FFF1F2;
+            border: 1px solid #FECDD3;
+            border-left: 4px solid #E11D48;
+            border-radius: 10px;
+            padding: 13px 15px;
+            margin-bottom: 22px;
+            animation: shakeEl 0.4s ease, bannerFadeIn 0.3s ease;
+        }
+
+        @keyframes bannerFadeIn {
+            from { opacity: 0; transform: translateY(-6px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes shakeEl {
+            0%, 100% { transform: translateX(0); }
+            18%, 62% { transform: translateX(-5px); }
+            38%, 82% { transform: translateX(5px); }
+        }
+
+        .error-icon {
+            width: 22px;
+            height: 22px;
+            background: #FECDD3;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #E11D48;
+            font-size: 11px;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+
+        .error-text {
+            font-size: 13px;
+            font-weight: 600;
+            color: #9F1239;
+            line-height: 1.4;
+        }
+
+        /* Divider */
+        .form-divider {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 22px;
+            font-size: 11.5px;
+            color: var(--gray-400);
+            font-weight: 500;
+        }
+        .form-divider::before, .form-divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--gray-200);
+        }
+
+        /* Input Fields */
+        .field-group {
+            margin-bottom: 18px;
+        }
+
+        .field-label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-family: var(--font-display);
+            font-size: 11.5px;
+            font-weight: 700;
+            color: var(--gray-600);
+            letter-spacing: 0.3px;
+            margin-bottom: 8px;
+        }
+        .field-label i { color: var(--gray-400); font-size: 11px; }
+
+        .field-wrap {
+            position: relative;
+        }
+
+        .field-input {
+            width: 100%;
+            padding: 13.5px 44px 13.5px 44px;
+            background: var(--gray-50);
+            border: 1.5px solid var(--gray-200);
+            border-radius: 12px;
+            font-family: var(--font-body);
+            font-size: 14px;
+            color: var(--gray-900);
+            outline: none;
+            transition: all 0.2s var(--ease-smooth);
+        }
+
+        .field-input::placeholder { color: var(--gray-400); font-size: 13.5px; }
+
+        .field-input:focus {
+            border-color: var(--sebn-purple);
+            background: var(--white);
+            box-shadow: 0 0 0 3.5px rgba(46,0,139,0.1), 0 1px 3px rgba(46,0,139,0.08);
+        }
+
+        .field-prefix {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--gray-400);
+            font-size: 14px;
+            pointer-events: none;
+            transition: color 0.2s ease;
+        }
+
+        .field-wrap:focus-within .field-prefix { color: var(--sebn-purple); }
+
+        .eye-btn {
+            position: absolute;
+            right: 13px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: var(--gray-100);
+            border: 1px solid var(--gray-200);
+            border-radius: 8px;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--gray-400);
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.18s ease;
+        }
+        .eye-btn:hover {
+            background: var(--sebn-light);
+            border-color: rgba(46,0,139,0.2);
+            color: var(--sebn-purple);
+        }
+
+        /* Remember Row */
+        .options-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 22px;
+        }
+
+        .remember-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: var(--gray-600);
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .remember-label input[type="checkbox"] {
+            display: none;
+        }
+
+        .checkbox-box {
+            width: 17px;
+            height: 17px;
+            border: 1.5px solid var(--gray-200);
+            border-radius: 5px;
+            background: var(--gray-50);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.18s ease;
+            flex-shrink: 0;
+        }
+
+        .checkbox-box i {
+            font-size: 9px;
+            color: var(--white);
+            opacity: 0;
+            transition: opacity 0.15s ease;
+        }
+
+        .remember-label input[type="checkbox"]:checked ~ .checkbox-box {
+            background: var(--sebn-purple);
+            border-color: var(--sebn-purple);
+        }
+
+        .remember-label input[type="checkbox"]:checked ~ .checkbox-box i {
+            opacity: 1;
+        }
+
+        /* Submit Button */
+        .btn-login {
+            width: 100%;
+            padding: 14.5px 20px;
+            background: linear-gradient(135deg, var(--sebn-purple-mid) 0%, var(--sebn-purple) 50%, var(--sebn-purple-h) 100%);
+            color: var(--white);
+            font-family: var(--font-display);
+            font-size: 13px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            box-shadow:
+                0 1px 2px rgba(46,0,139,0.3),
+                0 4px 12px rgba(46,0,139,0.28),
+                0 12px 28px rgba(46,0,139,0.2);
+            transition: all 0.25s var(--ease-smooth);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        /* Shimmer on hover */
+        .btn-login::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 50%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.14) 50%, transparent 100%);
+            skewX: -15deg;
+            transition: left 0.6s ease;
+        }
+        .btn-login:hover::before { left: 150%; }
+
+        .btn-login:hover:not(:disabled) {
+            background: linear-gradient(135deg, var(--sebn-purple) 0%, var(--sebn-purple-h) 100%);
+            box-shadow:
+                0 1px 2px rgba(46,0,139,0.4),
+                0 6px 18px rgba(46,0,139,0.38),
+                0 16px 36px rgba(46,0,139,0.26);
+            transform: translateY(-1.5px);
+        }
+
+        .btn-login:active:not(:disabled) { transform: translateY(0); }
+
+        .btn-login:disabled {
+            opacity: 0.8;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-login .spinner {
+            display: none;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255,255,255,0.35);
+            border-top-color: #FFFFFF;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Below button */
+        .system-name {
+            text-align: center;
+            font-size: 11.5px;
+            color: var(--gray-400);
+            font-weight: 500;
+            margin-top: 14px;
+            letter-spacing: 0.2px;
+        }
+
+        /* Security row */
+        .security-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 18px;
+            margin-top: 20px;
+        }
+
+        .security-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 11px;
+            color: var(--gray-400);
+        }
+        .security-item i { font-size: 10px; color: #10B981; }
+
+        .security-sep { width: 3px; height: 3px; background: var(--gray-200); border-radius: 50%; }
+
+        /* Developer credit */
+        .login-footer {
+            margin-top: 24px;
+            padding-top: 18px;
+            border-top: 1px solid var(--gray-100);
+            text-align: center;
+        }
+
+        .dev-credit {
+            font-size: 11px;
+            color: var(--gray-400);
+            letter-spacing: 0.3px;
+        }
+        .dev-credit a {
+            color: var(--gray-400);
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+        .dev-credit a:hover { color: var(--sebn-purple); }
+
+        /* ─────────────────────────────────────────────
+           RESPONSIVE
+        ───────────────────────────────────────────── */
+        @media (max-width: 860px) {
+            body { padding: 16px; align-items: flex-start; padding-top: 32px; }
+            .card {
+                grid-template-columns: 1fr;
+                max-width: 460px;
+                margin: 0 auto;
+                min-height: auto;
+            }
+            .brand {
+                padding: 36px 32px 30px;
+                min-height: 280px;
+            }
+            .features { display: none; }
+            .brand-name { font-size: 40px; }
+            .login-panel { padding: 36px 32px 32px; }
+        }
+
+        @media (max-width: 460px) {
+            .card { border-radius: 16px; }
+            .brand { padding: 28px 24px 24px; }
+            .login-panel { padding: 28px 24px; }
+            .brand-name { font-size: 34px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="card">
+
+    <!-- ═══════════════════════════════════════════
+         LEFT — SEBN-TN BRAND PANEL
+    ═══════════════════════════════════════════ -->
+    <div class="brand">
+        <!-- Orbs -->
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+
+        <!-- Animated Wire Harness SVG -->
+        <svg class="harness-svg" viewBox="0 0 520 640" fill="none" preserveAspectRatio="xMidYMid slice">
+            <!-- Main trunk cable -->
+            <path class="harness-path"
+                d="M-20 480 C100 480, 180 380, 280 320 C380 260, 440 200, 560 200"
+                stroke="rgba(110,193,228,0.28)" stroke-width="2.5"/>
+            <!-- Branch 1 -->
+            <path class="harness-path-2"
+                d="M280 320 C320 280, 360 180, 400 80"
+                stroke="rgba(255,255,255,0.18)" stroke-width="1.5" stroke-dasharray="5 6"/>
+            <!-- Branch 2 -->
+            <path class="harness-path-3"
+                d="M-20 200 C80 200, 160 240, 240 260 C320 280, 380 350, 420 500"
+                stroke="rgba(110,193,228,0.16)" stroke-width="1.5"/>
+            <!-- Connector dots -->
+            <circle class="harness-dot"   cx="280" cy="320" r="4" fill="#6EC1E4"/>
+            <circle class="harness-dot-2" cx="420" cy="500" r="3.5" fill="rgba(255,255,255,0.6)"/>
+            <circle class="harness-dot-3" cx="240" cy="260" r="3" fill="#6EC1E4"/>
+            <circle cx="400" cy="80"  r="2.5" fill="rgba(255,255,255,0.4)"/>
+            <circle cx="100" cy="480" r="2" fill="rgba(110,193,228,0.5)"/>
+        </svg>
+
+        <!-- Brand Content -->
+        <div class="brand-content">
+            <div class="sumitomo-badge">
+                <span class="dot"></span>
+                Sumitomo Electric Bordnetze
+            </div>
+
+            <div class="brand-logo-row">
+                <span class="brand-name">SEBN</span>
+                <span class="brand-tn">TN</span>
+            </div>
+
+            <div class="brand-headline">Maintenance &amp; Industrial Management</div>
+            <div class="brand-subline">
+                Système unifié de maintenance industrielle pour câblage automobile — PMA, IMA, EBM &amp; Passation.
+            </div>
+
+            <div class="features">
+                <div class="feature">
+                    <div class="feature-icon fi-blue"><i class="fa-solid fa-car"></i></div>
+                    <div class="feature-text">
+                        <strong>Production &amp; Câblage Automobile</strong>
+                        <span>Conformité industrielle &amp; excellence opérationnelle</span>
+                    </div>
+                    <div class="feature-check"><i class="fa-solid fa-check"></i></div>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon fi-green"><i class="fa-solid fa-screwdriver-wrench"></i></div>
+                    <div class="feature-text">
+                        <strong>Maintenance Préventive &amp; Curative</strong>
+                        <span>Checklists automatisées &amp; suivi temps réel</span>
+                    </div>
+                    <div class="feature-check"><i class="fa-solid fa-check"></i></div>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon fi-amber"><i class="fa-solid fa-chart-pie"></i></div>
+                    <div class="feature-text">
+                        <strong>Pilotage EBM &amp; Passation de Shift</strong>
+                        <span>Budget, équipements &amp; analytics avancés</span>
+                    </div>
+                    <div class="feature-check"><i class="fa-solid fa-check"></i></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="brand-bottom">
+            <div class="brand-footer-row">
+                <i class="fa-solid fa-location-dot"></i>
+                <span>Jendouba, Tunisie</span>
+                <div class="brand-divider"></div>
+                <i class="fa-solid fa-location-dot"></i>
+                <span>Bizerte, Tunisie</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════
+         RIGHT — LOGIN FORM PANEL
+    ═══════════════════════════════════════════ -->
+    <div class="login-panel">
+        <div class="login-top">
+            <div class="secured-badge">
+                <i class="fa-solid fa-shield-halved"></i>
+                Espace de travail sécurisé
+            </div>
+
+            <h1 class="login-title">Bienvenue</h1>
+            <p class="login-subtitle">Connectez-vous à votre espace de travail SEBN-TN</p>
+
+            <!-- Flash Error Banner -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for cat, msg in messages %}
+                    <div class="error-banner" role="alert">
+                        <div class="error-icon"><i class="fa-solid fa-exclamation"></i></div>
+                        <div class="error-text">{{ msg|safe }}</div>
+                    </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <div class="form-divider">Identification</div>
+
+            <form id="loginForm" method="POST" action="{{ url_for('login') }}" autocomplete="off" onsubmit="onSubmit(event)">
+
+                <div class="field-group">
+                    <label class="field-label" for="username">
+                        <i class="fa-solid fa-user"></i>
+                        Nom d'utilisateur
+                    </label>
+                    <div class="field-wrap">
+                        <i class="fa-solid fa-at field-prefix"></i>
+                        <input type="text"
+                               id="username"
+                               name="username"
+                               class="field-input"
+                               placeholder="Entrez votre nom d'utilisateur"
+                               required
+                               autofocus
+                               autocomplete="username">
+                    </div>
+                </div>
+
+                <div class="field-group">
+                    <label class="field-label" for="password">
+                        <i class="fa-solid fa-lock"></i>
+                        Mot de passe
+                    </label>
+                    <div class="field-wrap">
+                        <i class="fa-solid fa-lock field-prefix"></i>
+                        <input type="password"
+                               id="password"
+                               name="password"
+                               class="field-input"
+                               placeholder="Entrez votre mot de passe"
+                               required
+                               autocomplete="current-password">
+                        <button type="button" class="eye-btn" id="eyeBtn" onclick="togglePwd()" aria-label="Afficher/masquer le mot de passe">
+                            <i class="fa-solid fa-eye" id="eyeIcon"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="options-row">
+                    <label class="remember-label">
+                        <input type="checkbox" name="remember_me" value="1">
+                        <div class="checkbox-box"><i class="fa-solid fa-check"></i></div>
+                        Se souvenir de moi
+                    </label>
+                </div>
+
+                <button type="submit" class="btn-login" id="loginBtn">
+                    <div class="spinner" id="spinner"></div>
+                    <span id="btnLabel">
+                        <i class="fa-solid fa-right-to-bracket"></i>&nbsp; Se connecter
+                    </span>
+                </button>
+            </form>
+
+            <div class="system-name">SEBN-TN Maintenance System</div>
+
+            <div class="security-row">
+                <div class="security-item"><i class="fa-solid fa-circle-check"></i> Accès chiffré</div>
+                <div class="security-sep"></div>
+                <div class="security-item"><i class="fa-solid fa-circle-check"></i> Session sécurisée</div>
+                <div class="security-sep"></div>
+                <div class="security-item"><i class="fa-solid fa-circle-check"></i> Rôles contrôlés</div>
+            </div>
+        </div>
+
+        <div class="login-footer">
+            <div class="dev-credit">
+                Développé par <a href="#">Mohamed Aissaoui</a>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+function togglePwd() {
+    const pw = document.getElementById('password');
+    const ic = document.getElementById('eyeIcon');
+    if (pw.type === 'password') {
+        pw.type = 'text';
+        ic.classList.replace('fa-eye', 'fa-eye-slash');
+    } else {
+        pw.type = 'password';
+        ic.classList.replace('fa-eye-slash', 'fa-eye');
+    }
+}
+
+function onSubmit(e) {
+    const btn    = document.getElementById('loginBtn');
+    const label  = document.getElementById('btnLabel');
+    const spinner = document.getElementById('spinner');
+
+    label.style.opacity  = '0';
+    label.style.width    = '0';
+    label.style.overflow = 'hidden';
+    spinner.style.display = 'block';
+
+    btn.style.opacity       = '0.82';
+    btn.style.pointerEvents = 'none';
+
+    // Restore after 8s fallback (server should redirect by then)
+    setTimeout(() => {
+        label.style.opacity  = '';
+        label.style.width    = '';
+        label.style.overflow = '';
+        spinner.style.display = 'none';
+        btn.style.opacity       = '';
+        btn.style.pointerEvents = '';
+    }, 8000);
+}
+</script>
+
+</body>
+</html>

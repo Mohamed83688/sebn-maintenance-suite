@@ -1,0 +1,817 @@
+{% extends 'base.html' %}
+{% block title %}Administration — SEBN-TN Enterprise Maintenance{% endblock %}
+{% block page_title %}Paramètres Administrateur{% endblock %}
+{% block page_subtitle %}Configuration système, sécurité et gestion du personnel{% endblock %}
+
+{% block extra_css %}
+<style>
+.admin-layout { display: flex; gap: 24px; align-items: flex-start; }
+.admin-sidebar {
+    width: 220px; background: #FFFFFF;
+    border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 8px; flex-shrink: 0; position: sticky; top: 80px;
+    box-shadow: var(--shadow-sm);
+}
+.admin-tab {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 12px; border-radius: var(--radius-sm);
+    color: var(--text-sec); font-size: 13px; font-weight: 600;
+    cursor: pointer; transition: var(--transition-s); margin-bottom: 2px;
+}
+.admin-tab:hover { background: var(--bg-page); color: var(--text); }
+.admin-tab.active { background: var(--primary-light); color: var(--primary); }
+.admin-tab i { width: 16px; text-align: center; }
+
+.admin-main { flex: 1; min-width: 0; }
+.admin-panel { display: none; animation: fadeIn 0.25s ease; }
+.admin-panel.active { display: block; }
+
+.settings-card {
+    background: #FFFFFF; border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 24px;
+    margin-bottom: 20px; box-shadow: var(--shadow-sm);
+}
+.settings-header {
+    border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 20px;
+}
+.settings-title { font-size: 15px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 9px; }
+.settings-title i { color: var(--primary); }
+.settings-desc { font-size: 12px; color: var(--text-sec); margin-top: 3px; }
+
+.danger-zone { border: 1px solid var(--danger-border); background: var(--danger-bg); }
+.danger-zone .settings-title i { color: var(--danger); }
+.danger-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 0; border-bottom: 1px solid rgba(220,38,38,0.15);
+}
+.danger-item:last-child { border-bottom: none; padding-bottom: 0; }
+
+.toggle-switch { position: relative; display: inline-block; width: 42px; height: 22px; }
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.slider {
+    position: absolute; cursor: pointer; inset: 0;
+    background-color: #CBD5E1; transition: .3s; border-radius: 34px;
+}
+.slider:before {
+    position: absolute; content: ""; height: 16px; width: 16px;
+    left: 3px; bottom: 3px; background-color: white; transition: .3s; border-radius: 50%;
+}
+input:checked + .slider { background-color: var(--success); }
+input:checked + .slider:before { transform: translateX(20px); }
+
+/* Tech table mini */
+.tech-table-mini td, .tech-table-mini th { padding: 9px 14px; font-size: 12px; }
+.tech-table-mini th { font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-sec); }
+
+/* PPE templates list */
+.ppe-file-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px; border-radius: var(--radius-sm);
+    background: var(--bg-page); border: 1px solid var(--border);
+    margin-bottom: 8px;
+}
+.ppe-file-item:last-child { margin-bottom: 0; }
+
+@media(max-width: 900px) {
+    .admin-layout { flex-direction: column; }
+    .admin-sidebar { width: 100%; display: flex; flex-wrap: wrap; gap: 4px; padding: 8px; position: relative; top: 0; }
+    .admin-tab { flex: 0 0 auto; margin-bottom: 0; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="admin-layout">
+    <!-- Sidebar tabs -->
+    <div class="admin-sidebar animate-up">
+        <div class="admin-tab active" onclick="switchAdminTab('general')">
+            <i class="fa-solid fa-sliders"></i> Général
+        </div>
+        <div class="admin-tab" onclick="switchAdminTab('security')">
+            <i class="fa-solid fa-key"></i> Sécurité
+        </div>
+        <div class="admin-tab" onclick="switchAdminTab('shifts')">
+            <i class="fa-solid fa-people-group"></i> Équipes
+        </div>
+        <div class="admin-tab" onclick="switchAdminTab('email')">
+            <i class="fa-solid fa-envelope"></i> Email
+        </div>
+        <div class="admin-tab" onclick="switchAdminTab('ppe')">
+            <i class="fa-solid fa-file-excel"></i> PPE Templates
+        </div>
+        <div class="admin-tab" onclick="switchAdminTab('technicians')">
+            <i class="fa-solid fa-users"></i> Techniciens
+        </div>
+        <div class="admin-tab" onclick="switchAdminTab('asp')">
+            <i class="fa-solid fa-tags"></i> Codes ASP
+        </div>
+        <div class="admin-tab" onclick="switchAdminTab('pma')">
+            <i class="fa-solid fa-calendar-check"></i> Planning PMA
+        </div>
+        <div class="admin-tab" onclick="switchAdminTab('signatures')">
+            <i class="fa-solid fa-file-signature"></i> Signatures &amp; Validations
+        </div>
+        <div class="admin-tab" onclick="switchAdminTab('data')">
+            <i class="fa-solid fa-database"></i> Données &amp; Backup
+        </div>
+    </div>
+
+    <div class="admin-main">
+
+        <!-- ── GÉNÉRAL ───────────────────────────────────────────────────── -->
+        <div id="panel-general" class="admin-panel active">
+            <div class="settings-card">
+                <div class="settings-header">
+                    <div class="settings-title"><i class="fa-solid fa-sliders"></i> Paramètres Généraux du Portail</div>
+                    <div class="settings-desc">Configuration générale de l'application SEBN-TN Maintenance.</div>
+                </div>
+                <form method="POST" action="{{ url_for('admin_update_config') }}">
+                    <div class="grid-2">
+                        <div class="form-group">
+                            <label class="form-label">Nom de l'Entreprise</label>
+                            <input type="text" name="company_name" class="form-control" value="{{ config.get('company_name', 'SEBN-TN') }}">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Nom de l'Application</label>
+                            <input type="text" name="app_title" class="form-control" value="{{ config.get('app_title', 'Maintenance Suite') }}">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Délai d'Inactivité Session (minutes)</label>
+                        <input type="number" name="session_timeout" class="form-control" value="{{ config.get('session_timeout', 60) }}">
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fa-solid fa-floppy-disk"></i> Enregistrer
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- ── SÉCURITÉ ───────────────────────────────────────────────────── -->
+        <div id="panel-security" class="admin-panel">
+            <div class="settings-card">
+                <div class="settings-header">
+                    <div class="settings-title"><i class="fa-solid fa-key"></i> Changer le Mot de Passe Administrateur</div>
+                    <div class="settings-desc">Mettre à jour vos identifiants d'accès.</div>
+                </div>
+                <form method="POST" action="{{ url_for('admin_change_password') }}">
+                    <div class="form-group">
+                        <label class="form-label">Mot de Passe Actuel</label>
+                        <input type="password" name="current_password" class="form-control" required>
+                    </div>
+                    <div class="grid-2">
+                        <div class="form-group">
+                            <label class="form-label">Nouveau Mot de Passe</label>
+                            <input type="password" name="new_password" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Confirmer Nouveau Mot de Passe</label>
+                            <input type="password" name="confirm_password" class="form-control" required>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fa-solid fa-lock"></i> Modifier le Mot de Passe
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- ── ÉQUIPES ───────────────────────────────────────────────────── -->
+        <div id="panel-shifts" class="admin-panel">
+            <div class="settings-card">
+                <div class="settings-header">
+                    <div class="settings-title"><i class="fa-solid fa-people-group"></i> Configuration des Équipes (Shifts)</div>
+                    <div class="settings-desc">Définition des plages horaires de travail.</div>
+                </div>
+                <div class="grid-3">
+                    <div class="form-group">
+                        <label class="form-label">Équipe A</label>
+                        <input type="text" class="form-control" value="06:00 — 14:00" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Équipe B</label>
+                        <input type="text" class="form-control" value="14:00 — 22:00" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Équipe C</label>
+                        <input type="text" class="form-control" value="22:00 — 06:00" readonly>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── EMAIL ─────────────────────────────────────────────────────── -->
+        <div id="panel-email" class="admin-panel">
+            <div class="settings-card">
+                <div class="settings-header">
+                    <div class="settings-title"><i class="fa-solid fa-envelope"></i> Notifications Email / SMTP</div>
+                    <div class="settings-desc">Configuration des envois d'alertes automatiques en cas d'anomalie.</div>
+                </div>
+                <form method="POST" action="{{ url_for('admin_update_email') }}">
+                    <div class="grid-2">
+                        <div class="form-group">
+                            <label class="form-label">Serveur SMTP</label>
+                            <input type="text" name="smtp_server" class="form-control" value="{{ config.get('smtp_server', 'smtp.gmail.com') }}">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Port SMTP</label>
+                            <input type="number" name="smtp_port" class="form-control" value="{{ config.get('smtp_port', 587) }}">
+                        </div>
+                    </div>
+                    <div class="grid-2">
+                        <div class="form-group">
+                            <label class="form-label">Email Expéditeur</label>
+                            <input type="email" name="sender_email" class="form-control" value="{{ config.get('sender_email', '') }}">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Mot de Passe d'application</label>
+                            <input type="password" name="sender_password" class="form-control" value="{{ config.get('sender_password', '') }}">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fa-solid fa-paper-plane"></i> Enregistrer Paramètres SMTP
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- ── PPE / CHECKLIST TEMPLATES ─────────────────────────────────── -->
+        <div id="panel-ppe" class="admin-panel">
+            <div class="settings-card">
+                <div class="settings-header" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+                    <div>
+                        <div class="settings-title"><i class="fa-solid fa-file-excel"></i> Gestion des Checklists &amp; Modèles PPE</div>
+                        <div class="settings-desc">Source de vérité pour la configuration active des fiches d'inspection préventive.</div>
+                    </div>
+                    <button class="btn btn-primary btn-sm" onclick="openUploadModal()">
+                        <i class="fa-solid fa-plus"></i> Importer une Checklist Excel
+                    </button>
+                </div>
+
+                <!-- Table of Checklist Definitions & Versions -->
+                <div class="table-card" style="box-shadow:none; margin-bottom: 28px;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Checklist / Modèle</th>
+                                <th>Fichier Excel Source</th>
+                                <th>Version</th>
+                                <th>Points</th>
+                                <th>Statut</th>
+                                <th>Dernière MAJ</th>
+                                <th style="text-align:right;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for chk in checklists %}
+                            <tr>
+                                <td>
+                                    <div style="font-weight:700; color:var(--text);">{{ chk.name }}</div>
+                                    <div style="font-size:11px; color:var(--text-sec); font-family:var(--font-mono); margin-top:2px;">Code: {{ chk.checklist_code }} &nbsp;·&nbsp; Cible: {{ chk.equipment_pattern }}</div>
+                                </td>
+                                <td>
+                                    <div style="display:flex; align-items:center; gap:6px; font-size:12px;">
+                                        <i class="fa-solid fa-file-excel" style="color:var(--success);"></i>
+                                        <span style="font-weight:500; color:var(--text);">{{ chk.original_filename }}</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="badge badge-primary" style="font-family:var(--font-mono); font-size:11px;">
+                                        V{{ chk.version_number or 1 }}
+                                    </span>
+                                </td>
+                                <td style="font-size:12px; font-weight:700; color:var(--text);">
+                                    {{ chk.item_count or 0 }} points
+                                </td>
+                                <td>
+                                    {% if chk.status == 'ACTIVE' %}
+                                    <span class="badge badge-success">
+                                        <i class="fa-solid fa-circle-check"></i> ACTIF
+                                    </span>
+                                    {% else %}
+                                    <span class="badge badge-neutral">
+                                        <i class="fa-solid fa-circle-pause"></i> INACTIF
+                                    </span>
+                                    {% endif %}
+                                </td>
+                                <td style="font-size:11.5px; color:var(--text-sec); white-space:nowrap;">
+                                    {{ chk.imported_at[:16] if chk.imported_at else '—' }}
+                                </td>
+                                <td style="text-align:right;">
+                                    <div style="display:flex; align-items:center; justify-content:flex-end; gap:6px;">
+                                        <button type="button" class="btn btn-secondary btn-xs" onclick="previewItems({{ chk.version_id }}, '{{ chk.name|replace("'", "\\'") }}')" title="Voir les points de contrôle">
+                                            <i class="fa-solid fa-list-check"></i>
+                                        </button>
+                                        <a href="{{ url_for('download_ppe_file', version_id=chk.version_id) }}" class="btn btn-secondary btn-xs" title="Télécharger le fichier Excel">
+                                            <i class="fa-solid fa-download"></i>
+                                        </a>
+                                        <button type="button" class="btn btn-primary btn-xs" onclick="openUpdateModal('{{ chk.checklist_code }}', '{{ chk.name|replace("'", "\\'") }}', '{{ chk.equipment_pattern }}')" title="Remplacer par un nouvel Excel">
+                                            <i class="fa-solid fa-arrow-up-from-bracket"></i> MAJ
+                                        </button>
+                                        {% if chk.status == 'ACTIVE' %}
+                                        <button type="button" class="btn btn-danger btn-xs" onclick="confirmDeactivate({{ chk.version_id }}, '{{ chk.name|replace("'", "\\'") }}', {{ chk.version_number }})" title="Désactiver cette checklist">
+                                            <i class="fa-solid fa-power-off"></i>
+                                        </button>
+                                        {% else %}
+                                        <form method="POST" action="{{ url_for('toggle_ppe_template') }}" style="display:inline;">
+                                            <input type="hidden" name="version_id" value="{{ chk.version_id }}">
+                                            <input type="hidden" name="action" value="activate">
+                                            <button type="submit" class="btn btn-success btn-xs" title="Réactiver cette version">
+                                                <i class="fa-solid fa-play"></i>
+                                            </button>
+                                        </form>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="7" style="text-align:center; padding:32px; color:var(--text-sec);">
+                                    <i class="fa-solid fa-folder-open" style="font-size:28px; color:var(--text-dim); margin-bottom:8px; display:block;"></i>
+                                    Aucune checklist enregistrée dans la base.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Historical Executions Section -->
+                <div class="settings-header">
+                    <div class="settings-title"><i class="fa-solid fa-clock-rotate-left"></i> Historique Récent des Exécutions de Checklists</div>
+                    <div class="settings-desc">Les exécutions passées demeurent sauvegardées de manière permanente, même en cas de modification ou suppression de l'Excel source.</div>
+                </div>
+
+                <div class="table-card" style="box-shadow:none;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Date &amp; Heure</th>
+                                <th>Équipement</th>
+                                <th>Checklist / Modèle</th>
+                                <th>Technicien</th>
+                                <th>Équipe</th>
+                                <th>Résultat</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for ex in checklist_history %}
+                            <tr>
+                                <td style="font-size:12px; color:var(--text-sec); font-family:var(--font-mono);">{{ ex.executed_at[:16] }}</td>
+                                <td style="font-weight:700; color:var(--text); font-family:var(--font-mono);">{{ ex.equipment }}</td>
+                                <td>
+                                    <div style="font-size:12.5px; font-weight:600; color:var(--text);">{{ ex.checklist_name or ex.task_type }}</div>
+                                    <span class="badge badge-primary" style="font-size:9.5px;">V{{ ex.version_number or 1 }}</span>
+                                </td>
+                                <td style="font-size:12.5px;">{{ ex.technician_name }}</td>
+                                <td><span class="badge badge-info">Équipe {{ ex.shift }}</span></td>
+                                <td><span class="badge badge-success"><i class="fa-solid fa-check"></i> {{ ex.status }}</span></td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="6" style="text-align:center; padding:20px; color:var(--text-sec);">Aucun historique d'exécution récent.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── TECHNICIENS ────────────────────────────────────────────────── -->
+        <div id="panel-technicians" class="admin-panel">
+            <div class="settings-card">
+                <div class="settings-header">
+                    <div class="settings-title"><i class="fa-solid fa-users"></i> Personnel &amp; Techniciens</div>
+                    <div class="settings-desc">Liste des techniciens habilités sur la plateforme.</div>
+                </div>
+                <div class="table-card" style="box-shadow:none;">
+                    <table class="data-table tech-table-mini">
+                        <thead>
+                            <tr>
+                                <th>Matricule</th>
+                                <th>Nom &amp; Prénom</th>
+                                <th>Équipe</th>
+                                <th>Rôle</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for tech in technicians %}
+                            <tr>
+                                <td class="td-mono">{{ tech.matricule }}</td>
+                                <td style="font-weight:600;">{{ tech.name }}</td>
+                                <td><span class="badge badge-info">Équipe {{ tech.shift }}</span></td>
+                                <td><span class="badge badge-success">Technicien</span></td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="4" style="text-align:center; color:var(--text-sec);">Aucun technicien enregistré.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── CODES ASP ──────────────────────────────────────────────────── -->
+        <div id="panel-asp" class="admin-panel">
+            <div class="settings-card">
+                <div class="settings-header">
+                    <div class="settings-title"><i class="fa-solid fa-tags"></i> Référentiel des Codes ASP</div>
+                    <div class="settings-desc">Codes de défaillances et catégories d'anomalies.</div>
+                </div>
+                <form method="POST" action="{{ url_for('add_asp_code') }}" style="margin-bottom:20px;">
+                    <div class="grid-2">
+                        <div class="form-group">
+                            <label class="form-label">Code ASP</label>
+                            <input type="text" name="code" class="form-control" placeholder="Ex: ASP-102" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Description</label>
+                            <input type="text" name="description" class="form-control" placeholder="Description de la défaillance..." required>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <i class="fa-solid fa-plus"></i> Ajouter Code ASP
+                    </button>
+                </form>
+
+                <div class="table-card" style="box-shadow:none;">
+                    <table class="data-table tech-table-mini">
+                        <thead>
+                            <tr>
+                                <th>Code</th>
+                                <th>Description</th>
+                                <th style="text-align:right;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for c in asp_codes %}
+                            <tr>
+                                <td class="td-mono">{{ c.code }}</td>
+                                <td style="color:var(--text);">{{ c.description }}</td>
+                                <td style="text-align:right;">
+                                    <form method="POST" action="{{ url_for('delete_asp_code') }}" style="display:inline;" onsubmit="return confirm('Supprimer ce code ASP ?');">
+                                        <input type="hidden" name="code" value="{{ c.code }}">
+                                        <button type="submit" class="btn btn-danger btn-xs">
+                                            <i class="fa-solid fa-trash"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="3" style="text-align:center; color:var(--text-sec);">Aucun code ASP défini.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── PLANNING PMA ──────────────────────────────────────────────── -->
+        <div id="panel-pma" class="admin-panel">
+            <div class="settings-card">
+                <div class="settings-header">
+                    <div class="settings-title"><i class="fa-solid fa-calendar-check"></i> Fichier Planning PMA</div>
+                    <div class="settings-desc">Chargez ou remplacez le fichier Excel du planning préventif annuel.</div>
+                </div>
+                {% if excel_path %}
+                <div style="background:var(--success-bg); border:1px solid var(--success-border); border-radius:var(--radius-sm); padding:12px 16px; margin-bottom:20px; display:flex; align-items:center; gap:12px;">
+                    <i class="fa-solid fa-circle-check" style="color:var(--success); font-size:18px;"></i>
+                    <div>
+                        <div style="font-size:13px; font-weight:700; color:var(--success);">Planning actif</div>
+                        <div style="font-size:11px; color:var(--text-sec); word-break:break-all;">{{ excel_path }}</div>
+                    </div>
+                </div>
+                {% else %}
+                <div style="background:var(--warning-bg); border:1px solid var(--warning-border); border-radius:var(--radius-sm); padding:12px 16px; margin-bottom:20px; display:flex; align-items:center; gap:12px;">
+                    <i class="fa-solid fa-triangle-exclamation" style="color:var(--warning); font-size:18px;"></i>
+                    <div style="font-size:13px; font-weight:600; color:var(--warning);">Aucun fichier PMA chargé</div>
+                </div>
+                {% endif %}
+                <form method="POST" action="{{ url_for('pma_upload') }}" enctype="multipart/form-data">
+                    <div class="form-group">
+                        <label class="form-label">Fichier Excel Planning (current_schedule.xlsx)</label>
+                        <input type="file" name="excel_file" accept=".xlsx,.xls" required
+                               class="form-control" style="padding:8px;">
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fa-solid fa-upload"></i> Charger le Planning
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- ── SIGNATURES & VALIDATIONS ────────────────────────────────────── -->
+        <div id="panel-signatures" class="admin-panel">
+            <div class="settings-card">
+                <div class="settings-header">
+                    <div class="settings-title"><i class="fa-solid fa-file-signature"></i> Registre des Signatures &amp; Validations</div>
+                    <div class="settings-desc">Historique complet des signatures enregistrées lors de la validation des tâches préventives.</div>
+                </div>
+
+                {% if signatures %}
+                <div class="table-card" style="border-radius:var(--radius-sm); overflow:hidden; border:1px solid var(--border);">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Date &amp; Heure</th>
+                                <th>Utilisateur / Technicien</th>
+                                <th>Matricule</th>
+                                <th>Rôle</th>
+                                <th>Fichier Source</th>
+                                <th>Action / Statut</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for s in signatures %}
+                            <tr>
+                                <td>
+                                    <span style="font-weight:700; color:var(--text);">{{ s.date or '—' }}</span>
+                                    <span style="font-size:11px; color:var(--text-sec); margin-left:4px;">{{ s.time or '' }}</span>
+                                </td>
+                                <td>
+                                    <div style="font-weight:700; color:var(--text);">{{ s.name or '—' }}</div>
+                                </td>
+                                <td>
+                                    {% if s.matricule %}
+                                    <span class="badge badge-info" style="font-family:monospace; font-weight:800;">{{ s.matricule }}</span>
+                                    {% else %}
+                                    <span style="color:var(--text-dim);">—</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge {% if s.role == 'admin' or s.role == 'Administrator' %}badge-danger{% else %}badge-info{% endif %}">
+                                        {{ s.role or 'Technician' }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span style="font-family:monospace; font-size:11px; color:var(--text-sec);">{{ s.file or 'Planning' }}</span>
+                                </td>
+                                <td>
+                                    <span style="font-size:12px; color:var(--success); font-weight:600;">
+                                        <i class="fa-solid fa-circle-check"></i> {{ s.action or 'Validé' }}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="empty-state">
+                    <i class="fa-solid fa-file-signature empty-icon"></i>
+                    <div class="empty-title">Aucune signature enregistrée</div>
+                    <div class="empty-desc">Les signatures apparaîtront ici dès que les techniciens valideront des checklists.</div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- ── DONNÉES & BACKUP ──────────────────────────────────────────── -->
+        <div id="panel-data" class="admin-panel">
+            <div class="settings-card">
+                <div class="settings-header">
+                    <div class="settings-title"><i class="fa-solid fa-cloud-arrow-down"></i> Sauvegarde &amp; Exports</div>
+                    <div class="settings-desc">Téléchargez une copie sécurisée des données ou un rapport PDF.</div>
+                </div>
+                <p style="font-size:13px; color:var(--text-sec); margin-bottom:16px;">
+                    La base SQLite <code>IMA.db</code> contient toutes les interventions curatives. Le planning préventif réside dans le fichier Excel.
+                </p>
+                <div style="display:flex; gap:12px; flex-wrap:wrap;">
+                    <a href="{{ url_for('export_excel') }}" class="btn btn-success">
+                        <i class="fa-solid fa-file-excel"></i> Exporter IMA.db → Excel
+                    </a>
+                    <a href="{{ url_for('export_pdf') }}" class="btn btn-secondary" style="border-color:var(--danger); color:var(--danger);">
+                        <i class="fa-solid fa-file-pdf"></i> Rapport PDF
+                    </a>
+                </div>
+            </div>
+
+            <div class="settings-card danger-zone">
+                <div class="settings-header">
+                    <div class="settings-title"><i class="fa-solid fa-triangle-exclamation"></i> Zone de Danger</div>
+                    <div class="settings-desc" style="color:var(--danger);">Actions irréversibles. Soyez prudent.</div>
+                </div>
+
+                <div class="danger-item">
+                    <div>
+                        <div style="font-size:13px; font-weight:700; color:var(--text);">Purger les données PMA</div>
+                        <div style="font-size:11px; color:var(--text-sec);">Supprime le fichier Excel actif du préventif.</div>
+                    </div>
+                    <form method="POST" action="{{ url_for('purge_pma') }}" onsubmit="return confirm('Purger le fichier PMA ? Irréversible.');">
+                        <button type="submit" class="btn btn-danger btn-sm">
+                            <i class="fa-solid fa-trash"></i> Purger PMA
+                        </button>
+                    </form>
+                </div>
+                <div class="danger-item">
+                    <div>
+                        <div style="font-size:13px; font-weight:700; color:var(--text);">Réinitialiser la Base Curative (IMA)</div>
+                        <div style="font-size:11px; color:var(--text-sec);">Supprime l'intégralité des interventions. Les machines seront conservées.</div>
+                    </div>
+                    <form method="POST" action="{{ url_for('reset_db') }}" onsubmit="return confirm('ATTENTION: Toutes les pannes seront supprimées. Confirmer ?');">
+                        <button type="submit" class="btn btn-danger btn-sm">
+                            <i class="fa-solid fa-skull"></i> Reset Data
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+    </div><!-- /admin-main -->
+</div><!-- /admin-layout -->
+
+<!-- ── MODAL: UPLOAD / UPDATE CHECKLIST EXCEL ───────────────────────────── -->
+<div class="modal-overlay" id="upload-checklist-modal">
+    <div class="modal-box" style="max-width: 520px;">
+        <div class="modal-close" onclick="closeModal('upload-checklist-modal')">
+            <i class="fa-solid fa-xmark"></i>
+        </div>
+        <div style="display:flex; align-items:center; gap:12px; margin-bottom:18px;">
+            <div style="width:42px; height:42px; border-radius:10px; background:var(--primary-light); color:var(--primary); display:flex; align-items:center; justify-content:center; font-size:18px;">
+                <i class="fa-solid fa-file-excel"></i>
+            </div>
+            <div>
+                <h3 style="font-family:var(--font-display); font-size:16px; font-weight:800; color:var(--text);" id="modal-form-title">Importer une Checklist Excel</h3>
+                <p style="font-size:12px; color:var(--text-sec);">Configuration de la fiche d'inspection préventive.</p>
+            </div>
+        </div>
+
+        <form method="POST" action="{{ url_for('upload_ppe_template') }}" enctype="multipart/form-data">
+            <input type="hidden" name="checklist_code" id="modal-chk-code" value="">
+
+            <div class="form-group">
+                <label class="form-label">Titre / Nom de la Checklist</label>
+                <input type="text" name="checklist_name" id="modal-chk-name" class="form-control" placeholder="Ex: Checklist Mensuelle Presse Schuler" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Équipement / Machine Cible</label>
+                <input type="text" name="equipment_pattern" id="modal-chk-pattern" class="form-control" placeholder="Ex: TS1300, VAN, ou ALL" value="ALL" required>
+                <small style="font-size:11px; color:var(--text-dim); margin-top:3px; display:block;">Indiquez le code machine ou 'ALL' pour s'appliquer à tous les équipements.</small>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Fichier Excel (.xlsx / .xls)</label>
+                <input type="file" name="ppe_file" accept=".xlsx,.xls,.xlsm" required class="form-control" style="padding:8px;">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Notes de version / Changements (optionnel)</label>
+                <input type="text" name="change_summary" class="form-control" placeholder="Ex: Ajout de 2 points de contrôle pneumatique">
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:24px;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('upload-checklist-modal')">Annuler</button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fa-solid fa-check"></i> Valider &amp; Activer
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ── MODAL: CONFIRM DEACTIVATE ────────────────────────────────────────── -->
+<div class="modal-overlay" id="deactivate-modal">
+    <div class="modal-box" style="max-width: 480px;">
+        <div class="modal-close" onclick="closeModal('deactivate-modal')">
+            <i class="fa-solid fa-xmark"></i>
+        </div>
+        <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+            <div style="width:42px; height:42px; border-radius:10px; background:var(--warning-bg); color:var(--warning); display:flex; align-items:center; justify-content:center; font-size:20px;">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <div>
+                <h3 style="font-family:var(--font-display); font-size:16px; font-weight:800; color:var(--text);">Désactiver cette Checklist ?</h3>
+                <p style="font-size:12px; color:var(--text-sec);" id="deact-modal-subtitle"></p>
+            </div>
+        </div>
+
+        <div style="background:var(--bg-page); border:1px solid var(--border); border-radius:8px; padding:14px; margin-bottom:20px; font-size:13px; color:var(--text-sec); line-height:1.5;">
+            <strong style="color:var(--text);"><i class="fa-solid fa-shield-halved" style="color:var(--success);"></i> Préservation des données historiques :</strong><br>
+            Cette checklist ne sera plus proposée aux techniciens pour les <strong>nouvelles</strong> opérations préventives.<br>
+            Toutes les fiches historiques déjà remplies dans le passé <strong>restent conservées et consultables</strong>.
+        </div>
+
+        <form method="POST" action="{{ url_for('toggle_ppe_template') }}">
+            <input type="hidden" name="version_id" id="deact-version-id" value="">
+            <input type="hidden" name="action" value="deactivate">
+
+            <div style="display:flex; justify-content:flex-end; gap:10px;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('deactivate-modal')">Annuler</button>
+                <button type="submit" class="btn btn-danger">
+                    <i class="fa-solid fa-power-off"></i> Désactiver la Checklist
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ── MODAL: PREVIEW CHECKLIST ITEMS ───────────────────────────────────── -->
+<div class="modal-overlay" id="preview-items-modal">
+    <div class="modal-box" style="max-width: 720px; max-height: 85vh; display:flex; flex-direction:column;">
+        <div class="modal-close" onclick="closeModal('preview-items-modal')">
+            <i class="fa-solid fa-xmark"></i>
+        </div>
+        <div style="margin-bottom:16px;">
+            <h3 style="font-family:var(--font-display); font-size:16px; font-weight:800; color:var(--text);" id="preview-modal-title">Points de Contrôle</h3>
+            <p style="font-size:12px; color:var(--text-sec);">Liste des points extraits de la définition active.</p>
+        </div>
+
+        <div style="overflow-y:auto; flex:1; border:1px solid var(--border); border-radius:8px; margin-bottom:16px;">
+            <table class="data-table" id="preview-items-table">
+                <thead>
+                    <tr>
+                        <th style="width:40px; text-align:center;">#</th>
+                        <th>Point de Contrôle / Tâche</th>
+                        <th style="width:180px;">Méthode</th>
+                    </tr>
+                </thead>
+                <tbody id="preview-items-tbody">
+                    <tr><td colspan="3" style="text-align:center; padding:20px;">Chargement...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div style="text-align:right;">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('preview-items-modal')">Fermer</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function switchAdminTab(tabId) {
+    document.querySelectorAll('.admin-panel').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.admin-tab').forEach(el => el.classList.remove('active'));
+    document.getElementById('panel-' + tabId).classList.add('active');
+    const btn = document.querySelector(`[onclick="switchAdminTab('${tabId}')"]`);
+    if (btn) btn.classList.add('active');
+}
+
+function closeModal(modalId) {
+    const m = document.getElementById(modalId);
+    if (m) m.classList.remove('open');
+}
+
+function openUploadModal() {
+    document.getElementById('modal-form-title').textContent = 'Importer une Nouvelle Checklist Excel';
+    document.getElementById('modal-chk-code').value = '';
+    document.getElementById('modal-chk-name').value = '';
+    document.getElementById('modal-chk-pattern').value = 'ALL';
+    document.getElementById('upload-checklist-modal').classList.add('open');
+}
+
+function openUpdateModal(code, name, pattern) {
+    document.getElementById('modal-form-title').textContent = `Mettre à jour la Checklist (${name})`;
+    document.getElementById('modal-chk-code').value = code;
+    document.getElementById('modal-chk-name').value = name;
+    document.getElementById('modal-chk-pattern').value = pattern || 'ALL';
+    document.getElementById('upload-checklist-modal').classList.add('open');
+}
+
+function confirmDeactivate(versionId, name, version) {
+    document.getElementById('deact-version-id').value = versionId;
+    document.getElementById('deact-modal-subtitle').textContent = `${name} (V${version})`;
+    document.getElementById('deactivate-modal').classList.add('open');
+}
+
+async function previewItems(versionId, name) {
+    document.getElementById('preview-modal-title').textContent = `Points de contrôle — ${name}`;
+    const tbody = document.getElementById('preview-items-tbody');
+    tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:20px;"><i class="fa-solid fa-spinner fa-spin"></i> Chargement des points...</td></tr>';
+    document.getElementById('preview-items-modal').classList.add('open');
+
+    try {
+        const res = await fetch(`/admin/checklist-items/${versionId}`);
+        const data = await res.json();
+        if (data.items && data.items.length > 0) {
+            tbody.innerHTML = data.items.map(it => `
+                <tr>
+                    <td style="text-align:center; font-weight:700; color:var(--primary);">${it.item_number}</td>
+                    <td style="font-size:13px; font-weight:500; color:var(--text);">${it.description}</td>
+                    <td style="font-size:12px; color:var(--text-sec);">${it.method || 'Standard'}</td>
+                </tr>
+            `).join('');
+        } else {
+            tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:20px; color:var(--text-sec);">Aucun point de contrôle trouvé.</td></tr>';
+        }
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; padding:20px; color:var(--danger);">Erreur: ${e}</td></tr>`;
+    }
+}
+
+(function() {
+    const hash = window.location.hash.replace('#', '');
+    if (hash) {
+        const target = document.getElementById('panel-' + hash);
+        const btn = document.querySelector(`[onclick="switchAdminTab('${hash}')"]`);
+        if (target && btn) {
+            document.querySelectorAll('.admin-panel').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.admin-tab').forEach(el => el.classList.remove('active'));
+            target.classList.add('active');
+            btn.classList.add('active');
+        }
+    }
+})();
+</script>
+{% endblock %}
