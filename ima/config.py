@@ -2,7 +2,15 @@ import os
 
 class IMAConfig:
     def __init__(self):
-        self.active_base = os.path.join(os.path.expanduser('~'), 'Documents', 'SEBN-TN IMA APP')
+        env_data = os.environ.get("SEBN_DATA_DIR")
+        if env_data:
+            self.active_base = os.path.abspath(env_data)
+        else:
+            default_pma_data = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data')
+            if os.path.isdir(default_pma_data) or not os.path.exists(os.path.join(os.path.expanduser('~'), 'Documents', 'SEBN-TN IMA APP')):
+                self.active_base = default_pma_data
+            else:
+                self.active_base = os.path.join(os.path.expanduser('~'), 'Documents', 'SEBN-TN IMA APP')
         os.makedirs(self.active_base, exist_ok=True)
         
         self._ensure_admin_config()

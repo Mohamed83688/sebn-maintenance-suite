@@ -25,13 +25,15 @@ def get_ip():
         return "localhost"
 
 if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
     ip = get_ip()
     print("=" * 60)
     print("  SEBN-TN Maintenance Suite — Portail Unifié")
     print("=" * 60)
-    print(f"  Local:    http://localhost:5000")
-    print(f"  Réseau:   http://{ip}:5000")
+    print(f"  Port:     {port}")
+    print(f"  Local:    http://localhost:{port}")
+    print(f"  Réseau:   http://{ip}:{port}")
     print("=" * 60)
     
     # Run the application
-    app.run(host='0.0.0.0', port=5000, debug=False, threaded=True)
+    app.run(host='0.0.0.0', port=port, debug=False, threaded=True)
