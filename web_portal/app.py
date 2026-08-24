@@ -268,6 +268,76 @@ def diagnostic():
     except Exception as ex:
         return f'<pre>DIAG ERROR: {ex}</pre>', 500
 
+# ── Force sync endpoint (public, safe — read+write only) ─────────────────────
+@app.route('/sync')
+def force_sync():
+    import json as _json
+    try:
+        log_lines = []
+
+        # Directly look for the bundled Excel file relative to app.py
+        app_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        bundled_excel = os.path.join(app_root, 'data', 'current_schedule.xlsx')
+        log_lines.append(f"App root: {app_root}")
+        log_lines.append(f"Bundled Excel path: {bundled_excel}")
+        log_lines.append(f"Bundled Excel exists: {os.path.isfile(bundled_excel)}")
+        log_lines.append(f"active_base: {pma_config.active_base}")
+        log_lines.append(f"IMA_DB_PATH: {IMA_DB_PATH}")
+        log_lines.append(f"SEBN_DATA_DIR env: {os.environ.get('SEBN_DATA_DIR', '(not set)')}")
+
+        machines_before = len(ima_db.get_all_machines())
+        log_lines.append(f"Machines in DB before sync: {machines_before}")
+
+        # Gather all Excel paths
+        paths = pma_config.get_all_excel_paths()
+        if os.path.isfile(bundled_excel) and bundled_excel not in paths:
+            paths.append(bundled_excel)
+        log_lines.append(f"Excel paths to try: {paths}")
+
+        total = 0
+        from ima.excel_reader import CalendrierReader
+        reader = CalendrierReader()
+        for p in paths:
+            try:
+                cdf = reader.read_calendrier(p)
+                log_lines.append(f"  {os.path.basename(p)}: {len(cdf)} machines extracted")
+                if not cdf.empty:
+                    mlist = []
+                    for _, r in cdf.iterrows():
+                        mid = str(r.get('ID Machine', '')).strip()
+                        mname = str(r.get('Nom Machine', mid)).strip()
+                        grp = str(r.get('Groupe', '')).strip()
+                        if mid and mid.lower() not in ['nan', 'none', '']:
+                            mlist.append({
+                                'machine_id': mid,
+                                'machine_name': mname if mname and mname.lower() != 'nan' else mid,
+                                'group_name': grp if grp and grp.lower() != 'nan' else 'Général',
+                                'location': '', 'description': ''
+                            })
+                    if mlist:
+                        c = ima_db.upsert_machines(mlist)
+                        total += c
+                        log_lines.append(f"  Synced {c} machines from {os.path.basename(p)}")
+            except Exception as pe:
+                log_lines.append(f"  ERROR reading {p}: {pe}")
+
+        machines_after = len(ima_db.get_all_machines())
+        log_lines.append(f"Machines in DB after sync: {machines_after}")
+
+        color = '#d4edda' if machines_after > 0 else '#f8d7da'
+        status = f"✅ SUCCESS: {machines_after} machines synced!" if machines_after > 0 else "❌ FAILED: 0 machines"
+        html = f'<html><head><title>Force Sync</title></head><body style="font-family:sans-serif;padding:30px;">'
+        html += f'<h2>{status}</h2>'
+        html += f'<div style="background:{color};padding:15px;border-radius:8px;margin-bottom:20px;">'
+        html += f'<strong>Synced {machines_after} machines total</strong>'
+        html += f'</div>'
+        html += f'<pre style="background:#eee;padding:20px;font-size:13px;">' + '\n'.join(log_lines) + '</pre>'
+        html += f'<br><a href="/interventions/new" style="padding:10px 20px;background:#28a745;color:white;text-decoration:none;border-radius:5px;">→ Open Intervention Form</a>'
+        html += '</body></html>'
+        return html, 200
+    except Exception as ex:
+        return f'<pre>SYNC ERROR: {ex}</pre>', 500
+
 def get_local_ip():
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
