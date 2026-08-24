@@ -976,6 +976,7 @@ function togglePwd() {
 }
 
 function onSubmit(e) {
+    sessionStorage.setItem('sebn_auth_tab', '1');
     const btn    = document.getElementById('loginBtn');
     const label  = document.getElementById('btnLabel');
     const spinner = document.getElementById('spinner');

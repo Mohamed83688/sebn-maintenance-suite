@@ -17,9 +17,14 @@
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
-
-
-    <style>
+    <!-- Tab Lifecycle Security: Auto-logout when tab/browser is closed -->
+    <script>
+    (function() {
+        if (!sessionStorage.getItem('sebn_auth_tab')) {
+            window.location.replace("{{ url_for('logout') }}");
+        }
+    })();
+    </script>
         /* ============================================================
            SEBN CORPORATE DESIGN SYSTEM — AUTOMOTIVE INDUSTRIAL THEME
         ============================================================ */
