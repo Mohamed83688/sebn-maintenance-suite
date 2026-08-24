@@ -222,6 +222,7 @@ class DataEngine:
         """
         Reads one or multiple Excel files and extracts maintenance tasks.
         Accepts a single file path (str) or a list/tuple of file paths.
+        Guarantees deduplication so identical tasks are not multiplied.
         """
         if isinstance(file_path, (list, tuple)):
             valid_paths = [p for p in file_path if p and os.path.exists(p)]
@@ -230,9 +231,18 @@ class DataEngine:
                 return self.current_df
             
             all_tasks = []
+            seen_keys = set()
             for fp in valid_paths:
                 tasks_fp = self._parse_single_excel(fp)
-                all_tasks.extend(tasks_fp)
+                for t in tasks_fp:
+                    key = (
+                        str(t.get('Equipment', '')).strip().upper(),
+                        str(t.get('Sheet', '')).strip().upper(),
+                        str(t.get('Week', '')).strip().upper()
+                    )
+                    if key not in seen_keys:
+                        seen_keys.add(key)
+                        all_tasks.append(t)
                 
             self.source_file = valid_paths[0]
             self.source_files = valid_paths
@@ -241,10 +251,21 @@ class DataEngine:
         else:
             if not os.path.exists(file_path):
                 raise FileNotFoundError(f"File not found: {file_path}")
-            tasks = self._parse_single_excel(file_path)
+            raw_tasks = self._parse_single_excel(file_path)
+            all_tasks = []
+            seen_keys = set()
+            for t in raw_tasks:
+                key = (
+                    str(t.get('Equipment', '')).strip().upper(),
+                    str(t.get('Sheet', '')).strip().upper(),
+                    str(t.get('Week', '')).strip().upper()
+                )
+                if key not in seen_keys:
+                    seen_keys.add(key)
+                    all_tasks.append(t)
             self.source_file = file_path
             self.source_files = [file_path]
-            self.current_df = pd.DataFrame(tasks)
+            self.current_df = pd.DataFrame(all_tasks)
             return self.current_df
 
     def get_source_file_for_task(self, sheet_name, raw_idx):
