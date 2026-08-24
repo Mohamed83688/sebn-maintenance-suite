@@ -426,7 +426,8 @@ def owner_required(f):
             if request.path.startswith('/api/'):
                 return jsonify({'error': 'Unauthorized', 'redirect': url_for('login')}), 401
             return redirect(url_for('login'))
-        if session.get('role') != 'OWNER':
+        r = str(session.get('role', '')).upper().strip()
+        if r not in ('OWNER', 'PROPRIETAIRE', 'PROPRIÉTAIRE'):
             flash("Accès réservé exclusivement au Propriétaire (Owner).", "danger")
             return render_template('403.html'), 403
         return f(*args, **kwargs)
@@ -439,7 +440,8 @@ def admin_required(f):
             if request.path.startswith('/api/'):
                 return jsonify({'error': 'Unauthorized', 'redirect': url_for('login')}), 401
             return redirect(url_for('login'))
-        if session.get('role') not in ('OWNER', 'ADMIN', 'admin'):
+        r = str(session.get('role', '')).upper().strip()
+        if r not in ('OWNER', 'ADMIN', 'ADMINISTRATEUR', 'PROPRIETAIRE', 'PROPRIÉTAIRE'):
             flash("Accès refusé : Droits Administrateur requis.", "danger")
             return render_template('403.html'), 403
         return f(*args, **kwargs)
