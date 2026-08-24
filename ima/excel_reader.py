@@ -79,6 +79,35 @@ class CalendrierReader:
                             break
 
                     if header_row_idx is None or week_start_col is None:
+                        # Fallback for direct inventory sheets
+                        for r_i in range(min(15, len(df))):
+                            r_vals = [str(x).upper().strip() for x in df.iloc[r_i]]
+                            col_m = None
+                            col_n = None
+                            col_g = None
+                            for c_i, v in enumerate(r_vals):
+                                if any(k in v for k in ['ID MACHINE', 'CODE MACHINE', 'MACHINE', 'EQUIPMENT', 'EQUIPEMENT', 'ID_MACHINE']):
+                                    col_m = c_i
+                                elif any(k in v for k in ['NOM MACHINE', 'DESIGNATION', 'NOM', 'LIBELLE', 'DESCRIPTION']):
+                                    col_n = c_i
+                                elif any(k in v for k in ['GROUPE', 'ZONE', 'SECTEUR', 'GROUP', 'LIGNE']):
+                                    col_g = c_i
+                            if col_m is not None:
+                                for row_idx in range(r_i + 1, len(df)):
+                                    row = df.iloc[row_idx]
+                                    raw_m = str(row[col_m]).strip() if col_m < len(row) and pd.notna(row[col_m]) else ""
+                                    if not raw_m or raw_m.lower() in ["nan", "none", ""]:
+                                        continue
+                                    if raw_m.upper() in ['ID MACHINE', 'MACHINE', 'TOTAL', 'ROLE', 'ADMIN', 'USER', 'TECHNICIAN']:
+                                        continue
+                                    m_name = str(row[col_n]).strip() if col_n is not None and col_n < len(row) and pd.notna(row[col_n]) else raw_m
+                                    m_grp = str(row[col_g]).strip() if col_g is not None and col_g < len(row) and pd.notna(row[col_g]) else sheet_name.strip()
+                                    all_machines.append({
+                                        "Groupe": m_grp if m_grp and m_grp.lower() != 'nan' else "Général",
+                                        "ID Machine": raw_m,
+                                        "Nom Machine": m_name if m_name and m_name.lower() != 'nan' else raw_m
+                                    })
+                                break
                         continue
 
                     # Identify exact columns
@@ -117,15 +146,6 @@ class CalendrierReader:
                             'RESP', 'REV', 'ANNEXE', 'SOMMAIRE', 'VALIDÉ', 'VALIDE', 'VISA'
                         ]
                         if raw_m_up in noise or raw_m_up.startswith('PPE-VA') or raw_m_up.startswith('ANNEXE'):
-                            continue
-
-                        # Check if has schedule markers
-                        schedule_area = row[week_start_col:min(week_start_col + 54, len(row))]
-                        has_markers = any(
-                            any(x in str(v).strip().upper() for x in ['M', 'H', 'DONE', 'X', 'OK'])
-                            for v in schedule_area if pd.notna(v)
-                        )
-                        if not has_markers:
                             continue
 
                         zone_val = str(row[col_group]).strip() if col_group is not None and col_group < len(row) and pd.notna(row[col_group]) else ""

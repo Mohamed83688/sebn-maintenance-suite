@@ -139,80 +139,93 @@ def sync_pma_machines_to_ima(df=None):
     in intervention forms, machine lists, and analytics.
     """
     try:
+        total_synced = 0
+        
+        # 1. Check all discovered schedule paths via CalendrierReader
+        paths = pma_config.get_all_excel_paths()
+        if paths:
+            from ima.excel_reader import CalendrierReader
+            reader = CalendrierReader()
+            for p in paths:
+                try:
+                    c_df = reader.read_calendrier(p)
+                    if not c_df.empty:
+                        mlist = []
+                        for _, r in c_df.iterrows():
+                            mid = str(r.get('ID Machine', '')).strip()
+                            mname = str(r.get('Nom Machine', mid)).strip()
+                            grp = str(r.get('Groupe', '')).strip()
+                            if mid and mid.lower() not in ['nan', 'none', '']:
+                                mlist.append({
+                                    "machine_id": mid,
+                                    "machine_name": mname if mname and mname.lower() != 'nan' else mid,
+                                    "group_name": grp if grp and grp.lower() != 'nan' else "Général",
+                                    "location": "",
+                                    "description": ""
+                                })
+                        if mlist:
+                            c = ima_db.upsert_machines(mlist)
+                            total_synced += c
+                            logger.info(f"Synced {c} machines from file {os.path.basename(p)}")
+                except Exception as e:
+                    logger.warning(f"Error reading machines from {p}: {e}")
+
+        # 2. Check DataEngine DataFrame as additional source
         if df is None or (hasattr(df, 'empty') and df.empty):
-            eng = get_pma_engine()
-            df = eng.current_df
+            try:
+                eng = get_pma_engine()
+                df = eng.current_df
+            except Exception:
+                df = None
 
-        # If DataEngine df is empty, attempt reading from last excel path directly
-        if df is None or (hasattr(df, 'empty') and df.empty):
-            pma_file = pma_config.get_last_excel_path()
-            if pma_file and os.path.exists(pma_file):
-                from ima.excel_reader import CalendrierReader
-                reader = CalendrierReader()
-                c_df = reader.read_calendrier(pma_file)
-                if not c_df.empty:
-                    mlist = []
-                    for _, r in c_df.iterrows():
-                        mid = str(r.get('ID Machine', '')).strip()
-                        mname = str(r.get('Nom Machine', mid)).strip()
-                        grp = str(r.get('Groupe', '')).strip()
-                        if mid and mid.lower() not in ['nan', 'none', '']:
-                            mlist.append({
-                                "machine_id": mid,
-                                "machine_name": mname if mname and mname.lower() != 'nan' else mid,
-                                "group_name": grp if grp and grp.lower() != 'nan' else "Général",
-                                "location": "",
-                                "description": ""
-                            })
-                    if mlist:
-                        count = ima_db.upsert_machines(mlist)
-                        logger.info(f"Auto-synced {count} machines from CalendrierReader into IMA database.")
-                        return count
-            return 0
+        if df is not None and not df.empty:
+            col_equip = 'Equipment' if 'Equipment' in df.columns else ('equipment' if 'equipment' in df.columns else None)
+            if col_equip:
+                col_name = 'Machine_Name' if 'Machine_Name' in df.columns else ('Nom Machine' if 'Nom Machine' in df.columns else col_equip)
+                col_group = 'Group' if 'Group' in df.columns else ('Zone' if 'Zone' in df.columns else ('Sheet' if 'Sheet' in df.columns else None))
 
-        # Extract from DataEngine DataFrame
-        col_equip = 'Equipment' if 'Equipment' in df.columns else ('equipment' if 'equipment' in df.columns else None)
-        if not col_equip:
-            return 0
+                mlist = []
+                seen = set()
+                noise_keywords = [
+                    'ZONE', 'N° CARTE', 'SEMAINE', 'TOTAL', 'ROLE', 'ADMIN', 'ADMINISTRATEUR',
+                    'SIGNATURES', 'SIGNATURE', 'TECHNICIAN', 'TECHNICIEN', 'USER', 'USERS',
+                    'ACCOUNT', 'LOGIN', 'MATRICULE', 'DATE', 'SHIFT', 'EQUIPE', 'PAGE',
+                    'RESP', 'REV', 'ANNEXE', 'SOMMAIRE', 'VALIDÉ', 'VALIDE', 'VISA', 'NAN', 'NONE'
+                ]
 
-        col_name = 'Machine_Name' if 'Machine_Name' in df.columns else ('Nom Machine' if 'Nom Machine' in df.columns else col_equip)
-        col_group = 'Group' if 'Group' in df.columns else ('Zone' if 'Zone' in df.columns else ('Sheet' if 'Sheet' in df.columns else None))
+                for _, r in df.iterrows():
+                    mid = str(r.get(col_equip, '')).strip()
+                    if not mid or mid.upper() in noise_keywords or mid.upper().startswith('PPE-VA') or mid.upper().startswith('ANNEXE'):
+                        continue
+                    if mid in seen:
+                        continue
+                    seen.add(mid)
 
-        mlist = []
-        seen = set()
-        noise_keywords = [
-            'ZONE', 'N° CARTE', 'SEMAINE', 'TOTAL', 'ROLE', 'ADMIN', 'ADMINISTRATEUR',
-            'SIGNATURES', 'SIGNATURE', 'TECHNICIAN', 'TECHNICIEN', 'USER', 'USERS',
-            'ACCOUNT', 'LOGIN', 'MATRICULE', 'DATE', 'SHIFT', 'EQUIPE', 'PAGE',
-            'RESP', 'REV', 'ANNEXE', 'SOMMAIRE', 'VALIDÉ', 'VALIDE', 'VISA', 'NAN', 'NONE'
-        ]
+                    mname = str(r.get(col_name, mid)).strip()
+                    grp = str(r.get(col_group, '') if col_group else '').strip()
 
-        for _, r in df.iterrows():
-            mid = str(r.get(col_equip, '')).strip()
-            if not mid or mid.upper() in noise_keywords or mid.upper().startswith('PPE-VA') or mid.upper().startswith('ANNEXE'):
-                continue
-            if mid in seen:
-                continue
-            seen.add(mid)
+                    mlist.append({
+                        "machine_id": mid,
+                        "machine_name": mname if mname and mname.lower() != 'nan' else mid,
+                        "group_name": grp if grp and grp.lower() != 'nan' else "Général",
+                        "location": "",
+                        "description": ""
+                    })
 
-            mname = str(r.get(col_name, mid)).strip()
-            grp = str(r.get(col_group, '') if col_group else '').strip()
+                if mlist:
+                    c = ima_db.upsert_machines(mlist)
+                    total_synced += c
 
-            mlist.append({
-                "machine_id": mid,
-                "machine_name": mname if mname and mname.lower() != 'nan' else mid,
-                "group_name": grp if grp and grp.lower() != 'nan' else "Général",
-                "location": "",
-                "description": ""
-            })
-
-        if mlist:
-            count = ima_db.upsert_machines(mlist)
-            logger.info(f"Auto-synced {count} machines from PMA DataFrame into IMA database.")
-            return count
+        return total_synced
     except Exception as e:
         logger.error(f"Failed to auto-sync PMA machines to IMA: {e}")
     return 0
+
+# Trigger initial PMA machine synchronization on app startup
+try:
+    sync_pma_machines_to_ima()
+except Exception as e:
+    logger.warning(f"Initial PMA sync notice: {e}")
 
 def get_local_ip():
     try:
