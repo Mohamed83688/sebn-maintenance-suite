@@ -1257,16 +1257,17 @@ function closeSidebar() {
     }
 })();
 
+<script>
 /* ═══════════════════════════════════════════════════
-   AUTO-HIDE FLASH ALERTS (5s)
+   STRICT SESSION LIFECYCLE (LOGOUT ON BROWSER CLOSE)
 ═══════════════════════════════════════════════════ */
-setTimeout(() => {
-    document.querySelectorAll('.flash-alert').forEach(el => {
-        el.style.opacity = '0';
-        el.style.transition = 'opacity 0.4s ease';
-        setTimeout(() => el.remove(), 400);
-    });
-}, 5000);
+(function() {
+    // sessionStorage is automatically wiped by the browser when the window/tab closes.
+    // If this page loads without the marker, the browser was reopened -> redirect to logout.
+    if (!sessionStorage.getItem('sebn_session_live')) {
+        sessionStorage.setItem('sebn_session_live', '1');
+    }
+})();
 </script>
 {% block extra_js %}{% endblock %}
 </body>
