@@ -221,11 +221,7 @@ def sync_pma_machines_to_ima(df=None):
         logger.error(f"Failed to auto-sync PMA machines to IMA: {e}")
     return 0
 
-# Trigger initial PMA machine synchronization on app startup
-try:
-    sync_pma_machines_to_ima()
-except Exception as e:
-    logger.warning(f"Initial PMA sync notice: {e}")
+# (Machine sync happens on-demand per request, not at startup)
 
 # ── Diagnostic endpoint (public, read-only) ────────────────────────────────
 @app.route('/diag')
