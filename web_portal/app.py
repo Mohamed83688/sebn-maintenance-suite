@@ -135,90 +135,87 @@ def invalidate_pma_cache():
 def sync_pma_machines_to_ima(df=None):
     """
     Synchronizes all unique machines from the active Preventive Calendar (PMA)
-    into the Curative Maintenance (IMA) database so they immediately appear
-    in intervention forms, machine lists, and analytics.
+    into the Curative Maintenance (IMA) database.
     """
     try:
         total_synced = 0
-        
-        # 1. Check all discovered schedule paths via CalendrierReader
-        paths = pma_config.get_all_excel_paths()
-        if paths:
-            from ima.excel_reader import CalendrierReader
-            reader = CalendrierReader()
-            for p in paths:
-                try:
-                    c_df = reader.read_calendrier(p)
-                    if not c_df.empty:
-                        mlist = []
-                        for _, r in c_df.iterrows():
-                            mid = str(r.get('ID Machine', '')).strip()
-                            mname = str(r.get('Nom Machine', mid)).strip()
-                            grp = str(r.get('Groupe', '')).strip()
-                            if mid and mid.lower() not in ['nan', 'none', '']:
-                                mlist.append({
-                                    "machine_id": mid,
-                                    "machine_name": mname if mname and mname.lower() != 'nan' else mid,
-                                    "group_name": grp if grp and grp.lower() != 'nan' else "Général",
-                                    "location": "",
-                                    "description": ""
-                                })
+
+        # Build list of Excel files to try — hardcode bundled path relative to this file
+        app_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        bundled_excel = os.path.join(app_root, 'data', 'current_schedule.xlsx')
+        logger.info(f"sync_pma: app_root={app_root}, bundled={bundled_excel}, exists={os.path.isfile(bundled_excel)}")
+
+        paths = []
+        # Always try bundled file first
+        if os.path.isfile(bundled_excel):
+            paths.append(bundled_excel)
+        # Then try discovered paths
+        for p in pma_config.get_all_excel_paths():
+            if p not in paths:
+                paths.append(p)
+
+        logger.info(f"sync_pma: trying {len(paths)} Excel file(s): {[os.path.basename(p) for p in paths]}")
+
+        from ima.excel_reader import CalendrierReader
+        reader = CalendrierReader()
+        for p in paths:
+            try:
+                c_df = reader.read_calendrier(p)
+                logger.info(f"sync_pma: read {len(c_df)} rows from {os.path.basename(p)}")
+                if not c_df.empty:
+                    mlist = []
+                    for _, r in c_df.iterrows():
+                        mid = str(r.get('ID Machine', '')).strip()
+                        mname = str(r.get('Nom Machine', mid)).strip()
+                        grp = str(r.get('Groupe', '')).strip()
+                        if mid and mid.lower() not in ['nan', 'none', '']:
+                            mlist.append({
+                                "machine_id": mid,
+                                "machine_name": mname if mname and mname.lower() != 'nan' else mid,
+                                "group_name": grp if grp and grp.lower() != 'nan' else "Général",
+                                "location": "",
+                                "description": ""
+                            })
+                    if mlist:
+                        c = ima_db.upsert_machines(mlist)
+                        total_synced += c
+                        logger.info(f"sync_pma: synced {c} machines from {os.path.basename(p)}")
+                        break  # Stop after first successful file
+            except Exception as e:
+                logger.error(f"sync_pma: error reading {os.path.basename(p)}: {e}")
+
+        # Fallback: use DataEngine if CalendrierReader found nothing
+        if total_synced == 0:
+            try:
+                eng = get_pma_engine()
+                df2 = eng.current_df if df is None else df
+                if df2 is not None and not df2.empty:
+                    col_equip = 'Equipment' if 'Equipment' in df2.columns else None
+                    if col_equip:
+                        mlist, seen = [], set()
+                        for _, r in df2.iterrows():
+                            mid = str(r.get(col_equip, '')).strip()
+                            if not mid or mid.lower() in ['nan', 'none', ''] or mid in seen:
+                                continue
+                            seen.add(mid)
+                            grp = str(r.get('Zone', r.get('Sheet', 'Général'))).strip()
+                            mlist.append({
+                                "machine_id": mid,
+                                "machine_name": mid,
+                                "group_name": grp if grp and grp.lower() != 'nan' else "Général",
+                                "location": "", "description": ""
+                            })
                         if mlist:
                             c = ima_db.upsert_machines(mlist)
                             total_synced += c
-                            logger.info(f"Synced {c} machines from file {os.path.basename(p)}")
-                except Exception as e:
-                    logger.warning(f"Error reading machines from {p}: {e}")
+                            logger.info(f"sync_pma: synced {c} machines from DataEngine")
+            except Exception as e:
+                logger.error(f"sync_pma: DataEngine fallback error: {e}")
 
-        # 2. Check DataEngine DataFrame as additional source
-        if df is None or (hasattr(df, 'empty') and df.empty):
-            try:
-                eng = get_pma_engine()
-                df = eng.current_df
-            except Exception:
-                df = None
-
-        if df is not None and not df.empty:
-            col_equip = 'Equipment' if 'Equipment' in df.columns else ('equipment' if 'equipment' in df.columns else None)
-            if col_equip:
-                col_name = 'Machine_Name' if 'Machine_Name' in df.columns else ('Nom Machine' if 'Nom Machine' in df.columns else col_equip)
-                col_group = 'Group' if 'Group' in df.columns else ('Zone' if 'Zone' in df.columns else ('Sheet' if 'Sheet' in df.columns else None))
-
-                mlist = []
-                seen = set()
-                noise_keywords = [
-                    'ZONE', 'N° CARTE', 'SEMAINE', 'TOTAL', 'ROLE', 'ADMIN', 'ADMINISTRATEUR',
-                    'SIGNATURES', 'SIGNATURE', 'TECHNICIAN', 'TECHNICIEN', 'USER', 'USERS',
-                    'ACCOUNT', 'LOGIN', 'MATRICULE', 'DATE', 'SHIFT', 'EQUIPE', 'PAGE',
-                    'RESP', 'REV', 'ANNEXE', 'SOMMAIRE', 'VALIDÉ', 'VALIDE', 'VISA', 'NAN', 'NONE'
-                ]
-
-                for _, r in df.iterrows():
-                    mid = str(r.get(col_equip, '')).strip()
-                    if not mid or mid.upper() in noise_keywords or mid.upper().startswith('PPE-VA') or mid.upper().startswith('ANNEXE'):
-                        continue
-                    if mid in seen:
-                        continue
-                    seen.add(mid)
-
-                    mname = str(r.get(col_name, mid)).strip()
-                    grp = str(r.get(col_group, '') if col_group else '').strip()
-
-                    mlist.append({
-                        "machine_id": mid,
-                        "machine_name": mname if mname and mname.lower() != 'nan' else mid,
-                        "group_name": grp if grp and grp.lower() != 'nan' else "Général",
-                        "location": "",
-                        "description": ""
-                    })
-
-                if mlist:
-                    c = ima_db.upsert_machines(mlist)
-                    total_synced += c
-
+        logger.info(f"sync_pma: total={total_synced}")
         return total_synced
     except Exception as e:
-        logger.error(f"Failed to auto-sync PMA machines to IMA: {e}")
+        logger.error(f"sync_pma: FATAL ERROR: {e}")
     return 0
 
 # (Machine sync happens on-demand per request, not at startup)
