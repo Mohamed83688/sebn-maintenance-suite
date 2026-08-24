@@ -167,15 +167,11 @@ def sync_pma_machines_to_ima(df=None):
         except Exception as e:
             logger.warning(f"sync_pma: DataEngine parse step error: {e}")
 
-        # 2. Check all Excel files via CalendrierReader to catch any additional machines
+        # 2. Check uploaded Excel schedule files via CalendrierReader to catch any additional machines
         try:
             from ima.excel_reader import CalendrierReader
             reader = CalendrierReader()
             paths = pma_config.get_all_excel_paths()
-            app_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            bundled_excel = os.path.join(app_root, 'data', 'current_schedule.xlsx')
-            if os.path.isfile(bundled_excel) and bundled_excel not in paths:
-                paths.append(bundled_excel)
 
             for p in paths:
                 try:
