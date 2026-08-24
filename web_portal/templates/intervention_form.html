@@ -60,10 +60,10 @@
                 <label class="form-label">Groupe / Zone</label>
                 <div class="input-with-icon">
                     <i class="input-icon fa-solid fa-layer-group"></i>
-                    <select name="group_name" id="group-select" class="form-control" required>
-                        <option value="">Sélectionner un groupe...</option>
+                    <select name="group_name" id="group-select" class="form-control">
+                        <option value="">Tous les groupes / Choisir un groupe...</option>
                         {% for g in groups %}
-                        <option value="{{ g }}">{{ g }}</option>
+                        <option value="{{ g }}" {% if form_data.get('group_name')==g %}selected{% endif %}>{{ g }}</option>
                         {% endfor %}
                     </select>
                 </div>
@@ -72,8 +72,13 @@
                 <label class="form-label">Machine</label>
                 <div class="input-with-icon">
                     <i class="input-icon fa-solid fa-microchip"></i>
-                    <select name="machine_id" id="machine-select" class="form-control" required disabled>
-                        <option value="">Sélectionnez d'abord un groupe</option>
+                    <select name="machine_id" id="machine-select" class="form-control" required>
+                        <option value="">Sélectionner une machine...</option>
+                        {% for m in machines %}
+                        <option value="{{ m.machine_id }}" data-group="{{ m.group_name }}" data-name="{{ m.machine_name }}" {% if form_data.get('machine_id')==m.machine_id %}selected{% endif %}>
+                            {{ m.machine_id }}{% if m.machine_name and m.machine_name != m.machine_id %} — {{ m.machine_name }}{% endif %}{% if m.group_name %} ({{ m.group_name }}){% endif %}
+                        </option>
+                        {% endfor %}
                     </select>
                 </div>
             </div>
@@ -189,57 +194,59 @@ function selectFault(type, btn) {
 
 const groupSelect = document.getElementById('group-select');
 const machineSelect = document.getElementById('machine-select');
-const preselectedMachine = "{{ form_data.get('machine_id', '') }}";
 
-async function loadMachinesForGroup(grp, targetMachine = '') {
-    if (!grp) {
-        machineSelect.innerHTML = '<option value="">Choisissez d\'abord un groupe</option>';
-        machineSelect.disabled = true;
-        return;
-    }
+// Store all machine options initially from DOM
+const allMachineOptions = Array.from(machineSelect.options).filter(opt => opt.value !== '');
 
-    machineSelect.innerHTML = '<option value="">Chargement des machines...</option>';
-    machineSelect.disabled = true;
-
-    try {
-        const res = await fetch(`{{ url_for('api_machines_by_group') }}?group=${encodeURIComponent(grp)}`);
-        if (!res.ok) {
-            throw new Error(`HTTP ${res.status}`);
-        }
-        const machines = await res.json();
-        
-        if (!Array.isArray(machines) || machines.length === 0) {
-            machineSelect.innerHTML = '<option value="">Aucune machine disponible pour ce groupe</option>';
-            machineSelect.disabled = true;
-            return;
-        }
-
-        machineSelect.innerHTML = '<option value="">Choisir une machine...</option>';
-        machines.forEach(m => {
-            const opt = document.createElement('option');
-            opt.value = m.machine_id;
-            const hasName = m.machine_name && m.machine_name !== m.machine_id && m.machine_name.trim() !== '';
-            opt.textContent = hasName ? `${m.machine_id} — ${m.machine_name}` : m.machine_id;
-            if (targetMachine && m.machine_id === targetMachine) {
-                opt.selected = true;
+function filterMachinesByGroup(selectedGroup) {
+    const currentVal = machineSelect.value;
+    machineSelect.innerHTML = '<option value="">Sélectionner une machine...</option>';
+    
+    let matchFound = false;
+    allMachineOptions.forEach(opt => {
+        const grp = opt.getAttribute('data-group') || '';
+        if (!selectedGroup || grp.toLowerCase().trim() === selectedGroup.toLowerCase().trim()) {
+            const clone = opt.cloneNode(true);
+            if (clone.value === currentVal) {
+                clone.selected = true;
+                matchFound = true;
             }
-            machineSelect.appendChild(opt);
-        });
-        machineSelect.disabled = false;
-    } catch (err) {
-        console.error('Erreur de chargement des machines:', err);
-        machineSelect.innerHTML = '<option value="">Impossible de charger les machines</option>';
-        machineSelect.disabled = true;
+            machineSelect.appendChild(clone);
+        }
+    });
+
+    if (!matchFound && currentVal && selectedGroup) {
+        machineSelect.value = '';
     }
 }
 
-groupSelect.addEventListener('change', function() {
-    loadMachinesForGroup(this.value.trim());
-});
+if (groupSelect) {
+    groupSelect.addEventListener('change', function() {
+        filterMachinesByGroup(this.value.trim());
+    });
+}
 
-// Auto-load if group is preselected
-if (groupSelect.value.trim()) {
-    loadMachinesForGroup(groupSelect.value.trim(), preselectedMachine);
+if (machineSelect) {
+    machineSelect.addEventListener('change', function() {
+        const selectedOpt = machineSelect.options[machineSelect.selectedIndex];
+        if (selectedOpt && selectedOpt.value) {
+            const grp = selectedOpt.getAttribute('data-group');
+            if (grp && groupSelect) {
+                // Auto-select matching group
+                for (let i = 0; i < groupSelect.options.length; i++) {
+                    if (groupSelect.options[i].value.toLowerCase().trim() === grp.toLowerCase().trim()) {
+                        groupSelect.selectedIndex = i;
+                        break;
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Auto-filter on load if group was already selected
+if (groupSelect && groupSelect.value.trim()) {
+    filterMachinesByGroup(groupSelect.value.trim());
 }
 </script>
 {% endblock %}

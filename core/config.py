@@ -107,11 +107,20 @@ class ConfigManager:
                     if os.path.isfile(full_p) and full_p not in paths:
                         paths.append(full_p)
 
-        # Backward-compat: also check last_excel.txt path (may point to data/ root)
-        if not paths:
-            last_p = self.get_last_excel_path()
-            if last_p and os.path.exists(last_p) and last_p not in paths:
-                paths.append(last_p)
+        # Also check last_excel.txt path (may point to data/ root)
+        last_p = self.get_last_excel_path()
+        if last_p and os.path.exists(last_p) and last_p not in paths:
+            paths.append(last_p)
+
+        # Fallback: scan active_base root for any schedule Excel files
+        if not paths and os.path.isdir(self.active_base):
+            for f in sorted(os.listdir(self.active_base)):
+                if f.startswith('~$') or f.startswith('.'):
+                    continue
+                if f.lower().endswith(('.xlsx', '.xlsm')) and not f.startswith('dashboard_ebm'):
+                    full_p = os.path.join(self.active_base, f)
+                    if os.path.isfile(full_p) and full_p not in paths:
+                        paths.append(full_p)
 
         return paths
 
