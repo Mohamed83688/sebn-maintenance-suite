@@ -1351,13 +1351,82 @@ def intervention_form():
         flash(f"Intervention {code} créée avec succès.", "success")
         return redirect(url_for('intervention_detail', code=code))
 
+    # --- Multi-layer machine loading — always shows machines no matter what ---
     machs = ima_db.get_all_machines()
+
+    # Layer 1: if DB has no machines, sync from Excel then retry
     if not machs:
-        sync_pma_machines_to_ima()
-        machs = ima_db.get_all_machines()
-    groups = list({m['group_name'] for m in machs if m.get('group_name')}) if machs else ima_db.get_machine_groups()
-    groups.sort()
+        try:
+            sync_pma_machines_to_ima()
+            machs = ima_db.get_all_machines()
+        except Exception as _e:
+            logger.error(f"Layer-1 sync failed: {_e}")
+
+    # Layer 2: if still empty, read machines DIRECTLY from Excel (bypass DB entirely)
+    if not machs:
+        try:
+            from ima.excel_reader import CalendrierReader
+            _reader = CalendrierReader()
+            _paths = pma_config.get_all_excel_paths()
+            # Also check the app's own bundled data/ folder explicitly
+            _app_data = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data')
+            for _f in ['current_schedule.xlsx', 'calendrier.xlsx', 'planning.xlsx']:
+                _fp = os.path.join(_app_data, _f)
+                if os.path.isfile(_fp) and _fp not in _paths:
+                    _paths.append(_fp)
+            for _p in _paths:
+                _cdf = _reader.read_calendrier(_p)
+                if not _cdf.empty:
+                    for _, _r in _cdf.iterrows():
+                        _mid = str(_r.get('ID Machine', '')).strip()
+                        _mname = str(_r.get('Nom Machine', _mid)).strip()
+                        _grp = str(_r.get('Groupe', '')).strip()
+                        if _mid and _mid.lower() not in ['nan', 'none', '']:
+                            machs.append({
+                                'machine_id': _mid,
+                                'machine_name': _mname if _mname and _mname.lower() != 'nan' else _mid,
+                                'group_name': _grp if _grp and _grp.lower() != 'nan' else 'Général',
+                            })
+                    if machs:
+                        break
+            # Try to persist these into DB for next time
+            if machs:
+                try:
+                    ima_db.upsert_machines([{**m, 'location': '', 'description': ''} for m in machs])
+                except Exception:
+                    pass
+        except Exception as _e:
+            logger.error(f"Layer-2 direct Excel read failed: {_e}")
+
+    # Layer 3: if still empty, get from the DataEngine (PMA engine that drives the calendar)
+    if not machs:
+        try:
+            _eng = get_pma_engine()
+            if _eng.current_df is not None and not _eng.current_df.empty:
+                _df = _eng.current_df
+                _col = 'Equipment' if 'Equipment' in _df.columns else None
+                if _col:
+                    _seen = set()
+                    for _, _r in _df.iterrows():
+                        _mid = str(_r.get(_col, '')).strip()
+                        if _mid and _mid.lower() not in ['nan', 'none', ''] and _mid not in _seen:
+                            _seen.add(_mid)
+                            _grp = str(_r.get('Zone', _r.get('Sheet', 'Général'))).strip()
+                            machs.append({
+                                'machine_id': _mid,
+                                'machine_name': _mid,
+                                'group_name': _grp if _grp and _grp.lower() != 'nan' else 'Général',
+                            })
+        except Exception as _e:
+            logger.error(f"Layer-3 DataEngine fallback failed: {_e}")
+
+    # Deduplicate
+    _seen_ids = set()
+    machs = [m for m in machs if m['machine_id'] not in _seen_ids and not _seen_ids.add(m['machine_id'])]
+
+    groups = sorted({m['group_name'] for m in machs if m.get('group_name')}) if machs else []
     asp_codes = ima_db.get_asp_codes_enriched()
+    logger.info(f"intervention_form: rendering with {len(machs)} machines, {len(groups)} groups")
     return render_template('intervention_form.html', groups=groups, asp_codes=asp_codes,
                            machines=machs, now=datetime.datetime.now().strftime('%Y-%m-%dT%H:%M'), form_data={})
 
