@@ -227,6 +227,47 @@ try:
 except Exception as e:
     logger.warning(f"Initial PMA sync notice: {e}")
 
+# ── Diagnostic endpoint (public, read-only) ────────────────────────────────
+@app.route('/diag')
+def diagnostic():
+    import json as _json
+    try:
+        app_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        active_base = pma_config.active_base
+        app_data_dir = os.path.join(app_root, 'data')
+        excel_paths = pma_config.get_all_excel_paths()
+        machine_count = len(ima_db.get_all_machines())
+        last_excel = pma_config.get_last_excel_path()
+
+        # List files in active_base and app data dir
+        def list_files(d):
+            try:
+                return sorted(os.listdir(d)) if os.path.isdir(d) else ['(not a directory)']
+            except Exception as ex:
+                return [f'ERROR: {ex}']
+
+        info = {
+            'app_root': app_root,
+            'active_base': active_base,
+            'app_data_dir': app_data_dir,
+            'SEBN_DATA_DIR_env': os.environ.get('SEBN_DATA_DIR', '(not set)'),
+            'IMA_DB_PATH': IMA_DB_PATH,
+            'db_exists': os.path.isfile(IMA_DB_PATH),
+            'last_excel_txt': last_excel,
+            'excel_paths_found': excel_paths,
+            'machine_count_in_db': machine_count,
+            'active_base_files': list_files(active_base),
+            'app_data_files': list_files(app_data_dir),
+            'schedules_dir_files': list_files(os.path.join(active_base, 'Schedules')),
+        }
+        html = '<html><head><title>Diagnostic</title></head><body>'
+        html += '<h2>SEBN-TN Diagnostic</h2><pre style="background:#eee;padding:20px;font-size:14px;">'
+        html += _json.dumps(info, indent=2, ensure_ascii=False)
+        html += '</pre></body></html>'
+        return html, 200
+    except Exception as ex:
+        return f'<pre>DIAG ERROR: {ex}</pre>', 500
+
 def get_local_ip():
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
