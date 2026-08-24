@@ -1298,8 +1298,9 @@ def intervention_form():
             flash(f"Erreur lors de la création : {e}", "danger")
             groups    = ima_db.get_machine_groups()
             asp_codes = ima_db.get_asp_codes_enriched()
+            machs     = ima_db.get_all_machines()
             return render_template('intervention_form.html', groups=groups, asp_codes=asp_codes,
-                                   now=datetime.datetime.now().strftime('%Y-%m-%dT%H:%M'), form_data=data)
+                                   machines=machs, now=datetime.datetime.now().strftime('%Y-%m-%dT%H:%M'), form_data=data)
 
         end_time = request.form.get('end_time', '').strip()
         if end_time:
@@ -1309,13 +1310,15 @@ def intervention_form():
         flash(f"Intervention {code} créée avec succès.", "success")
         return redirect(url_for('intervention_detail', code=code))
 
-    groups    = ima_db.get_machine_groups()
-    if not groups:
+    machs = ima_db.get_all_machines()
+    if not machs:
         sync_pma_machines_to_ima()
-        groups = ima_db.get_machine_groups()
+        machs = ima_db.get_all_machines()
+    groups = list({m['group_name'] for m in machs if m.get('group_name')}) if machs else ima_db.get_machine_groups()
+    groups.sort()
     asp_codes = ima_db.get_asp_codes_enriched()
     return render_template('intervention_form.html', groups=groups, asp_codes=asp_codes,
-                           now=datetime.datetime.now().strftime('%Y-%m-%dT%H:%M'), form_data={})
+                           machines=machs, now=datetime.datetime.now().strftime('%Y-%m-%dT%H:%M'), form_data={})
 
 @app.route('/api/machines-by-group')
 @login_required
