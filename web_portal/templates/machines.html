@@ -4,14 +4,12 @@
 {% block page_subtitle %}{{ machines|length }} machines référencées au total{% endblock %}
 
 {% block topbar_actions %}
-{% if role in ['admin', 'owner'] %}
-<a href="{{ url_for('machines_sync_pma') }}" class="btn btn-primary btn-sm" style="display:inline-flex; align-items:center; gap:6px;">
+<a href="{{ url_for('machines_sync_pma') }}" class="btn btn-primary btn-sm" style="display:inline-flex; align-items:center; gap:6px; background:#2563EB; color:#fff; padding:6px 14px; border-radius:6px; font-weight:600; text-decoration:none;">
     <i class="fa-solid fa-arrows-rotate"></i> Synchroniser Planning PMA
 </a>
-<button class="btn btn-secondary btn-sm" onclick="document.getElementById('import-modal').classList.add('open')">
+<button class="btn btn-secondary btn-sm" onclick="document.getElementById('import-modal').classList.add('open')" style="display:inline-flex; align-items:center; gap:6px; padding:6px 14px; border-radius:6px; font-weight:600; cursor:pointer;">
     <i class="fa-solid fa-file-excel"></i> Importer Fichier Excel
 </button>
-{% endif %}
 {% endblock %}
 
 {% block extra_css %}
@@ -71,6 +69,14 @@
                 <i class="fa-solid fa-xmark"></i> Réinitialiser
             </a>
             {% endif %}
+            <div style="margin-left:auto; display:flex; gap:8px;">
+                <a href="{{ url_for('machines_sync_pma') }}" class="btn btn-primary btn-sm" style="display:inline-flex; align-items:center; gap:6px; background:#2563EB; color:#fff; padding:7px 14px; border-radius:var(--radius-sm); font-weight:600; text-decoration:none;">
+                    <i class="fa-solid fa-arrows-rotate"></i> Synchroniser Planning PMA
+                </a>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('import-modal').classList.add('open')" style="display:inline-flex; align-items:center; gap:6px; padding:7px 14px; border-radius:var(--radius-sm); font-weight:600; cursor:pointer;">
+                    <i class="fa-solid fa-file-excel"></i> Importer Excel
+                </button>
+            </div>
         </form>
     </div>
 </div>
@@ -147,7 +153,6 @@
 {% endif %}
 
 <!-- Import Modal -->
-{% if role == 'admin' %}
 <div class="modal-overlay" id="import-modal">
     <div class="modal-box">
         <div class="modal-close" onclick="document.getElementById('import-modal').classList.remove('open')">
@@ -155,18 +160,17 @@
         </div>
         <h3 style="margin-bottom:6px; font-size:16px; font-weight:700; color:var(--text);">Importer le Parc Machine</h3>
         <p style="font-size:12px; color:var(--text-sec); margin-bottom:20px;">
-            Format: colonnes <code>Machine ID</code>, <code>Machine Name</code>, <code>Group</code>, <code>Location</code>, <code>Description</code>
+            Chargez un planning préventif ou un fichier d'inventaire Excel (<code>.xlsx</code> / <code>.xlsm</code>).
         </p>
         <form method="POST" action="{{ url_for('machines_import') }}" enctype="multipart/form-data">
-            <div class="form-group">
-                <label class="form-label">Fichier Excel</label>
-                <input type="file" name="excel_file" accept=".xlsx,.xls" required class="form-control" style="padding:8px;">
+            <div class="form-group" style="margin-bottom:16px;">
+                <label class="form-label" style="display:block; margin-bottom:6px; font-weight:600;">Fichier Excel</label>
+                <input type="file" name="excel_file" accept=".xlsx,.xls,.xlsm" required class="form-control" style="padding:8px; width:100%;">
             </div>
-            <button type="submit" class="btn btn-primary w-full" style="justify-content:center;">
-                <i class="fa-solid fa-upload"></i> Importer
+            <button type="submit" class="btn btn-primary w-full" style="width:100%; justify-content:center; padding:10px; font-weight:600;">
+                <i class="fa-solid fa-upload"></i> Importer & Synchroniser
             </button>
         </form>
     </div>
 </div>
-{% endif %}
 {% endblock %}
