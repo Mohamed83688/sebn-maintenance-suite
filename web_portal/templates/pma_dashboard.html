@@ -127,7 +127,7 @@
         </svg>
         <div class="progress-ring-text">
             <div class="progress-ring-pct">{{ stats.rate }}<span style="font-size:0.9rem; font-weight:600; color:var(--text-sec);">%</span></div>
-            <div class="progress-ring-lbl">Taux Global</div>
+            <div class="progress-ring-lbl">{% if stats.is_filtered %}Taux Filtré{% else %}Taux Global{% endif %}</div>
         </div>
     </div>
 
@@ -140,15 +140,15 @@
         </div>
         <div class="hero-counters stagger">
             <div class="hero-counter">
-                <div class="hero-counter-val" style="color:var(--primary);" data-count="{{ stats.total }}">0</div>
+                <div class="hero-counter-val" style="color:var(--primary);" data-count="{{ stats.total }}">{{ stats.total }}</div>
                 <div class="hero-counter-lbl">Total Tâches</div>
             </div>
             <div class="hero-counter">
-                <div class="hero-counter-val" style="color:var(--success);" data-count="{{ stats.done }}">0</div>
+                <div class="hero-counter-val" style="color:var(--success);" data-count="{{ stats.done }}">{{ stats.done }}</div>
                 <div class="hero-counter-lbl">Complétées</div>
             </div>
             <div class="hero-counter">
-                <div class="hero-counter-val" style="color:var(--warning);" data-count="{{ stats.pending }}">0</div>
+                <div class="hero-counter-val" style="color:var(--warning);" data-count="{{ stats.pending }}">{{ stats.pending }}</div>
                 <div class="hero-counter-lbl">En Attente</div>
             </div>
         </div>

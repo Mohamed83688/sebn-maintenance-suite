@@ -1221,9 +1221,11 @@ function closeSidebar() {
 ═══════════════════════════════════════════════════ */
 (function() {
     function animateCounter(el) {
-        const target = parseInt(el.getAttribute('data-count') || el.textContent, 10);
-        if (isNaN(target) || target === 0) { el.textContent = '0'; return; }
-        const duration = Math.min(1000, Math.max(400, target * 4));
+        const raw = el.getAttribute('data-count') || el.textContent;
+        const target = parseInt(raw, 10);
+        if (isNaN(target)) return;
+        if (target === 0) { el.textContent = '0'; return; }
+        const duration = Math.min(1000, Math.max(350, Math.min(target * 4, 800)));
         const start = performance.now();
         function step(now) {
             const p = Math.min((now - start) / duration, 1);
@@ -1234,16 +1236,20 @@ function closeSidebar() {
         requestAnimationFrame(step);
     }
 
-    const io = new IntersectionObserver((entries) => {
-        entries.forEach(e => {
-            if (e.isIntersecting) {
-                animateCounter(e.target);
-                io.unobserve(e.target);
-            }
-        });
-    }, { threshold: 0.3 });
+    if ('IntersectionObserver' in window) {
+        const io = new IntersectionObserver((entries) => {
+            entries.forEach(e => {
+                if (e.isIntersecting) {
+                    animateCounter(e.target);
+                    io.unobserve(e.target);
+                }
+            });
+        }, { threshold: 0.05, rootMargin: '50px' });
 
-    document.querySelectorAll('[data-count]').forEach(el => io.observe(el));
+        document.querySelectorAll('[data-count]').forEach(el => io.observe(el));
+    } else {
+        document.querySelectorAll('[data-count]').forEach(animateCounter);
+    }
 })();
 
 /* ═══════════════════════════════════════════════════

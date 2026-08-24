@@ -244,7 +244,7 @@
     <div class="glass-card kpi-card accent-info">
         <div class="kpi-top">
             <div>
-                <div class="kpi-number" data-count="{{ pma.total }}">0</div>
+                <div class="kpi-number" data-count="{{ pma.total }}">{{ pma.total }}</div>
                 <div class="kpi-name">Tâches Planifiées</div>
                 <span class="badge badge-info mt-2">
                     <i class="fa-solid fa-list-check"></i> Planifié
@@ -259,7 +259,7 @@
     <div class="glass-card kpi-card accent-success">
         <div class="kpi-top">
             <div>
-                <div class="kpi-number" data-count="{{ pma.done }}">0</div>
+                <div class="kpi-number" data-count="{{ pma.done }}">{{ pma.done }}</div>
                 <div class="kpi-name">Tâches Complétées</div>
                 <span class="badge badge-success mt-2">
                     <i class="fa-solid fa-check-double"></i> Exécutées
@@ -274,7 +274,7 @@
     <div class="glass-card kpi-card accent-warning">
         <div class="kpi-top">
             <div>
-                <div class="kpi-number" data-count="{{ pma.pending }}">0</div>
+                <div class="kpi-number" data-count="{{ pma.pending }}">{{ pma.pending }}</div>
                 <div class="kpi-name">Tâches En Attente</div>
                 <span class="badge badge-warning mt-2">
                     <i class="fa-solid fa-hourglass-half"></i> À faire

@@ -1980,7 +1980,28 @@ def pma_dashboard():
 
         tasks.sort(key=sort_key)
 
-    stats = eng.get_stats()
+    is_filtered = bool(month or sheet or week or search)
+    if tasks:
+        t_total = len(tasks)
+        t_done = sum(1 for t in tasks if str(t.get('status', '')).upper().strip() in ('COMPLÉTÉ', 'COMPLETE', 'DONE', 'OK', 'TERMINÉ'))
+        t_pending = t_total - t_done
+        t_rate = round((t_done / t_total) * 100) if t_total > 0 else 0
+        stats = {
+            'total': t_total,
+            'done': t_done,
+            'pending': t_pending,
+            'rate': t_rate,
+            'is_filtered': is_filtered
+        }
+    else:
+        raw_stats = eng.get_stats()
+        stats = {
+            'total': raw_stats.get('total', 0) if not is_filtered else 0,
+            'done': raw_stats.get('done', 0) if not is_filtered else 0,
+            'pending': raw_stats.get('pending', 0) if not is_filtered else 0,
+            'rate': raw_stats.get('rate', 0) if not is_filtered else 0,
+            'is_filtered': is_filtered
+        }
 
     months, sheets, weeks = [], [], []
     if eng.current_df is not None and not eng.current_df.empty:
