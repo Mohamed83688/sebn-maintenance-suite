@@ -1682,6 +1682,9 @@ def machines_import():
 @app.route('/machines/<machine_id>')
 @login_required
 def machine_detail(machine_id):
+    if machine_id in ('sync', 'sync-pma', 'import'):
+        return redirect(url_for('machines_sync_pma'))
+
     history  = ima_db.get_machine_history(machine_id)
     enriched = [m for m in ima_db.get_machines_enriched() if m['machine_id'] == machine_id]
 
