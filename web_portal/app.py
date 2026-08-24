@@ -156,7 +156,7 @@ def sync_pma_machines_to_ima(df=None):
                         if not mid or mid.lower() in ['nan', 'none', '']:
                             continue
                         mname = str(r.get('Machine_Name', mid)).strip()
-                        grp = str(r.get('Group', r.get('Zone', r.get('Sheet', 'Général')))).strip()
+                        grp = str(r.get('Sheet', 'Général')).strip()
                         machine_map[mid] = {
                             "machine_id": mid,
                             "machine_name": mname if mname and mname.lower() != 'nan' else mid,

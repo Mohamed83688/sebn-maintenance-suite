@@ -174,9 +174,8 @@ class DataEngine:
                         if raw_machine_up in noise_keywords or raw_machine_up.startswith('PPE-VA') or raw_machine_up.startswith('ANNEXE'):
                             continue
 
-                        # Extract group, machine name, and carte
-                        zone_val = str(row[col_group]).strip() if col_group is not None and col_group < len(row) and pd.notna(row[col_group]) else ""
-                        group_name = zone_val if zone_val and zone_val.lower() != 'nan' else sheet_name.strip()
+                        # Group strictly comes from the Excel Sheet Tab name
+                        group_name = sheet_name.strip()
                         
                         m_name_val = str(row[col_name]).strip() if col_name is not None and col_name < len(row) and pd.notna(row[col_name]) else ""
                         machine_name = m_name_val if m_name_val and m_name_val.lower() != 'nan' else raw_machine
@@ -203,7 +202,7 @@ class DataEngine:
                                     "Machine_Name": machine_name,
                                     "Zone": group_name,
                                     "Group": group_name,
-                                    "Sheet": sheet_name,
+                                    "Sheet": group_name,
                                     "Carte": carte,
                                     "Matricule": carte,
                                     "Week": f"S{week_num}",
