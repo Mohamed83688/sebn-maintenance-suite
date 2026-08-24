@@ -135,88 +135,78 @@ def invalidate_pma_cache():
 def sync_pma_machines_to_ima(df=None):
     """
     Synchronizes all unique machines from the active Preventive Calendar (PMA)
-    into the Curative Maintenance (IMA) database.
+    into the Curative Maintenance (IMA) database so they immediately appear
+    in intervention forms, machine lists, and analytics.
     """
     try:
-        total_synced = 0
+        machine_map = {}
 
-        # Build list of Excel files to try — hardcode bundled path relative to this file
-        app_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        bundled_excel = os.path.join(app_root, 'data', 'current_schedule.xlsx')
-        logger.info(f"sync_pma: app_root={app_root}, bundled={bundled_excel}, exists={os.path.isfile(bundled_excel)}")
-
-        paths = []
-        # Always try bundled file first
-        if os.path.isfile(bundled_excel):
-            paths.append(bundled_excel)
-        # Then try discovered paths
-        for p in pma_config.get_all_excel_paths():
-            if p not in paths:
-                paths.append(p)
-
-        logger.info(f"sync_pma: trying {len(paths)} Excel file(s): {[os.path.basename(p) for p in paths]}")
-
-        from ima.excel_reader import CalendrierReader
-        reader = CalendrierReader()
-        for p in paths:
-            try:
-                c_df = reader.read_calendrier(p)
-                logger.info(f"sync_pma: read {len(c_df)} rows from {os.path.basename(p)}")
-                if not c_df.empty:
-                    mlist = []
-                    for _, r in c_df.iterrows():
-                        mid = str(r.get('ID Machine', '')).strip()
-                        mname = str(r.get('Nom Machine', mid)).strip()
-                        grp = str(r.get('Groupe', '')).strip()
-                        if mid and mid.lower() not in ['nan', 'none', '']:
-                            mlist.append({
-                                "machine_id": mid,
-                                "machine_name": mname if mname and mname.lower() != 'nan' else mid,
-                                "group_name": grp if grp and grp.lower() != 'nan' else "Général",
-                                "location": "",
-                                "description": ""
-                            })
-                    if mlist:
-                        c = ima_db.upsert_machines(mlist)
-                        total_synced += c
-                        logger.info(f"sync_pma: synced {c} machines from {os.path.basename(p)}")
-                        break  # Stop after first successful file
-            except Exception as e:
-                logger.error(f"sync_pma: error reading {os.path.basename(p)}: {e}")
-
-        # Fallback: use DataEngine if CalendrierReader found nothing
-        if total_synced == 0:
-            try:
+        # 1. Direct DataEngine DataFrame inspection (most accurate, 100% matches Preventive Calendar)
+        try:
+            target_df = df
+            if target_df is None or (hasattr(target_df, 'empty') and target_df.empty):
                 eng = get_pma_engine()
-                df2 = eng.current_df if df is None else df
-                if df2 is not None and not df2.empty:
-                    col_equip = 'Equipment' if 'Equipment' in df2.columns else None
-                    if col_equip:
-                        mlist, seen = [], set()
-                        for _, r in df2.iterrows():
-                            mid = str(r.get(col_equip, '')).strip()
-                            if not mid or mid.lower() in ['nan', 'none', ''] or mid in seen:
-                                continue
-                            seen.add(mid)
-                            grp = str(r.get('Zone', r.get('Sheet', 'Général'))).strip()
-                            mlist.append({
-                                "machine_id": mid,
-                                "machine_name": mid,
-                                "group_name": grp if grp and grp.lower() != 'nan' else "Général",
-                                "location": "", "description": ""
-                            })
-                        if mlist:
-                            c = ima_db.upsert_machines(mlist)
-                            total_synced += c
-                            logger.info(f"sync_pma: synced {c} machines from DataEngine")
-            except Exception as e:
-                logger.error(f"sync_pma: DataEngine fallback error: {e}")
+                target_df = eng.current_df
 
-        logger.info(f"sync_pma: total={total_synced}")
-        return total_synced
+            if target_df is not None and not target_df.empty:
+                col_equip = 'Equipment' if 'Equipment' in target_df.columns else ('equipment' if 'equipment' in target_df.columns else None)
+                if col_equip:
+                    for _, r in target_df.iterrows():
+                        mid = str(r.get(col_equip, '')).strip()
+                        if not mid or mid.lower() in ['nan', 'none', '']:
+                            continue
+                        mname = str(r.get('Machine_Name', mid)).strip()
+                        grp = str(r.get('Group', r.get('Zone', r.get('Sheet', 'Général')))).strip()
+                        machine_map[mid] = {
+                            "machine_id": mid,
+                            "machine_name": mname if mname and mname.lower() != 'nan' else mid,
+                            "group_name": grp if grp and grp.lower() != 'nan' else "Général",
+                            "location": "",
+                            "description": ""
+                        }
+        except Exception as e:
+            logger.warning(f"sync_pma: DataEngine parse step error: {e}")
+
+        # 2. Check all Excel files via CalendrierReader to catch any additional machines
+        try:
+            from ima.excel_reader import CalendrierReader
+            reader = CalendrierReader()
+            paths = pma_config.get_all_excel_paths()
+            app_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            bundled_excel = os.path.join(app_root, 'data', 'current_schedule.xlsx')
+            if os.path.isfile(bundled_excel) and bundled_excel not in paths:
+                paths.append(bundled_excel)
+
+            for p in paths:
+                try:
+                    c_df = reader.read_calendrier(p)
+                    if not c_df.empty:
+                        for _, r in c_df.iterrows():
+                            mid = str(r.get('ID Machine', '')).strip()
+                            mname = str(r.get('Nom Machine', mid)).strip()
+                            grp = str(r.get('Groupe', '')).strip()
+                            if mid and mid.lower() not in ['nan', 'none', '']:
+                                if mid not in machine_map:
+                                    machine_map[mid] = {
+                                        "machine_id": mid,
+                                        "machine_name": mname if mname and mname.lower() != 'nan' else mid,
+                                        "group_name": grp if grp and grp.lower() != 'nan' else "Général",
+                                        "location": "",
+                                        "description": ""
+                                    }
+                except Exception as ex:
+                    logger.warning(f"sync_pma: CalendrierReader on {p} warning: {ex}")
+        except Exception as e:
+            logger.warning(f"sync_pma: CalendrierReader step error: {e}")
+
+        if machine_map:
+            c = ima_db.upsert_machines(list(machine_map.values()))
+            logger.info(f"sync_pma: successfully synced {c} machines to IMA database")
+            return c
+        return 0
     except Exception as e:
         logger.error(f"sync_pma: FATAL ERROR: {e}")
-    return 0
+        return 0
 
 # (Machine sync happens on-demand per request, not at startup)
 
