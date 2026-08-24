@@ -1650,32 +1650,15 @@ def machines_sync_pma():
 def machines_import():
     file = request.files.get('excel_file')
     if file and file.filename:
-        from ima.excel_reader import CalendrierReader
-        path = os.path.join(pma_config.active_base, "current_schedule.xlsx")
+        safe_filename = file.filename.replace('/', '_').replace('\\', '_').strip()
+        path = os.path.join(pma_config.active_base, safe_filename)
         file.save(path)
         pma_config.set_last_excel_path(path)
         invalidate_pma_cache()
         try:
-            reader = CalendrierReader()
-            df = reader.read_calendrier(path)
-            if not df.empty:
-                mlist = []
-                for _, r in df.iterrows():
-                    mid   = str(r.get('ID Machine', '')).strip()
-                    mname = str(r.get('Nom Machine', mid)).strip()
-                    grp   = str(r.get('Groupe', '')).strip()
-                    if mid and mid.lower() != 'nan':
-                        mlist.append({
-                            "machine_id":   mid,
-                            "machine_name": mname if mname and mname.lower() != 'nan' else mid,
-                            "group_name":   grp,
-                            "location":     "",
-                            "description":  ""
-                        })
-                c = ima_db.upsert_machines(mlist)
-                flash(f"{c} machines importées avec succès et planning PMA mis à jour.", "success")
-            else:
-                flash("Aucune machine identifiée dans le fichier Excel.", "warning")
+            eng = get_pma_engine(force=True)
+            c = sync_pma_machines_to_ima(eng.current_df)
+            flash(f"{c} machines importées et synchronisées avec succès.", "success")
         except Exception as e:
             logger.error(f"Machines import error: {e}")
             flash(f"Erreur lors de l'importation : {e}", "danger")
