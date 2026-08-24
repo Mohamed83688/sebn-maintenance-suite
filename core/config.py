@@ -91,13 +91,13 @@ class ConfigManager:
     def get_all_excel_paths(self):
         """
         Discovers and returns all valid schedule Excel files.
-        First checks data/Schedules/ (dedicated folder),
-        then falls back to active_base for backward-compat (current_schedule.xlsx).
+        Checks active_base/Schedules/, last_excel.txt, active_base/, and finally
+        the app's built-in data/ folder as a seed source.
         """
         paths = []
         schedules_dir = self.get_schedules_dir()
 
-        # Prefer files in Schedules/ subfolder
+        # 1. Files in active_base/Schedules/ subfolder
         if os.path.isdir(schedules_dir):
             for f in sorted(os.listdir(schedules_dir)):
                 if f.startswith('~$') or f.startswith('.'):
@@ -107,13 +107,13 @@ class ConfigManager:
                     if os.path.isfile(full_p) and full_p not in paths:
                         paths.append(full_p)
 
-        # Also check last_excel.txt path (may point to data/ root)
+        # 2. File referenced by last_excel.txt
         last_p = self.get_last_excel_path()
         if last_p and os.path.exists(last_p) and last_p not in paths:
             paths.append(last_p)
 
-        # Fallback: scan active_base root for any schedule Excel files
-        if not paths and os.path.isdir(self.active_base):
+        # 3. Scan active_base root for Excel files
+        if os.path.isdir(self.active_base):
             for f in sorted(os.listdir(self.active_base)):
                 if f.startswith('~$') or f.startswith('.'):
                     continue
@@ -121,6 +121,18 @@ class ConfigManager:
                     full_p = os.path.join(self.active_base, f)
                     if os.path.isfile(full_p) and full_p not in paths:
                         paths.append(full_p)
+
+        # 4. Fallback: scan the app's own bundled data/ directory (seed for Railway first boot)
+        if not paths:
+            app_data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data')
+            if os.path.isdir(app_data_dir) and os.path.abspath(app_data_dir) != os.path.abspath(self.active_base):
+                for f in sorted(os.listdir(app_data_dir)):
+                    if f.startswith('~$') or f.startswith('.'):
+                        continue
+                    if f.lower().endswith(('.xlsx', '.xlsm')) and not f.startswith('dashboard_ebm'):
+                        full_p = os.path.join(app_data_dir, f)
+                        if os.path.isfile(full_p) and full_p not in paths:
+                            paths.append(full_p)
 
         return paths
 
