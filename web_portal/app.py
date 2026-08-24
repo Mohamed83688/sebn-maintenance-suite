@@ -115,6 +115,10 @@ def get_pma_engine(force=False):
             _DE_CACHE.load_excel(paths if len(paths) > 1 else paths[0])
             _DE_PATHS  = paths
             _DE_MTIMES = current_mtimes
+            try:
+                sync_pma_machines_to_ima(_DE_CACHE.current_df)
+            except Exception as e:
+                logger.warning(f"Could not auto-sync machines: {e}")
         except Exception as e:
             logger.error(f"PMA engine error: {e}")
             if not _DE_CACHE:
@@ -127,6 +131,88 @@ def invalidate_pma_cache():
     _DE_CACHE  = None
     _DE_PATHS  = []
     _DE_MTIMES = {}
+
+def sync_pma_machines_to_ima(df=None):
+    """
+    Synchronizes all unique machines from the active Preventive Calendar (PMA)
+    into the Curative Maintenance (IMA) database so they immediately appear
+    in intervention forms, machine lists, and analytics.
+    """
+    try:
+        if df is None or (hasattr(df, 'empty') and df.empty):
+            eng = get_pma_engine()
+            df = eng.current_df
+
+        # If DataEngine df is empty, attempt reading from last excel path directly
+        if df is None or (hasattr(df, 'empty') and df.empty):
+            pma_file = pma_config.get_last_excel_path()
+            if pma_file and os.path.exists(pma_file):
+                from ima.excel_reader import CalendrierReader
+                reader = CalendrierReader()
+                c_df = reader.read_calendrier(pma_file)
+                if not c_df.empty:
+                    mlist = []
+                    for _, r in c_df.iterrows():
+                        mid = str(r.get('ID Machine', '')).strip()
+                        mname = str(r.get('Nom Machine', mid)).strip()
+                        grp = str(r.get('Groupe', '')).strip()
+                        if mid and mid.lower() not in ['nan', 'none', '']:
+                            mlist.append({
+                                "machine_id": mid,
+                                "machine_name": mname if mname and mname.lower() != 'nan' else mid,
+                                "group_name": grp if grp and grp.lower() != 'nan' else "Général",
+                                "location": "",
+                                "description": ""
+                            })
+                    if mlist:
+                        count = ima_db.upsert_machines(mlist)
+                        logger.info(f"Auto-synced {count} machines from CalendrierReader into IMA database.")
+                        return count
+            return 0
+
+        # Extract from DataEngine DataFrame
+        col_equip = 'Equipment' if 'Equipment' in df.columns else ('equipment' if 'equipment' in df.columns else None)
+        if not col_equip:
+            return 0
+
+        col_name = 'Machine_Name' if 'Machine_Name' in df.columns else ('Nom Machine' if 'Nom Machine' in df.columns else col_equip)
+        col_group = 'Group' if 'Group' in df.columns else ('Zone' if 'Zone' in df.columns else ('Sheet' if 'Sheet' in df.columns else None))
+
+        mlist = []
+        seen = set()
+        noise_keywords = [
+            'ZONE', 'N° CARTE', 'SEMAINE', 'TOTAL', 'ROLE', 'ADMIN', 'ADMINISTRATEUR',
+            'SIGNATURES', 'SIGNATURE', 'TECHNICIAN', 'TECHNICIEN', 'USER', 'USERS',
+            'ACCOUNT', 'LOGIN', 'MATRICULE', 'DATE', 'SHIFT', 'EQUIPE', 'PAGE',
+            'RESP', 'REV', 'ANNEXE', 'SOMMAIRE', 'VALIDÉ', 'VALIDE', 'VISA', 'NAN', 'NONE'
+        ]
+
+        for _, r in df.iterrows():
+            mid = str(r.get(col_equip, '')).strip()
+            if not mid or mid.upper() in noise_keywords or mid.upper().startswith('PPE-VA') or mid.upper().startswith('ANNEXE'):
+                continue
+            if mid in seen:
+                continue
+            seen.add(mid)
+
+            mname = str(r.get(col_name, mid)).strip()
+            grp = str(r.get(col_group, '') if col_group else '').strip()
+
+            mlist.append({
+                "machine_id": mid,
+                "machine_name": mname if mname and mname.lower() != 'nan' else mid,
+                "group_name": grp if grp and grp.lower() != 'nan' else "Général",
+                "location": "",
+                "description": ""
+            })
+
+        if mlist:
+            count = ima_db.upsert_machines(mlist)
+            logger.info(f"Auto-synced {count} machines from PMA DataFrame into IMA database.")
+            return count
+    except Exception as e:
+        logger.error(f"Failed to auto-sync PMA machines to IMA: {e}")
+    return 0
 
 def get_local_ip():
     try:
@@ -1211,6 +1297,9 @@ def intervention_form():
         return redirect(url_for('intervention_detail', code=code))
 
     groups    = ima_db.get_machine_groups()
+    if not groups:
+        sync_pma_machines_to_ima()
+        groups = ima_db.get_machine_groups()
     asp_codes = ima_db.get_asp_codes_enriched()
     return render_template('intervention_form.html', groups=groups, asp_codes=asp_codes,
                            now=datetime.datetime.now().strftime('%Y-%m-%dT%H:%M'), form_data={})
@@ -1220,6 +1309,8 @@ def intervention_form():
 def api_machines_by_group():
     grp = request.args.get('group', '').strip()
     try:
+        if not ima_db.get_all_machines():
+            sync_pma_machines_to_ima()
         if grp:
             machines = ima_db.get_machines_by_group(grp)
         else:
@@ -1346,7 +1437,11 @@ def machines():
     group  = request.args.get('group', 'All')
     search = request.args.get('search', '').strip()
 
-    machs    = ima_db.search_machines(search, group if group != 'All' else None)
+    machs = ima_db.search_machines(search, group if group != 'All' else None)
+    if not machs and not search and group == 'All':
+        sync_pma_machines_to_ima()
+        machs = ima_db.search_machines(search, group if group != 'All' else None)
+
     enriched = ima_db.get_machines_enriched()
     e_dict   = {m['machine_id']: m for m in enriched}
 
@@ -1358,6 +1453,16 @@ def machines():
     groups = ima_db.get_machine_groups()
     return render_template('machines.html', machines=final_machs, groups=groups,
                            current_group=group, current_search=search)
+
+@app.route('/machines/sync-pma', methods=['POST', 'GET'])
+@login_required
+def machines_sync_pma():
+    count = sync_pma_machines_to_ima()
+    if count > 0:
+        flash(f"{count} machines synchronisées avec succès depuis le planning PMA.", "success")
+    else:
+        flash("Aucune machine trouvée dans le planning actuel. Vérifiez que le fichier Excel est bien chargé.", "warning")
+    return redirect(url_for('machines'))
 
 @app.route('/machines/import', methods=['POST'])
 @admin_required
@@ -1752,7 +1857,9 @@ def pma_upload():
         file.save(path)
         pma_config.set_last_excel_path(path)
         invalidate_pma_cache()
-        flash(f"Planning '{safe_filename}' ajouté et mis à jour avec succès.", "success")
+        eng = get_pma_engine(force=True)
+        count = sync_pma_machines_to_ima(eng.current_df)
+        flash(f"Planning '{safe_filename}' ajouté avec succès ({count} machines synchronisées pour les interventions).", "success")
     else:
         flash("Aucun fichier sélectionné.", "danger")
     return redirect(url_for('admin'))

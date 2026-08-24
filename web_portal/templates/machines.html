@@ -4,9 +4,12 @@
 {% block page_subtitle %}{{ machines|length }} machines référencées au total{% endblock %}
 
 {% block topbar_actions %}
-{% if role == 'admin' %}
+{% if role in ['admin', 'owner'] %}
+<a href="{{ url_for('machines_sync_pma') }}" class="btn btn-primary btn-sm" style="display:inline-flex; align-items:center; gap:6px;">
+    <i class="fa-solid fa-arrows-rotate"></i> Synchroniser Planning PMA
+</a>
 <button class="btn btn-secondary btn-sm" onclick="document.getElementById('import-modal').classList.add('open')">
-    <i class="fa-solid fa-file-excel"></i> Importer Machines
+    <i class="fa-solid fa-file-excel"></i> Importer Fichier Excel
 </button>
 {% endif %}
 {% endblock %}
