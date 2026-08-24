@@ -122,19 +122,24 @@ class ConfigManager:
                     if os.path.isfile(full_p) and full_p not in paths:
                         paths.append(full_p)
 
-        # 4. Fallback: scan the app's own bundled data/ directory (seed for Railway first boot)
-        if not paths:
-            app_data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data')
-            if os.path.isdir(app_data_dir) and os.path.abspath(app_data_dir) != os.path.abspath(self.active_base):
-                for f in sorted(os.listdir(app_data_dir)):
-                    if f.startswith('~$') or f.startswith('.'):
-                        continue
-                    if f.lower().endswith(('.xlsx', '.xlsm')) and not f.startswith('dashboard_ebm'):
-                        full_p = os.path.join(app_data_dir, f)
-                        if os.path.isfile(full_p) and full_p not in paths:
-                            paths.append(full_p)
+        # Deduplicate by real path and filename so the same file is never parsed twice
+        seen_keys = set()
+        unique_paths = []
+        for p in paths:
+            if not p or not os.path.isfile(p):
+                continue
+            try:
+                canonical = os.path.realpath(os.path.abspath(p))
+                bname = os.path.basename(canonical).lower()
+                if canonical not in seen_keys and bname not in seen_keys:
+                    seen_keys.add(canonical)
+                    seen_keys.add(bname)
+                    unique_paths.append(canonical)
+            except Exception:
+                if p not in unique_paths:
+                    unique_paths.append(p)
 
-        return paths
+        return unique_paths
 
     def list_schedule_files(self):
         """Returns metadata list for all discovered schedule files (for admin UI)."""
