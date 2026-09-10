@@ -1,0 +1,38 @@
+{
+  "name": "Ahmed Ben Salah",
+  "matricule": "TN-5555",
+  "shift": "B",
+  "hire_date": "",
+  "exams": [
+    {
+      "exam_id": 4,
+      "name": "CSwin & Brainware & Vacuum",
+      "type": "Exam",
+      "exam_level": "Level 3",
+      "date": "2026-09-10",
+      "score": "0/19",
+      "percentage": 0.0,
+      "status": "ÉCHOUÉ"
+    },
+    {
+      "exam_id": 3,
+      "name": "CSwin Creation Hardware",
+      "type": "Exam",
+      "exam_level": "Level 2",
+      "date": "2026-09-10",
+      "score": "0/19",
+      "percentage": 0.0,
+      "status": "ÉCHOUÉ"
+    },
+    {
+      "exam_id": 2,
+      "name": "CSwin Basic Knowledge",
+      "type": "Exam",
+      "exam_level": "Level 1",
+      "date": "2026-09-10",
+      "score": "17/17",
+      "percentage": 100.0,
+      "status": "RÉUSSI"
+    }
+  ]
+}

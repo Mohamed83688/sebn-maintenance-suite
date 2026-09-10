@@ -1,0 +1,19 @@
+{
+  "name": "Mohamed Issaoui",
+  "matricule": "11818",
+  "shift": "B",
+  "hire_date": "",
+  "technician_level": "Level 1",
+  "exams": [
+    {
+      "exam_id": 2,
+      "name": "CSwin Basic Knowledge",
+      "type": "Exam",
+      "exam_level": "Level 1",
+      "date": "2026-09-10",
+      "score": "14/17",
+      "percentage": 82.35294117647058,
+      "status": "RÉUSSI"
+    }
+  ]
+}
