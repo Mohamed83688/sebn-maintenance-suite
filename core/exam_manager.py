@@ -5,7 +5,10 @@ import re
 import json
 import uuid
 import logging
-from docx import Document
+try:
+    from docx import Document
+except ImportError:
+    Document = None
 
 logger = logging.getLogger('sebn-maintenance')
 
@@ -270,6 +273,9 @@ class ExamManager:
         """
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"File not found: {file_path}")
+
+        if Document is None:
+            raise ImportError("Le module python-docx est requis pour analyser les fichiers Word (.docx). Installez-le avec: pip install python-docx")
 
         doc = Document(file_path)
 
