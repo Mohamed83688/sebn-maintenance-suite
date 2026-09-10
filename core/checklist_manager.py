@@ -162,9 +162,10 @@ class ChecklistManager:
             if not os.path.exists(file_path):
                 return False, "Fichier introuvable.", [], {}
 
-            # Attempt to open workbook
+            # Attempt to open workbook (use binary stream to support misnamed .xls)
             try:
-                wb = openpyxl.load_workbook(file_path, data_only=True)
+                with open(file_path, 'rb') as fh:
+                    wb = openpyxl.load_workbook(fh, data_only=True)
             except Exception as e:
                 return False, f"Impossible d'ouvrir le fichier Excel (format corrompu ou invalide): {e}", [], {}
 
