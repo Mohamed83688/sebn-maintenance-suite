@@ -162,9 +162,9 @@ def generate_technician_card_pdf(tech_details: dict) -> str:
     ]))
 
     # Level Banner flowable
-    level_txt = tech_details.get('technician_level') or 'Level 1'
+    level_txt = tech_details.get('technician_level') or 'Level 0'
     # Extract level detail description
-    lvl_desc = "CSwin Basic Knowledge"
+    lvl_desc = "Niveau Initial (Débutant)" if ("0" in level_txt) else "CSwin Basic Knowledge"
     if "2" in level_txt or "50%" in level_txt: lvl_desc = "CSwin Creation Hardware"
     elif "3" in level_txt or "75%" in level_txt: lvl_desc = "CSwin & Brainware & Vacuum"
     elif "4" in level_txt or "100%" in level_txt: lvl_desc = "CSwin & Brainware & Vacuum"

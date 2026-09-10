@@ -806,22 +806,24 @@ class ExamManager:
             return {r['question_id']: r['answer_text'] for r in cur.fetchall()}
 
     # Sequential level order — used for progression enforcement
-    LEVEL_ORDER = ['Level 1', 'Level 2', 'Level 3', 'Level 4']
+    LEVEL_ORDER = ['Level 0', 'Level 1', 'Level 2', 'Level 3', 'Level 4']
 
     @classmethod
     def normalize_level(cls, lvl: str) -> str:
         if not lvl:
-            return 'Level 1'
+            return 'Level 0'
         s = str(lvl).strip()
         su = s.upper()
-        if '100' in su or su == 'LEVEL 4' or su == 'LEVEL4' or su == 'LEVEL 4 (EXPERT)':
+        if '100' in su or su == 'LEVEL 4' or su == 'LEVEL4' or 'EXPERT' in su or su == '4':
             return 'Level 4'
-        if '75' in su or su == 'LEVEL 3' or su == 'LEVEL3':
+        if '75' in su or su == 'LEVEL 3' or su == 'LEVEL3' or su == '3':
             return 'Level 3'
-        if '50' in su or su == 'LEVEL 2' or su == 'LEVEL2':
+        if '50' in su or su == 'LEVEL 2' or su == 'LEVEL2' or su == '2':
             return 'Level 2'
-        if '25' in su or su == 'LEVEL 1' or su == 'LEVEL1' or 'BASE' in su:
+        if '25' in su or su == 'LEVEL 1' or su == 'LEVEL1' or su == '1':
             return 'Level 1'
+        if '0' in su or 'BASE' in su or 'DÉBUTANT' in su or 'DEBUTANT' in su:
+            return 'Level 0'
         # If already Title-cased "Level X"
         for l in cls.LEVEL_ORDER:
             if l.lower() == s.lower():
@@ -1081,10 +1083,12 @@ class ExamManager:
                 current_idx = lo.index(current_level)
 
             level_descriptions = {
+                'Level 0': 'Niveau Initial (Débutant)',
                 'Level 1': 'CSwin Basic Knowledge',
                 'Level 2': 'CSwin Creation Hardware',
                 'Level 3': 'CSwin & Brainware & Vacuum',
                 'Level 4': 'CSwin & Brainware & Vacuum',
+                'LEVEL 0%':   'Niveau Initial (Débutant)',
                 'LEVEL 25%':  'CSwin Basic Knowledge',
                 'LEVEL 50%':  'CSwin Creation Hardware',
                 'LEVEL 75%':  'CSwin & Brainware & Vacuum',
@@ -1255,10 +1259,12 @@ class ExamManager:
             techs = [dict(r) for r in cur.fetchall()]
 
         level_descriptions = {
+            'Level 0': 'Niveau Initial (Débutant)',
             'Level 1': 'CSwin Basic Knowledge',
             'Level 2': 'CSwin Creation Hardware',
             'Level 3': 'CSwin & Brainware & Vacuum',
             'Level 4': 'CSwin & Brainware & Vacuum',
+            'LEVEL 0%':   'Niveau Initial (Débutant)',
             'LEVEL 25%':  'CSwin Basic Knowledge',
             'LEVEL 50%':  'CSwin Creation Hardware',
             'LEVEL 75%':  'CSwin & Brainware & Vacuum',
@@ -1270,7 +1276,7 @@ class ExamManager:
             t['level_description'] = level_descriptions.get(lvl, '')
             lo = self.LEVEL_ORDER
             t['level_idx'] = lo.index(lvl) if lvl in lo else 0
-            t['level_pct'] = (t['level_idx'] + 1) * 25
+            t['level_pct'] = t['level_idx'] * 25
         return techs
 
     # ── Multi-Image Helpers ────────────────────────────────────────────────────
@@ -1444,10 +1450,12 @@ class ExamManager:
         """Creates a blank draft exam for the given level."""
         technician_level = self.normalize_level(technician_level)
         level_descriptions = {
+            'Level 0': 'Niveau Initial (Débutant)',
             'Level 1': 'CSwin Basic Knowledge',
             'Level 2': 'CSwin Creation Hardware',
             'Level 3': 'CSwin & Brainware & Vacuum',
             'Level 4': 'CSwin & Brainware & Vacuum',
+            'LEVEL 0%':   'Niveau Initial (Débutant)',
             'LEVEL 25%':  'CSwin Basic Knowledge',
             'LEVEL 50%':  'CSwin Creation Hardware',
             'LEVEL 75%':  'CSwin & Brainware & Vacuum',

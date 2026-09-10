@@ -64,6 +64,7 @@
                 <label class="form-label" style="font-size:11px;">Niveau Habilité</label>
                 <select name="level" class="form-control" style="padding:6px 12px; font-size:12.5px;">
                     <option value="">Tous les niveaux</option>
+                    <option value="Level 0" {% if filters.level == 'Level 0' %}selected{% endif %}>Level 0</option>
                     <option value="Level 1" {% if filters.level == 'Level 1' %}selected{% endif %}>Level 1</option>
                     <option value="Level 2" {% if filters.level == 'Level 2' %}selected{% endif %}>Level 2</option>
                     <option value="Level 3" {% if filters.level == 'Level 3' %}selected{% endif %}>Level 3</option>

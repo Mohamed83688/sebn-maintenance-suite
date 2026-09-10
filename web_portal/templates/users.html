@@ -240,7 +240,7 @@
                             <span class="badge badge-primary">ADMIN</span>
                             {% elif u.role == 'TECHNICIAN' %}
                             <span class="badge badge-warning">TECHNICIEN</span>
-                            <div style="font-size:10px; font-weight:700; color:var(--primary); margin-top:2px;">{{ u.technician_level or 'Level 1' }}</div>
+                            <div style="font-size:10px; font-weight:700; color:var(--primary); margin-top:2px;">{{ u.technician_level or 'Level 0' }}</div>
                             {% else %}
                             <span class="badge badge-secondary">{{ u.role }}</span>
                             {% endif %}
@@ -261,7 +261,7 @@
                         <td style="text-align:right;">
                             <div style="display:flex; justify-content:flex-end; gap:6px;">
                                 <button class="btn btn-secondary btn-xs" title="Modifier" 
-                                        onclick="openEditModal({{ u.id }}, '{{ u.name|replace("'", "\\'") }}', '{{ u.username }}', '{{ u.matricule or '' }}', '{{ u.role }}', '{{ u.shift or 'A' }}', '{{ u.technician_level or 'Level 1' }}')">
+                                        onclick="openEditModal({{ u.id }}, '{{ u.name|replace("'", "\\'") }}', '{{ u.username }}', '{{ u.matricule or '' }}', '{{ u.role }}', '{{ u.shift or 'A' }}', '{{ u.technician_level or 'Level 0' }}')">
                                     <i class="fa-solid fa-pen-to-square"></i>
                                 </button>
                                 <button class="btn btn-warning btn-xs" title="Réinitialiser mot de passe" 
@@ -348,10 +348,11 @@
             <div class="form-group" id="create_level_group">
                 <label class="form-label">Niveau Habilité *</label>
                 <select name="technician_level" class="form-control">
-                    <option value="Level 1">Level 1 (CSwin Basic Knowledge)</option>
-                    <option value="Level 2">Level 2 (CSwin Creation Hardware)</option>
-                    <option value="Level 3">Level 3 (CSwin & Brainware & Vacuum)</option>
-                    <option value="Level 4">Level 4 (CSwin & Brainware & Vacuum)</option>
+                    <option value="Level 0" selected>Level 0 (Débutant / Non qualifié)</option>
+                    <option value="Level 1">Level 1 (CSwin Basic Knowledge - 25%)</option>
+                    <option value="Level 2">Level 2 (CSwin Creation Hardware - 50%)</option>
+                    <option value="Level 3">Level 3 (CSwin & Brainware & Vacuum - 75%)</option>
+                    <option value="Level 4">Level 4 (CSwin & Brainware & Vacuum - 100%)</option>
                 </select>
             </div>
             <div class="modal-footer">
@@ -514,7 +515,7 @@ function openEditModal(id, name, username, matricule, role, shift, level) {
     // Show current level as read-only (controlled by exams)
     const lvlText = document.getElementById('edit_level_text');
     const lvlLink = document.getElementById('edit_prog_link');
-    if (lvlText) lvlText.textContent = level || 'Level 1';
+    if (lvlText) lvlText.textContent = level || 'Level 0';
     if (lvlLink) lvlLink.href = `/training/progression/${id}`;
     openModal('editModal');
 }

@@ -261,7 +261,7 @@
                             <label class="form-label" style="font-size:11px;">Nouveau Niveau</label>
                             <select name="new_level" class="form-control" required style="font-size:12px; padding:7px 10px;">
                                 <option value="">-- Choisir --</option>
-                                {% for lvl in ['Level 1','Level 2','Level 3','Level 4'] %}
+                                {% for lvl in ['Level 0','Level 1','Level 2','Level 3','Level 4'] %}
                                 <option value="{{ lvl }}" {% if lvl == progression.current_level %}disabled style="color:#94A3B8;"{% endif %}>
                                     {{ lvl }}{% if lvl == progression.current_level %} (actuel){% endif %}
                                 </option>

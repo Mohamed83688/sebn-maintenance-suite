@@ -146,9 +146,9 @@
 
             <!-- Level banner -->
             <div class="badge-level">
-                {% set tech_level = card.technician_level or 'Level 1' %}
+                {% set tech_level = card.technician_level or 'Level 0' %}
                 {{ tech_level }}
-                {% set level_desc = "CSwin Basic Knowledge" %}
+                {% set level_desc = "Niveau Initial (Débutant)" if ("0" in tech_level) else "CSwin Basic Knowledge" %}
                 {% if "2" in tech_level or "50%" in tech_level %}{% set level_desc = "CSwin Creation Hardware" %}{% elif "3" in tech_level or "75%" in tech_level %}{% set level_desc = "CSwin & Brainware & Vacuum" %}{% elif "4" in tech_level or "100%" in tech_level %}{% set level_desc = "CSwin & Brainware & Vacuum" %}{% endif %}
                 <div style="font-size:9.5px; font-weight:400; color:#C7D2FE; margin-top:2px;">{{ level_desc }}</div>
             </div>

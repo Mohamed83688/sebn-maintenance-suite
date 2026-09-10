@@ -855,8 +855,8 @@ input:checked + .slider:before { transform: translateX(20px); }
                 <select id="override-tech-select" class="form-control" onchange="updateOverrideTechInfo()">
                     <option value="">— Choisir un technicien —</option>
                     {% for t in technicians_for_override %}
-                    <option value="{{ t.id }}" data-level="{{ t.technician_level or 'Level 1' }}" data-name="{{ t.name }}">
-                        {{ t.name }} ({{ t.matricule }}) — {{ t.technician_level or 'Level 1' }}
+                    <option value="{{ t.id }}" data-level="{{ t.technician_level or 'Level 0' }}" data-name="{{ t.name }}">
+                        {{ t.name }} ({{ t.matricule }}) — {{ t.technician_level or 'Level 0' }}
                     </option>
                     {% endfor %}
                 </select>
@@ -873,7 +873,7 @@ input:checked + .slider:before { transform: translateX(20px); }
             <div style="margin-bottom:14px;">
                 <label class="form-label">Nouveau Niveau à Attribuer</label>
                 <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                    {% for lvl, pct, col in [('Level 1', 25, '#D97706'), ('Level 2', 50, '#059669'), ('Level 3', 75, '#0284C7'), ('Level 4', 100, '#6D28D9')] %}
+                    {% for lvl, pct, col in [('Level 0', 0, '#64748B'), ('Level 1', 25, '#D97706'), ('Level 2', 50, '#059669'), ('Level 3', 75, '#0284C7'), ('Level 4', 100, '#6D28D9')] %}
                     <button type="button" class="override-level-btn" data-level="{{ lvl }}"
                             onclick="selectOverrideLevel(this, '{{ lvl }}')"
                             style="padding:8px 16px; border-radius:8px; border:2px solid #E2E8F0; background:#fff; font-weight:700; font-size:12px; cursor:pointer; transition:all 0.15s; color:#374151;">

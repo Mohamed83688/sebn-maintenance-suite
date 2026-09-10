@@ -203,5 +203,58 @@ class TestExamSystem(unittest.TestCase):
         if os.path.exists(pdf_path):
             os.remove(pdf_path)
 
+    def test_technician_starts_at_level_0(self):
+        # 1. Create a brand new technician without specifying level
+        ok, msg, new_tech_id = self.user_mgr.create_user(
+            name="Nouveau Tech",
+            username="nouveau.tech",
+            password="password123",
+            role="TECHNICIAN",
+            matricule="TN-NEW001",
+            shift="B"
+        )
+        self.assertTrue(ok)
+        
+        # Verify technician starts at Level 0
+        tech_user = self.user_mgr.get_user_by_id(new_tech_id)
+        self.assertEqual(tech_user['technician_level'], 'Level 0')
+
+        # Check progression object
+        prog = self.exam_mgr.get_technician_progression(new_tech_id)
+        self.assertEqual(prog['current_level'], 'Level 0')
+        self.assertEqual(prog['next_level'], 'Level 1')
+
+        # 2. Create and pass a Level 1 exam
+        parsed_questions = [{
+            "question_number": 1,
+            "question_text": "Q1 Level 1",
+            "choices": [{"answer_text": "Correct Ans", "is_correct": 1}]
+        }]
+        exam_id = self.exam_mgr.create_exam_with_questions(
+            title="Examen Level 1 Test",
+            description="Examen Level 1",
+            technician_level="Level 1",
+            level_percentage=25,
+            source_file="TestL1.docx",
+            duration=30,
+            passing_score=75,
+            status="published",
+            parsed_questions=parsed_questions
+        )
+        exam = self.exam_mgr.get_exam_by_id(exam_id)
+        q_id = exam['questions'][0]['id']
+        ans_id = exam['questions'][0]['answers'][0]['id']
+        self.exam_mgr.save_exam_answers_setup(exam_id, {str(q_id): ans_id})
+
+        # Start attempt and pass
+        attempt = self.exam_mgr.start_exam_attempt(exam_id, new_tech_id)
+        self.exam_mgr.save_attempt_answer(attempt['id'], q_id, ans_id)
+        status = self.exam_mgr.submit_exam_attempt(attempt['id'])
+        self.assertEqual(status, 'passed')
+
+        # 3. Technician should now be advanced from Level 0 to Level 1
+        tech_user_after = self.user_mgr.get_user_by_id(new_tech_id)
+        self.assertEqual(tech_user_after['technician_level'], 'Level 1')
+
 if __name__ == '__main__':
     unittest.main()

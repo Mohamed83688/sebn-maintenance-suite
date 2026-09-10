@@ -89,7 +89,8 @@ class UserManager:
 
             # --- Normalize any legacy lowercase roles to uppercase ---
             cur.execute("UPDATE users SET role = UPPER(role) WHERE role != UPPER(role)")
-            cur.execute("UPDATE users SET technician_level = 'Level 1' WHERE role = 'TECHNICIAN' AND (technician_level IS NULL OR technician_level = '' OR technician_level LIKE '%25%')")
+            cur.execute("UPDATE users SET technician_level = 'Level 1' WHERE role = 'TECHNICIAN' AND technician_level LIKE '%25%'")
+            cur.execute("UPDATE users SET technician_level = 'Level 0' WHERE role = 'TECHNICIAN' AND (technician_level IS NULL OR technician_level = '')")
 
             # 1. Owner account
             cur.execute("SELECT id, role FROM users WHERE username = 'owner'")
@@ -275,17 +276,19 @@ class UserManager:
     @staticmethod
     def normalize_level(lvl: str) -> str:
         if not lvl:
-            return 'Level 1'
+            return 'Level 0'
         s = str(lvl).strip().upper()
-        if '100' in s or '4' in s:
+        if '100' in s or 'LEVEL 4' in s or 'LEVEL4' in s or 'EXPERT' in s or s == '4':
             return 'Level 4'
-        if '75' in s or '3' in s:
+        if '75' in s or 'LEVEL 3' in s or 'LEVEL3' in s or s == '3':
             return 'Level 3'
-        if '50' in s or '2' in s:
+        if '50' in s or 'LEVEL 2' in s or 'LEVEL2' in s or s == '2':
             return 'Level 2'
-        if '25' in s or '1' in s:
+        if '25' in s or 'LEVEL 1' in s or 'LEVEL1' in s or s == '1':
             return 'Level 1'
-        return 'Level 1'
+        if '0' in s or 'BASE' in s or 'DÉBUTANT' in s or 'DEBUTANT' in s:
+            return 'Level 0'
+        return 'Level 0'
 
     def create_user(
         self,
@@ -308,7 +311,7 @@ class UserManager:
             role = 'TECHNICIAN'
 
         if role == 'TECHNICIAN':
-            technician_level = self.normalize_level(technician_level)
+            technician_level = self.normalize_level(technician_level) if technician_level else 'Level 0'
         else:
             technician_level = None
 

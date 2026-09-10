@@ -88,21 +88,27 @@
             <!-- Level overview banner -->
             <div class="level-card">
                 <span style="font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:2px; color:#E0E7FF; display:block; margin-bottom:6px;">Votre Qualification Actuelle</span>
-                <h2 style="font-size:24px; font-weight:900; margin-bottom:4px; color:#FFFFFF;">{{ user.technician_level or 'NIVEAU DE DÉPART (0%)' }}</h2>
+                <h2 style="font-size:24px; font-weight:900; margin-bottom:4px; color:#FFFFFF;">{{ user.technician_level or 'Level 0' }}</h2>
                 
                 {% set level_desc = "CSwin Basic Knowledge" %}
-                {% if "50%" in user.technician_level %}
+                {% if "0" in (user.technician_level or '') %}
+                    {% set level_desc = "Niveau Initial (Débutant)" %}
+                {% elif "50%" in (user.technician_level or '') or "Level 2" in (user.technician_level or '') %}
                     {% set level_desc = "CSwin Creation Hardware" %}
-                {% elif "75%" in user.technician_level %}
+                {% elif "75%" in (user.technician_level or '') or "Level 3" in (user.technician_level or '') %}
                     {% set level_desc = "CSwin & Brainware & Vacuum" %}
-                {% elif "100%" in user.technician_level %}
+                {% elif "100%" in (user.technician_level or '') or "Level 4" in (user.technician_level or '') %}
                     {% set level_desc = "CSwin & Brainware & Vacuum" %}
                 {% endif %}
                 <p style="font-size:13px; color:#C7D2FE; margin-bottom:18px;">{{ level_desc }}</p>
                 
                 <!-- Progression mini bar -->
-                {% set pct = 25 %}
-                {% if "50%" in user.technician_level %}{% set pct = 50 %}{% elif "75%" in user.technician_level %}{% set pct = 75 %}{% elif "100%" in user.technician_level %}{% set pct = 100 %}{% endif %}
+                {% set pct = 0 %}
+                {% if "25%" in (user.technician_level or '') or "Level 1" in (user.technician_level or '') %}{% set pct = 25 %}
+                {% elif "50%" in (user.technician_level or '') or "Level 2" in (user.technician_level or '') %}{% set pct = 50 %}
+                {% elif "75%" in (user.technician_level or '') or "Level 3" in (user.technician_level or '') %}{% set pct = 75 %}
+                {% elif "100%" in (user.technician_level or '') or "Level 4" in (user.technician_level or '') %}{% set pct = 100 %}
+                {% endif %}
                 <div style="background:rgba(255,255,255,0.15); height:8px; border-radius:4px; overflow:hidden; margin-bottom:6px; max-width:320px;">
                     <div style="background:#FFFFFF; width:{{ pct }}%; height:100%; border-radius:4px;"></div>
                 </div>

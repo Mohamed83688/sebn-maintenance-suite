@@ -33,6 +33,7 @@
     font-weight: 800;
     letter-spacing: 0.3px;
 }
+.lvl-0  { background: #F1F5F9; color: #475569; border: 1px solid #CBD5E1; }
 .lvl-25  { background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE; }
 .lvl-50  { background: #ECFDF5; color: #065F46; border: 1px solid #A7F3D0; }
 .lvl-75  { background: #FEF3C7; color: #92400E; border: 1px solid #FDE68A; }
@@ -162,10 +163,10 @@
             </thead>
             <tbody>
                 {% for t in techs %}
-                {% set lvl = t.technician_level or 'Level 1' %}
+                {% set lvl = t.technician_level or 'Level 0' %}
                 {% set lvl_idx = t.level_idx | default(0) %}
-                {% set lvl_pct = t.level_pct | default(25) %}
-                {% set lvl_class = 'lvl-25' if ('25' in lvl or '1' in lvl) else ('lvl-50' if ('50' in lvl or '2' in lvl) else ('lvl-75' if ('75' in lvl or '3' in lvl) else 'lvl-100')) %}
+                {% set lvl_pct = t.level_pct | default(0) %}
+                {% set lvl_class = 'lvl-0' if ('0' in lvl) else ('lvl-25' if ('25' in lvl or '1' in lvl) else ('lvl-50' if ('50' in lvl or '2' in lvl) else ('lvl-75' if ('75' in lvl or '3' in lvl) else 'lvl-100'))) %}
                 <tr class="tech-row" data-search="{{ t.name|lower }} {{ (t.matricule or '')|lower }}">
                     <td>
                         <div style="display:flex; align-items:center; gap:10px;">
@@ -184,7 +185,7 @@
                     </td>
                     <td>
                         <span class="lvl-badge {{ lvl_class }}">
-                            {% if '25' in lvl %}⬤{% elif '50' in lvl %}⬤{% elif '75' in lvl %}⬤{% else %}★{% endif %}
+                            {% if '0' in lvl %}○{% elif '25' in lvl or '1' in lvl %}⬤{% elif '50' in lvl or '2' in lvl %}⬤{% elif '75' in lvl or '3' in lvl %}⬤{% else %}★{% endif %}
                             {{ lvl }}
                         </span>
                         <div style="font-size:10px; color:var(--text-sec); margin-top:3px;">{{ t.level_description or '' }}</div>
@@ -248,8 +249,8 @@
                 <select name="technician_id" id="modal_tech_select" class="form-control" required onchange="onModalTechChange()">
                     <option value="">-- Choisir un Technicien --</option>
                     {% for t in techs %}
-                    <option value="{{ t.id }}" data-level="{{ t.technician_level or 'Level 1' }}">
-                        {{ t.name }} ({{ t.matricule or 'Sans matricule' }}) — {{ t.technician_level or 'Level 1' }}
+                    <option value="{{ t.id }}" data-level="{{ t.technician_level or 'Level 0' }}">
+                        {{ t.name }} ({{ t.matricule or 'Sans matricule' }}) — {{ t.technician_level or 'Level 0' }}
                     </option>
                     {% endfor %}
                 </select>
@@ -297,6 +298,9 @@ function filterTechs() {
 }
 
 const levelProgressionMap = {
+    'Level 0': 'Level 1',
+    'LEVEL 0': 'Level 1',
+    'LEVEL 0%': 'Level 1',
     'Level 1': 'Level 2',
     'Level 2': 'Level 3',
     'Level 3': 'Level 4',
@@ -338,12 +342,12 @@ function onModalTechChange() {
         return;
     }
 
-    const currentLvl = opt.getAttribute('data-level') || 'Level 1';
+    const currentLvl = opt.getAttribute('data-level') || 'Level 0';
     lbl.textContent = currentLvl;
     box.style.display = 'block';
 
     // Suggest the next exam level automatically
-    const targetLvl = levelProgressionMap[currentLvl] || 'Level 2';
+    const targetLvl = levelProgressionMap[currentLvl] || 'Level 1';
     for (let i = 0; i < examSel.options.length; i++) {
         const exOpt = examSel.options[i];
         if (exOpt.getAttribute('data-level') === targetLvl) {
