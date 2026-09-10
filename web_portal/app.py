@@ -18,6 +18,7 @@ from core.owner_security import OwnerSecurityManager
 from core.data_engine import DataEngine
 from core.tech_db import TechnicianDatabase
 from core.user_manager import UserManager
+from core.exam_manager import ExamManager
 from core.ebm_manager import EBMManager
 from core.passation_manager import PassationManager
 from core.document_manager import DocumentManager
@@ -68,6 +69,8 @@ ima_db = IMADatabase(IMA_DB_PATH)
 
 # Centralized User & Auth Manager (OWNER, ADMIN, TECHNICIAN, USER)
 user_mgr = UserManager(db_path=IMA_DB_PATH, data_dir=pma_config.active_base)
+exam_mgr = ExamManager(db_path=IMA_DB_PATH, data_dir=pma_config.active_base)
+from web_portal.utils.pdf_card_generator import generate_technician_card_pdf
 
 # EBM & Passation Managers (Owner Modules)
 ebm_mgr = EBMManager(db_path=IMA_DB_PATH, data_dir=pma_config.active_base)
@@ -749,17 +752,28 @@ def analytics_export():
     return send_file(bytes_out, mimetype='text/csv', as_attachment=True, download_name=f'analyse_interventions_{datetime.date.today().isoformat()}.csv')
 
 @app.route('/training')
-@admin_required
+@login_required
 def training():
-    techs    = tech_db.get_dashboard_summary()
-    mvp      = None
-    max_exams = -1
+    # If the user is a technician, redirect to their space
+    if session.get('role') == 'TECHNICIAN':
+        return redirect(url_for('tech_my_exams'))
+    
+    # Load technicians with real progression data from the exam system
+    techs = exam_mgr.get_all_technicians_with_progression()
+    all_exams = exam_mgr.get_all_exams()
+    
+    # MVP = technician with the highest level
+    level_order = exam_mgr.LEVEL_ORDER
+    mvp = None
+    max_idx = -1
     for t in techs:
-        valid_exams = [e for e in t.get('exams', []) if e.get('type') == 'Validation']
-        if len(valid_exams) > max_exams:
-            max_exams = len(valid_exams)
+        lvl = exam_mgr.normalize_level(t.get('technician_level'))
+        idx = level_order.index(lvl) if lvl in level_order else 0
+        if idx > max_idx:
+            max_idx = idx
             mvp = t
-    return render_template('training.html', techs=techs, mvp=mvp)
+
+    return render_template('training.html', techs=techs, mvp=mvp, all_exams=all_exams)
 
 @app.route('/training/<matricule>')
 @admin_required
@@ -832,6 +846,713 @@ def training_add_exam(matricule):
     flash(f"Événement '{exam_type}' ajouté avec succès.", "success")
     return redirect(url_for('training_profile', matricule=matricule))
 
+
+# ── Formation & Exam System Routes ──────────────────────────────────────────
+
+@app.route('/training/my-exams')
+@login_required
+def tech_my_exams():
+    if session.get('role') not in ('TECHNICIAN',):
+        return redirect(url_for('training'))
+    
+    u = user_mgr.get_user_by_username(session.get('username'))
+    if not u:
+        flash("Compte utilisateur introuvable.", "danger")
+        return redirect(url_for('logout'))
+        
+    all_exams = exam_mgr.get_all_exams(role='TECHNICIAN')
+    user_level = exam_mgr.normalize_level(u.get('technician_level'))
+    progression = exam_mgr.get_technician_progression(u['id'])
+    
+    with exam_mgr._get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT ea.*, e.title as exam_title, e.number_of_questions
+            FROM exam_attempts ea
+            JOIN exams e ON ea.exam_id = e.id
+            WHERE ea.user_id = ?
+            ORDER BY ea.started_at DESC
+        """, (u['id'],))
+        attempts = [dict(r) for r in cur.fetchall()]
+
+    card = exam_mgr.get_technician_card_details(u['id'])
+    
+    return render_template('tech_exams.html', user=u, exams=all_exams, attempts=attempts, card=card, progression=progression)
+
+
+@app.route('/training/exams')
+@admin_required
+def training_exams():
+    exams = exam_mgr.get_all_exams(role=session.get('role'))
+    techs = exam_mgr.get_all_technicians_with_progression()
+    return render_template('training_exams.html', exams=exams, techs=techs)
+
+
+@app.route('/training/exams/import', methods=['POST'])
+@admin_required
+def exam_import():
+    file = request.files.get('exam_file')
+    if file and file.filename:
+        fname = file.filename.lower()
+        lvl = None
+        if "25%" in fname or "level 1" in fname or "level1" in fname: lvl = "Level 1"
+        elif "50%" in fname or "level 2" in fname or "level2" in fname: lvl = "Level 2"
+        elif "75%" in fname or "level 3" in fname or "level3" in fname: lvl = "Level 3"
+        elif "100%" in fname or "level 4" in fname or "level4" in fname: lvl = "Level 4"
+        
+        if not lvl:
+            flash("Nom du fichier incorrect. Il doit contenir Level 1, 2, 3 ou 4 (ou 25%, 50%, 75%, 100%).", "danger")
+            return redirect(url_for('training_exams'))
+
+        temp_path = os.path.join(pma_config.dirs["archives"], f"temp_{secrets.token_hex(4)}.docx")
+        os.makedirs(os.path.dirname(temp_path), exist_ok=True)
+        file.save(temp_path)
+        
+        try:
+            questions = exam_mgr.parse_docx_exam(temp_path, output_images_dir=EXAM_IMAGES_DIR)
+            levels_pct = {"Level 1": 25, "Level 2": 50, "Level 3": 75, "Level 4": 100,
+                          "LEVEL 25%": 25, "LEVEL 50%": 50, "LEVEL 75%": 75, "LEVEL 100%": 100}
+            
+            exam_id = exam_mgr.create_exam_with_questions(
+                title=f"Test {lvl}",
+                description=f"Examen de validation pour le niveau {lvl}",
+                technician_level=lvl,
+                level_percentage=levels_pct.get(lvl, 25),
+                source_file=file.filename,
+                duration=30,
+                passing_score=75,
+                status='draft',
+                parsed_questions=questions
+            )
+            flash(f"Examen importé avec succès. {len(questions)} questions détectées. Veuillez définir les réponses correctes.", "success")
+            return redirect(url_for('exam_preview', exam_id=exam_id))
+        except Exception as e:
+            flash(f"Erreur d'importation : {e}", "danger")
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+                
+    return redirect(url_for('training_exams'))
+
+
+@app.route('/training/exams/preview/<int:exam_id>')
+@admin_required
+def exam_preview(exam_id: int):
+    exam = exam_mgr.get_exam_by_id(exam_id)
+    if not exam:
+        flash("Examen introuvable.", "danger")
+        return redirect(url_for('training_exams'))
+    return render_template('exam_preview.html', exam=exam)
+
+
+@app.route('/training/exams/save-config/<int:exam_id>', methods=['POST'])
+@admin_required
+def exam_save_config(exam_id: int):
+    title = request.form.get('title', '').strip()
+    description = request.form.get('description', '').strip()
+    duration = int(request.form.get('duration', '30'))
+    passing_score = int(request.form.get('passing_score', '75'))
+    status = request.form.get('status', 'draft')
+
+    exam_mgr.update_exam_details(exam_id, title, description, duration, passing_score, status)
+
+    correct_answers_map = {}
+    for key, value in request.form.items():
+        if key.startswith('correct_answer_'):
+            q_id = key.replace('correct_answer_', '')
+            correct_answers_map[q_id] = int(value)
+
+    exam_mgr.save_exam_answers_setup(exam_id, correct_answers_map)
+    flash("Configuration de l'examen enregistrée avec succès.", "success")
+    return redirect(url_for('exam_preview', exam_id=exam_id))
+
+
+@app.route('/training/exams/delete/<int:exam_id>', methods=['POST'])
+@admin_required
+def exam_delete(exam_id: int):
+    exam_mgr.delete_exam(exam_id)
+    flash("Examen supprimé avec succès.", "success")
+    return redirect(url_for('training_exams'))
+
+
+@app.route('/training/results')
+@admin_required
+def training_results():
+    filters = {
+        'technician': request.args.get('technician', ''),
+        'matricule': request.args.get('matricule', ''),
+        'level': request.args.get('level', ''),
+        'exam_id': request.args.get('exam_id', ''),
+        'status': request.args.get('status', ''),
+        'date': request.args.get('date', '')
+    }
+    results = exam_mgr.get_all_results(filters)
+    exams = exam_mgr.get_all_exams(role='admin')
+    return render_template('training_results.html', results=results, exams=exams, filters=filters)
+
+
+@app.route('/training/cards')
+@admin_required
+def training_cards():
+    with exam_mgr._get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT id FROM users WHERE role = 'TECHNICIAN' ORDER BY name ASC")
+        tech_ids = [r['id'] for r in cur.fetchall()]
+        
+    techs = []
+    for t_id in tech_ids:
+        details = exam_mgr.get_technician_card_details(t_id)
+        if details:
+            techs.append(details)
+            
+    return render_template('training_cards.html', techs=techs)
+
+
+@app.route('/training/card/view/<int:user_id>')
+@login_required
+def tech_card_view(user_id: int):
+    if session.get('role') == 'TECHNICIAN':
+        u = user_mgr.get_user_by_username(session.get('username'))
+        if not u or u['id'] != user_id:
+            flash("Accès non autorisé.", "danger")
+            return redirect(url_for('training'))
+
+    card = exam_mgr.get_technician_card_details(user_id)
+    if not card:
+        flash("Technicien introuvable.", "danger")
+        return redirect(url_for('training'))
+        
+    return render_template('tech_card_view.html', card=card)
+
+
+@app.route('/training/card/upload-photo/<int:user_id>', methods=['POST'])
+@admin_required
+def tech_card_upload_photo(user_id: int):
+    file = request.files.get('photo_file')
+    if file and file.filename:
+        ext = os.path.splitext(file.filename)[1].lower()
+        if ext not in ('.png', '.jpg', '.jpeg'):
+            flash("Format d'image non valide. Utilisez PNG, JPG ou JPEG.", "danger")
+            return redirect(url_for('tech_card_view', user_id=user_id))
+            
+        u = user_mgr.get_user_by_id(user_id)
+        if not u:
+            flash("Utilisateur introuvable.", "danger")
+            return redirect(url_for('training'))
+            
+        mat = u.get('matricule') or f"user_{user_id}"
+        safe_mat = str(mat).replace("/", "_").replace("\\", "_").strip()
+        
+        photo_dir = os.path.join(pma_config.active_base, "Technicians", "photos")
+        os.makedirs(photo_dir, exist_ok=True)
+        photo_filename = f"photo_{safe_mat}{ext}"
+        photo_path = os.path.join(photo_dir, photo_filename)
+        file.save(photo_path)
+        
+        with exam_mgr._get_conn() as conn:
+            cur = conn.cursor()
+            cur.execute("UPDATE users SET photo = ? WHERE id = ?", (photo_filename, user_id))
+            conn.commit()
+            
+        flash("Photo du profil mise à jour.", "success")
+        
+    return redirect(url_for('tech_card_view', user_id=user_id))
+
+
+@app.route('/training/static-photo/<filename>')
+@login_required
+def static_photo_download(filename):
+    photo_path = os.path.join(pma_config.active_base, "Technicians", "photos", filename)
+    if os.path.exists(photo_path):
+        return send_file(photo_path)
+    return redirect(url_for('static', filename='placeholder.png'))
+
+
+@app.route('/training/card/print/<int:user_id>')
+@login_required
+def tech_card_print(user_id: int):
+    if session.get('role') == 'TECHNICIAN':
+        u = user_mgr.get_user_by_username(session.get('username'))
+        if not u or u['id'] != user_id:
+            return "Accès non autorisé.", 403
+
+    card = exam_mgr.get_technician_card_details(user_id)
+    if not card:
+        return "Technicien introuvable.", 404
+        
+    if card.get('photo'):
+        card['photo'] = os.path.join(pma_config.active_base, "Technicians", "photos", card['photo'])
+
+    try:
+        pdf_path = generate_technician_card_pdf(card)
+        return send_file(pdf_path, mimetype='application/pdf', as_attachment=False)
+    except Exception as e:
+        return f"Erreur lors de la génération du PDF : {e}", 500
+
+
+@app.route('/training/exam/start/<int:exam_id>', methods=['GET', 'POST'])
+@login_required
+def exam_start(exam_id: int):
+    role = session.get('role', '').upper().strip()
+    tech_id = request.form.get('technician_id', type=int) or request.args.get('technician_id', type=int)
+
+    if role in ('OWNER', 'ADMIN', 'admin'):
+        if not tech_id:
+            flash("Veuillez sélectionner un technicien pour passer l'examen.", "warning")
+            return redirect(url_for('training'))
+        u = user_mgr.get_user_by_id(tech_id)
+        if not u or u.get('role') != 'TECHNICIAN':
+            flash("Le compte sélectionné n'est pas un technicien valide.", "danger")
+            return redirect(url_for('training'))
+    else:
+        u = user_mgr.get_user_by_username(session.get('username'))
+        if not u or u.get('role') != 'TECHNICIAN':
+            flash("Seuls les techniciens peuvent passer des examens.", "danger")
+            return redirect(url_for('training'))
+
+    exam = exam_mgr.get_exam_by_id(exam_id)
+    if not exam:
+        flash("Examen introuvable.", "danger")
+        return redirect(url_for('training'))
+
+    if exam.get('status') != 'published' and role not in ('OWNER', 'ADMIN', 'admin'):
+        flash("Cet examen n'est pas encore disponible.", "danger")
+        return redirect(url_for('training'))
+
+    attempt = exam_mgr.start_exam_attempt(exam_id, u['id'])
+    return redirect(url_for('exam_take_view', attempt_id=attempt['id']))
+
+
+@app.route('/training/exam/take/<int:attempt_id>')
+@login_required
+def exam_take_view(attempt_id: int):
+    attempt = exam_mgr.get_active_attempt(attempt_id)
+    if not attempt or attempt['status'] != 'running':
+        flash("Tentative d'examen introuvable ou déjà soumise.", "danger")
+        return redirect(url_for('training'))
+
+    u = user_mgr.get_user_by_id(attempt['user_id'])
+    if session.get('role') == 'TECHNICIAN' and session.get('username') != u['username']:
+        flash("Accès non autorisé.", "danger")
+        return redirect(url_for('training'))
+
+    exam = exam_mgr.get_exam_by_id(attempt['exam_id'])
+    rem_seconds = exam_mgr.get_remaining_seconds(attempt_id, exam['duration'])
+    
+    if rem_seconds <= 0:
+        exam_mgr.submit_exam_attempt(attempt_id)
+        flash("Le temps de l'examen est écoulé. Vos réponses ont été soumises.", "warning")
+        return redirect(url_for('exam_result_view', attempt_id=attempt_id))
+
+    saved_answers = exam_mgr.get_saved_answers_for_attempt(attempt_id)
+    saved_text_answers = exam_mgr.get_saved_text_answers_for_attempt(attempt_id)
+    
+    return render_template(
+        'exam_take.html', 
+        attempt=attempt, 
+        exam=exam, 
+        remaining_seconds=rem_seconds, 
+        saved_answers=saved_answers,
+        saved_text_answers=saved_text_answers,
+        tech=u
+    )
+
+
+@app.route('/training/exam/save-answer', methods=['POST'])
+@login_required
+def exam_save_answer():
+    data = request.get_json() or {}
+    attempt_id = data.get('attempt_id')
+    question_id = data.get('question_id')
+    selected_answer_id = data.get('selected_answer_id')
+    answer_text = data.get('answer_text')
+
+    if attempt_id and question_id:
+        attempt = exam_mgr.get_active_attempt(attempt_id)
+        if attempt and attempt['status'] == 'running':
+            exam_mgr.save_attempt_answer(
+                attempt_id, question_id, 
+                selected_answer_id=selected_answer_id,
+                answer_text=answer_text
+            )
+            return jsonify({"status": "success"})
+            
+    return jsonify({"status": "error"}), 400
+
+
+@app.route('/training/exam/submit/<int:attempt_id>', methods=['POST'])
+@login_required
+def exam_submit(attempt_id: int):
+    attempt = exam_mgr.get_active_attempt(attempt_id)
+    if not attempt or attempt['status'] != 'running':
+        flash("Tentative déjà soumise ou inexistante.", "danger")
+        return redirect(url_for('training'))
+
+    u = user_mgr.get_user_by_id(attempt['user_id'])
+    if session.get('role') == 'TECHNICIAN' and session.get('username') != u['username']:
+        flash("Accès non autorisé.", "danger")
+        return redirect(url_for('training'))
+
+    # Save any form responses submitted with the form POST
+    for k, v in request.form.items():
+        if k.startswith('question_'):
+            try:
+                qid = int(k.replace('question_', ''))
+                ans_id = int(v)
+                exam_mgr.save_attempt_answer(attempt_id, qid, selected_answer_id=ans_id)
+            except Exception:
+                pass
+        elif k.startswith('labeling_answers_'):
+            try:
+                qid = int(k.replace('labeling_answers_', ''))
+                if v and str(v).strip():
+                    exam_mgr.save_attempt_answer(attempt_id, qid, answer_text=str(v).strip())
+            except Exception:
+                pass
+        elif k.startswith('text_answer_'):
+            try:
+                qid = int(k.replace('text_answer_', ''))
+                if v and str(v).strip():
+                    exam_mgr.save_attempt_answer(attempt_id, qid, answer_text=str(v).strip())
+            except Exception:
+                pass
+
+    exam_mgr.submit_exam_attempt(attempt_id)
+    flash("Examen soumis et corrigé avec succès.", "success")
+    return redirect(url_for('exam_result_view', attempt_id=attempt_id))
+
+
+@app.route('/training/exam/result/<int:attempt_id>')
+@login_required
+def exam_result_view(attempt_id: int):
+    with exam_mgr._get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM exam_attempts WHERE id = ?", (attempt_id,))
+        attempt = cur.fetchone()
+        
+    if not attempt:
+        flash("Tentative d'examen introuvable.", "danger")
+        return redirect(url_for('training'))
+
+    attempt = dict(attempt)
+    u = user_mgr.get_user_by_id(attempt['user_id'])
+    if session.get('role') == 'TECHNICIAN' and session.get('username') != u['username']:
+        flash("Accès non autorisé.", "danger")
+        return redirect(url_for('training'))
+
+    exam = exam_mgr.get_exam_by_id(attempt['exam_id'])
+    
+    return render_template('exam_result.html', attempt=attempt, exam=exam, tech=u)
+
+
+# ── ADMIN EXAM MANAGEMENT ROUTES ─────────────────────────────────────────────
+
+EXAM_IMAGES_DIR = os.path.join(os.path.dirname(__file__), 'static', 'exam_images')
+ALLOWED_IMG_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+
+
+def _allowed_img(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_IMG_EXTENSIONS
+
+
+@app.route('/api/admin/exam/<int:exam_id>/questions')
+@admin_required
+def api_admin_exam_questions(exam_id: int):
+    """Returns full exam with questions+answers+images as JSON (for modal editor)."""
+    exam = exam_mgr.get_exam_by_id(exam_id)
+    if not exam:
+        return jsonify({'error': 'not found'}), 404
+    return jsonify(exam)
+
+
+@app.route('/admin/exam/<int:exam_id>/edit', methods=['POST'])
+@admin_required
+def admin_exam_edit(exam_id: int):
+    """Update exam metadata from admin panel."""
+    title        = request.form.get('title', '').strip()
+    description  = request.form.get('description', '').strip()
+    duration     = int(request.form.get('duration', 30))
+    passing_score = int(request.form.get('passing_score', 75))
+    status       = request.form.get('status', 'draft')
+    if not title:
+        return jsonify({'error': 'Title required'}), 400
+    exam_mgr.update_exam_details(exam_id, title, description, duration, passing_score, status)
+    return jsonify({'success': True})
+
+
+@app.route('/admin/exam/create', methods=['POST'])
+@admin_required
+def admin_exam_create():
+    """Create a blank draft exam."""
+    title  = request.form.get('title', '').strip()
+    level  = exam_mgr.normalize_level(request.form.get('technician_level', 'Level 1'))
+    pct_map = {'Level 1': 25, 'Level 2': 50, 'Level 3': 75, 'Level 4': 100,
+               'LEVEL 25%': 25, 'LEVEL 50%': 50, 'LEVEL 75%': 75, 'LEVEL 100%': 100}
+    pct = pct_map.get(level, 25)
+    if not title:
+        flash("Un titre est requis pour créer un examen.", "danger")
+        return redirect(url_for('admin') + '#exams')
+    exam_mgr.create_blank_exam(title, level, pct)
+    flash(f"Examen '{title}' créé en mode brouillon.", "success")
+    return redirect(url_for('admin') + '#exams')
+
+
+@app.route('/admin/exam/<int:exam_id>/delete', methods=['POST'])
+@admin_required
+def admin_exam_delete(exam_id: int):
+    """Delete an exam from admin panel."""
+    exam_mgr.delete_exam(exam_id)
+    flash("Examen supprimé.", "success")
+    return redirect(url_for('admin') + '#exams')
+
+
+@app.route('/admin/exam/question/<int:question_id>/upload-image', methods=['POST'])
+@admin_required
+def admin_question_upload_image(question_id: int):
+    """Upload an image for a specific exam question."""
+    if 'image' not in request.files:
+        return jsonify({'error': 'No file'}), 400
+    f = request.files['image']
+    if not f or not _allowed_img(f.filename):
+        return jsonify({'error': 'Invalid file type. Allowed: png, jpg, jpeg, gif, webp'}), 400
+
+    import uuid
+    ext = f.filename.rsplit('.', 1)[1].lower()
+    filename = f"q_{question_id}_{uuid.uuid4().hex[:8]}.{ext}"
+    os.makedirs(EXAM_IMAGES_DIR, exist_ok=True)
+    f.save(os.path.join(EXAM_IMAGES_DIR, filename))
+    exam_mgr.update_question_image(question_id, filename)
+    return jsonify({'success': True, 'filename': filename, 'url': f'/static/exam_images/{filename}'})
+
+
+@app.route('/admin/exam/question/<int:question_id>/remove-image', methods=['POST'])
+@admin_required
+def admin_question_remove_image(question_id: int):
+    """Remove the image from an exam question."""
+    exam_mgr.remove_question_image(question_id)
+    return jsonify({'success': True})
+
+
+@app.route('/admin/exam/question/<int:source_question_id>/move-image-to/<int:target_question_id>', methods=['POST'])
+@admin_required
+def admin_question_move_image(source_question_id: int, target_question_id: int):
+    """
+    Move (reassign) the primary image of source_question_id to target_question_id.
+    Admin safety feature: 'Associer l'image à la question'.
+    Both questions must belong to the same exam.
+    """
+    ok, msg = exam_mgr.move_question_image(source_question_id, target_question_id)
+    return jsonify({'success': ok, 'message': msg})
+
+
+@app.route('/admin/exam/question/<int:question_id>/update-text', methods=['POST'])
+@admin_required
+def admin_question_update_text(question_id: int):
+    """Update the text of a question."""
+    text = (request.form.get('question_text') or request.get_json(silent=True, force=True) or {}).get('question_text', '') if request.is_json else request.form.get('question_text', '')
+    if request.is_json:
+        text = (request.get_json(silent=True) or {}).get('question_text', '')
+    else:
+        text = request.form.get('question_text', '')
+    if not text:
+        return jsonify({'error': 'No text'}), 400
+    exam_mgr.update_question_text(question_id, text)
+    return jsonify({'success': True})
+
+
+@app.route('/admin/exam/question/<int:question_id>/delete', methods=['POST'])
+@admin_required
+def admin_question_delete(question_id: int):
+    """Delete a question from an exam."""
+    exam_mgr.delete_question(question_id)
+    return jsonify({'success': True})
+
+
+@app.route('/admin/exam/question/<int:question_id>/set-type', methods=['POST'])
+@admin_required
+def admin_question_set_type(question_id: int):
+    """Update question_type for a question."""
+    data = request.get_json(silent=True) or request.form
+    new_type = data.get('question_type')
+    if not new_type:
+        return jsonify({'error': 'Type de question manquant'}), 400
+    ok = exam_mgr.set_question_type(question_id, new_type)
+    if ok:
+        return jsonify({'success': True, 'question_type': new_type})
+    return jsonify({'error': 'Type de question invalide'}), 400
+
+
+@app.route('/admin/exam/question/<int:question_id>/set-labels', methods=['POST'])
+@admin_required
+def admin_question_set_labels(question_id: int):
+    """Update available_labels list for an image_labeling question."""
+    data = request.get_json(silent=True) or {}
+    labels = data.get('labels', [])
+    ok = exam_mgr.set_available_labels(question_id, labels)
+    if ok:
+        return jsonify({'success': True, 'labels': labels})
+    return jsonify({'error': 'Erreur lors de la sauvegarde des étiquettes'}), 400
+
+
+@app.route('/admin/exam/<int:exam_id>/fix-types', methods=['POST'])
+@admin_required
+def admin_exam_fix_types(exam_id: int):
+    """Auto-detect and fix question types for a single exam."""
+    result = exam_mgr.fix_question_types_for_exam(exam_id)
+    return jsonify({'success': True, 'result': result})
+
+
+@app.route('/admin/exam/fix-all-types', methods=['POST'])
+@admin_required
+def admin_exam_fix_all_types():
+    """Auto-detect and fix question types for all exams."""
+    result = exam_mgr.fix_all_question_types()
+    return jsonify({'success': True, 'result': result})
+
+
+@app.route('/admin/exam/reimport-all-official', methods=['POST'])
+@admin_required
+def admin_exam_reimport_all_official():
+    """Re-import official exams from Downloads folder."""
+    result = exam_mgr.reimport_official_exams()
+    if result.get('success'):
+        flash("Les examens officiels ont été réimportés avec succès avec détection automatique des types.", "success")
+    else:
+        flash("Erreur lors de la réimportation: " + result.get('error', result.get('message', '')), "danger")
+    return redirect(url_for('admin') + '#exams')
+
+
+
+@app.route('/admin/exam/<int:exam_id>/set-correct-answers', methods=['POST'])
+@admin_required
+def admin_exam_set_correct_answers(exam_id: int):
+    """Save correct answer selections for all questions of an exam."""
+    data = request.get_json(silent=True) or {}
+    correct_map = data.get('correct_answers', {})
+    exam_mgr.save_exam_answers_setup(exam_id, correct_map)
+    return jsonify({'success': True})
+
+
+@app.route('/admin/exam/<int:exam_id>/publish', methods=['POST'])
+@admin_required
+def admin_exam_publish(exam_id: int):
+    """Toggle publish status for an exam."""
+    new_status = exam_mgr.toggle_publish_exam(exam_id)
+    if new_status == 'published':
+        flash("Examen publié avec succès. Il est maintenant disponible pour les techniciens.", "success")
+    elif new_status == 'draft':
+        flash("Examen passé en mode brouillon.", "warning")
+    else:
+        flash("Examen introuvable.", "danger")
+    return redirect(url_for('admin') + '#exams')
+
+
+@app.route('/admin/exam/<int:exam_id>/add-question', methods=['POST'])
+@admin_required
+def admin_exam_add_question(exam_id: int):
+    """Add a new question with 4 choices to an exam."""
+    q_text = request.form.get('question_text', '').strip()
+    if not q_text:
+        return jsonify({'error': 'Texte de la question requis'}), 400
+
+    choices = []
+    correct_idx = request.form.get('correct_choice', type=int) or 0
+    for i in range(4):
+        txt = request.form.get(f'choice_{i}', '').strip()
+        if txt:
+            choices.append({'answer_text': txt, 'is_correct': 1 if i == correct_idx else 0})
+
+    if not choices:
+        return jsonify({'error': 'Au moins une réponse est requise'}), 400
+
+    q_id = exam_mgr.add_question_with_choices(exam_id, q_text, choices)
+
+    if 'image' in request.files:
+        f = request.files['image']
+        if f and _allowed_img(f.filename):
+            ext = f.filename.rsplit('.', 1)[1].lower()
+            filename = f"q_{q_id}_{uuid.uuid4().hex[:8]}.{ext}"
+            os.makedirs(EXAM_IMAGES_DIR, exist_ok=True)
+            f.save(os.path.join(EXAM_IMAGES_DIR, filename))
+            exam_mgr.update_question_image(q_id, filename)
+
+    return jsonify({'success': True, 'question_id': q_id})
+
+
+@app.route('/admin/exam/import-docx', methods=['POST'])
+@admin_required
+def admin_exam_import_docx():
+    """Upload and parse a .docx exam file using a two-pass boundary-aware image extractor."""
+    if 'exam_file' not in request.files:
+        flash("Aucun fichier sélectionné.", "danger")
+        return redirect(url_for('admin') + '#exams')
+    f = request.files['exam_file']
+    if not f or not f.filename.endswith('.docx'):
+        flash("Veuillez sélectionner un fichier Word (.docx) valide.", "danger")
+        return redirect(url_for('admin') + '#exams')
+
+    level = exam_mgr.normalize_level(request.form.get('technician_level', 'Level 1'))
+    pct_map = {'Level 1': 25, 'Level 2': 50, 'Level 3': 75, 'Level 4': 100,
+               'LEVEL 25%': 25, 'LEVEL 50%': 50, 'LEVEL 75%': 75, 'LEVEL 100%': 100}
+    pct = pct_map.get(level, 25)
+    title = request.form.get('title', '').strip() or f.filename.replace('.docx', '')
+
+    import tempfile
+
+    temp_dir = tempfile.mkdtemp()
+    temp_path = os.path.join(temp_dir, f.filename)
+    f.save(temp_path)
+
+    try:
+        # Document-structure-aware parser extracts questions, textboxes, and correctly associates images
+        parsed = exam_mgr.parse_docx_exam(temp_path, output_images_dir=EXAM_IMAGES_DIR)
+
+        ex_id = exam_mgr.create_exam_with_questions(
+            title=title,
+            description=f"Importé via admin pour {level}",
+            technician_level=level,
+            level_percentage=pct,
+            source_file=f.filename,
+            duration=int(request.form.get('duration', 30)),
+            passing_score=int(request.form.get('passing_score', 75)),
+            status='draft',
+            parsed_questions=parsed
+        )
+
+        flash(f"Examen '{title}' importé avec succès ({len(parsed)} questions).", "success")
+    except Exception as e:
+        logger.exception(f"[EXAM IMPORT] Error: {e}")
+        flash(f"Erreur lors de l'import : {e}", "danger")
+    finally:
+        try:
+            os.remove(temp_path)
+            os.rmdir(temp_dir)
+        except Exception:
+            pass
+
+    return redirect(url_for('admin') + '#exams')
+
+
+
+@app.route('/admin/tech-level-override/<int:user_id>', methods=['POST'])
+@admin_required
+def admin_tech_level_override(user_id: int):
+    """Admin/Owner manual technician level override from the admin panel."""
+    new_level   = request.form.get('new_level', '').strip()
+    reason      = request.form.get('reason', '').strip()
+    create_cert = (request.form.get('create_cert') == '1')
+    actor       = session.get('username', 'admin')
+    ok, msg     = exam_mgr.owner_override_level(
+        user_id=user_id,
+        new_level=new_level,
+        reason=reason,
+        owner_username=actor,
+        create_cert=create_cert
+    )
+    flash(msg, "success" if ok else "danger")
+    return redirect(url_for('admin') + '#exams')
+
+
 @app.route('/vault')
 @admin_required
 def vault():
@@ -901,10 +1622,12 @@ def admin_users_create():
     matricule = request.form.get('matricule', '').strip()
     role = request.form.get('role', 'TECHNICIAN').strip()
     shift = request.form.get('shift', 'A').strip()
+    technician_level = request.form.get('technician_level', '').strip() or None
 
     ok, msg, _ = user_mgr.create_user(
         name=name, username=username, password=password,
-        role=role, matricule=matricule, shift=shift
+        role=role, matricule=matricule, shift=shift,
+        technician_level=technician_level
     )
     flash(msg, "success" if ok else "danger")
     return redirect(url_for('admin_users'))
@@ -917,6 +1640,9 @@ def admin_users_edit(user_id: int):
     matricule = request.form.get('matricule', '').strip()
     role = request.form.get('role', 'TECHNICIAN').strip()
     shift = request.form.get('shift', 'A').strip()
+    # NOTE: technician_level is intentionally NOT read from the edit form.
+    # Level is controlled exclusively by exam results.
+    # OWNER can override via /training/level-override/<user_id>.
 
     ok, msg = user_mgr.update_user(
         user_id=user_id, name=name, username=username,
@@ -924,6 +1650,37 @@ def admin_users_edit(user_id: int):
     )
     flash(msg, "success" if ok else "danger")
     return redirect(url_for('admin_users'))
+
+
+@app.route('/training/progression/<int:user_id>')
+@admin_required
+def tech_progression(user_id: int):
+    """Admin/Owner view: technician progression card + level history."""
+    progression = exam_mgr.get_technician_progression(user_id)
+    if not progression:
+        flash("Technicien introuvable.", "danger")
+        return redirect(url_for('training'))
+    history = exam_mgr.get_technician_level_history(user_id)
+    all_exams = exam_mgr.get_all_exams()
+    return render_template('tech_progression.html', progression=progression, history=history, all_exams=all_exams)
+
+
+@app.route('/training/level-override/<int:user_id>', methods=['POST'])
+@owner_required
+def tech_level_override(user_id: int):
+    """OWNER ONLY: manual level override with reason and audit log."""
+    new_level = request.form.get('new_level', '').strip()
+    reason    = request.form.get('reason', '').strip()
+    owner_username = session.get('username', 'owner')
+
+    ok, msg = exam_mgr.owner_override_level(
+        user_id=user_id,
+        new_level=new_level,
+        reason=reason,
+        owner_username=owner_username
+    )
+    flash(msg, "success" if ok else "danger")
+    return redirect(url_for('tech_progression', user_id=user_id))
 
 @app.route('/admin/users/reset-password/<int:user_id>', methods=['POST'])
 @owner_required
@@ -1168,6 +1925,10 @@ def admin():
             pass
     signatures.reverse()
 
+    # Exam management data for admin panel
+    all_exams_admin = exam_mgr.get_all_exams(role='ADMIN')
+    technicians_for_override = exam_mgr.get_all_technicians_for_override()
+
     return render_template(
         'admin.html',
         excel_path=excel_path,
@@ -1179,7 +1940,9 @@ def admin():
         checklist_history=chk_history,
         shift_config=shift_config,
         email_config=email_config,
-        signatures=signatures
+        signatures=signatures,
+        all_exams_admin=all_exams_admin,
+        technicians_for_override=technicians_for_override
     )
 
 @app.route('/admin/credentials', methods=['POST'])
@@ -2830,3 +3593,7 @@ def server_error(e):
     logger.error(f"500 error: {e}")
     flash("Une erreur interne est survenue. Veuillez réessayer.", "danger")
     return redirect(url_for('index'))
+
+
+if __name__ == '__main__':
+    app.run(debug=True, port=5000)

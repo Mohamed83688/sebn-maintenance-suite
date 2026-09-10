@@ -69,6 +69,12 @@ class UserManager:
             if "last_login" not in existing_cols:
                 cur.execute("ALTER TABLE users ADD COLUMN last_login DATETIME")
 
+            if "technician_level" not in existing_cols:
+                cur.execute("ALTER TABLE users ADD COLUMN technician_level TEXT")
+
+            if "photo" not in existing_cols:
+                cur.execute("ALTER TABLE users ADD COLUMN photo TEXT")
+
             cur.execute("CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_users_matricule ON users(matricule)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_users_role ON users(role)")
@@ -83,6 +89,7 @@ class UserManager:
 
             # --- Normalize any legacy lowercase roles to uppercase ---
             cur.execute("UPDATE users SET role = UPPER(role) WHERE role != UPPER(role)")
+            cur.execute("UPDATE users SET technician_level = 'Level 1' WHERE role = 'TECHNICIAN' AND (technician_level IS NULL OR technician_level = '' OR technician_level LIKE '%25%')")
 
             # 1. Owner account
             cur.execute("SELECT id, role FROM users WHERE username = 'owner'")
@@ -239,7 +246,7 @@ class UserManager:
         with self._get_conn() as conn:
             cur = conn.cursor()
             cur.execute("""
-                SELECT id, name, matricule, username, role, shift, is_active, created_at, updated_at, last_login 
+                SELECT id, name, matricule, username, role, shift, is_active, created_at, updated_at, last_login, technician_level, photo 
                 FROM users 
                 ORDER BY 
                     CASE role 
@@ -265,6 +272,21 @@ class UserManager:
             row = cur.fetchone()
             return dict(row) if row else None
 
+    @staticmethod
+    def normalize_level(lvl: str) -> str:
+        if not lvl:
+            return 'Level 1'
+        s = str(lvl).strip().upper()
+        if '100' in s or '4' in s:
+            return 'Level 4'
+        if '75' in s or '3' in s:
+            return 'Level 3'
+        if '50' in s or '2' in s:
+            return 'Level 2'
+        if '25' in s or '1' in s:
+            return 'Level 1'
+        return 'Level 1'
+
     def create_user(
         self,
         name: str,
@@ -273,7 +295,9 @@ class UserManager:
         role: str = 'TECHNICIAN',
         matricule: str = '',
         shift: str = 'A',
-        is_active: bool = True
+        is_active: bool = True,
+        technician_level: str = None,
+        photo: str = None
     ) -> Tuple[bool, str, Optional[int]]:
         """Creates a new user with hashed password."""
         name = name.strip()
@@ -282,6 +306,11 @@ class UserManager:
         role = role.strip().upper()
         if role not in ('OWNER', 'ADMIN', 'TECHNICIAN', 'USER'):
             role = 'TECHNICIAN'
+
+        if role == 'TECHNICIAN':
+            technician_level = self.normalize_level(technician_level)
+        else:
+            technician_level = None
 
         if not name or not username or not password:
             return False, "Le nom complet, le nom d'utilisateur et le mot de passe sont obligatoires.", None
@@ -315,15 +344,15 @@ class UserManager:
             if "nom" in cols and "prenom" in cols:
                 cur.execute("""
                     INSERT INTO users (
-                        nom, prenom, name, matricule, username, password_hash, role, shift, is_active, status, created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                """, (nom, prenom, name, matricule or '', username, pwd_hash, role, shift, active_int, st_text))
+                        nom, prenom, name, matricule, username, password_hash, role, shift, is_active, status, technician_level, photo, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """, (nom, prenom, name, matricule or '', username, pwd_hash, role, shift, active_int, st_text, technician_level, photo))
             else:
                 cur.execute("""
                     INSERT INTO users (
-                        name, matricule, username, password_hash, role, shift, is_active, created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                """, (name, matricule or '', username, pwd_hash, role, shift, active_int))
+                        name, matricule, username, password_hash, role, shift, is_active, technician_level, photo, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """, (name, matricule or '', username, pwd_hash, role, shift, active_int, technician_level, photo))
 
             conn.commit()
             new_id = cur.lastrowid
@@ -339,6 +368,7 @@ class UserManager:
                     "matricule": matricule,
                     "shift": shift,
                     "hire_date": "",
+                    "technician_level": technician_level,
                     "exams": []
                 }
                 if not os.path.exists(p):
@@ -355,7 +385,9 @@ class UserManager:
         role: str,
         matricule: str = '',
         shift: str = 'A',
-        is_active: bool = True
+        is_active: bool = True,
+        technician_level: str = None,
+        photo: str = None
     ) -> Tuple[bool, str]:
         """Updates user profile information."""
         name = name.strip()
@@ -364,6 +396,11 @@ class UserManager:
         role = role.strip().upper()
         if role not in ('OWNER', 'ADMIN', 'TECHNICIAN', 'USER'):
             role = 'TECHNICIAN'
+
+        if role == 'TECHNICIAN':
+            technician_level = self.normalize_level(technician_level)
+        else:
+            technician_level = None
 
         if not name or not username:
             return False, "Le nom et le nom d'utilisateur sont obligatoires."
@@ -385,9 +422,16 @@ class UserManager:
                 if cur.fetchone():
                     return False, f"Le matricule '{matricule}' est déjà utilisé."
 
+            # If photo is not provided, preserve the existing photo
+            if photo is None:
+                cur.execute("SELECT photo FROM users WHERE id = ?", (user_id,))
+                exist_photo = cur.fetchone()
+                if exist_photo:
+                    photo = exist_photo["photo"]
+
             cur.execute("""
                 UPDATE users 
-                SET name = ?, username = ?, matricule = ?, role = ?, shift = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP
+                SET name = ?, username = ?, matricule = ?, role = ?, shift = ?, is_active = ?, technician_level = ?, photo = ?, updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
             """, (
                 name,
@@ -396,9 +440,38 @@ class UserManager:
                 role,
                 shift or 'A',
                 1 if is_active else 0,
+                technician_level,
+                photo,
                 user_id
             ))
             conn.commit()
+
+            # Sync to JSON profile if technician
+            if role == 'TECHNICIAN' and matricule:
+                tech_dir = os.path.join(self.data_dir, "Technicians")
+                os.makedirs(tech_dir, exist_ok=True)
+                safe_mat = str(matricule).replace("/", "_").replace("\\", "_").strip()
+                p = os.path.join(tech_dir, f"{safe_mat}.json")
+                profile = {
+                    "name": name,
+                    "matricule": matricule,
+                    "shift": shift,
+                    "hire_date": "",
+                    "technician_level": technician_level,
+                    "exams": []
+                }
+                # Preserve existing exams if JSON already exists
+                if os.path.exists(p):
+                    try:
+                        with open(p, 'r', encoding='utf-8') as f:
+                            old = json.load(f)
+                            profile["exams"] = old.get("exams", [])
+                            profile["hire_date"] = old.get("hire_date", "")
+                    except Exception:
+                        pass
+                with open(p, 'w', encoding='utf-8') as f:
+                    json.dump(profile, f, indent=2, ensure_ascii=False)
+
             return True, f"Compte '{name}' mis à jour avec succès."
 
     def reset_password(self, user_id: int, new_password: str) -> Tuple[bool, str]:

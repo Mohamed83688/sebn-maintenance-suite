@@ -114,6 +114,9 @@ input:checked + .slider:before { transform: translateX(20px); }
         <div class="admin-tab" onclick="switchAdminTab('data')">
             <i class="fa-solid fa-database"></i> Données &amp; Backup
         </div>
+        <div class="admin-tab" onclick="switchAdminTab('exams')" id="tab-exams">
+            <i class="fa-solid fa-graduation-cap"></i> Examens
+        </div>
     </div>
 
     <div class="admin-main">
@@ -736,6 +739,360 @@ input:checked + .slider:before { transform: translateX(20px); }
         </div>
     </div>
 </div>
+
+<!-- ══ ADMIN EXAMENS PANEL ════════════════════════════════════════════════ -->
+<div id="panel-exams" class="admin-panel">
+
+    <!-- ── Exam List ───────────────────────────────────────────────────── -->
+    <div class="settings-card">
+        <div class="settings-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+            <div>
+                <div class="settings-title"><i class="fa-solid fa-graduation-cap"></i> Gestion des Examens</div>
+                <div class="settings-desc">Créer, importer (.docx), modifier, publier et supprimer les examens de niveau.</div>
+            </div>
+            <div style="display:flex; gap:8px;">
+                <form method="POST" action="/admin/exam/reimport-all-official" style="display:inline;" onsubmit="return confirm('Réimporter et synchroniser les 4 examens officiels depuis les fichiers Word (.docx) avec détection automatique des types ?');">
+                    <button type="submit" class="btn btn-secondary btn-sm" title="Réimporter tous les examens officiels avec détection de type">
+                        <i class="fa-solid fa-arrows-rotate"></i> Sync Officiels (.docx)
+                    </button>
+                </form>
+                <button class="btn btn-secondary btn-sm" onclick="openImportExamModal()">
+                    <i class="fa-solid fa-file-arrow-up"></i> Importer (.docx)
+                </button>
+                <button class="btn btn-primary btn-sm" onclick="openCreateExamModal()">
+                    <i class="fa-solid fa-plus"></i> Nouvel Examen
+                </button>
+            </div>
+        </div>
+
+        {% if all_exams_admin %}
+        <div style="overflow-x:auto;">
+            <table class="data-table" id="admin-exams-table">
+                <thead>
+                    <tr>
+                        <th>Niveau</th>
+                        <th>Titre</th>
+                        <th style="text-align:center;">Questions</th>
+                        <th style="text-align:center;">Durée</th>
+                        <th style="text-align:center;">Score Min.</th>
+                        <th style="text-align:center;">Statut</th>
+                        <th style="text-align:right;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for ex in all_exams_admin %}
+                <tr id="exam-row-{{ ex.id }}">
+                    <td>
+                        <span class="badge" style="background:{% if ex.level_percentage == 100 %}#6D28D9{% elif ex.level_percentage == 75 %}#0284C7{% elif ex.level_percentage == 50 %}#059669{% else %}#D97706{% endif %}; color:#fff; padding:3px 9px; border-radius:20px; font-size:11px; font-weight:700;">
+                            {{ ex.level_percentage }}%
+                        </span>
+                    </td>
+                    <td style="font-weight:600;">{{ ex.title }}</td>
+                    <td style="text-align:center; font-weight:700; color:var(--primary);">{{ ex.number_of_questions }}</td>
+                    <td style="text-align:center;">{{ ex.duration }} min</td>
+                    <td style="text-align:center;">{{ ex.passing_score }}%</td>
+                    <td style="text-align:center;">
+                        {% if ex.status == 'published' %}
+                            <span style="background:#D1FAE5; color:#065F46; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700;"><i class="fa-solid fa-circle-check"></i> Publié</span>
+                        {% elif ex.status == 'archived' %}
+                            <span style="background:#F3F4F6; color:#6B7280; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700;"><i class="fa-solid fa-box-archive"></i> Archivé</span>
+                        {% else %}
+                            <span style="background:#FEF3C7; color:#92400E; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700;"><i class="fa-solid fa-file-pen"></i> Brouillon</span>
+                        {% endif %}
+                        {% if ex.correct_count == 0 %}
+                            <br><span style="background:#FEE2E2; color:#991B1B; padding:2px 8px; border-radius:20px; font-size:10px; font-weight:700; margin-top:4px; display:inline-block;" title="Aucune réponse correcte configurée — ouvrez l'éditeur de questions pour les définir"><i class="fa-solid fa-triangle-exclamation"></i> Réponses non configurées</span>
+                        {% endif %}
+                    </td>
+                    <td style="text-align:right;">
+                        <div style="display:flex; gap:6px; justify-content:flex-end; align-items:center;">
+                            <form method="POST" action="/admin/exam/{{ ex.id }}/publish" style="display:inline;">
+                                {% if ex.status == 'published' %}
+                                <button type="submit" class="btn btn-sm" style="background:#FEF3C7; color:#92400E; border:1px solid #FDE68A;" title="Dépublier (passer en brouillon)">
+                                    <i class="fa-solid fa-eye-slash"></i>
+                                </button>
+                                {% else %}
+                                <button type="submit" class="btn btn-sm" style="background:#D1FAE5; color:#065F46; border:1px solid #A7F3D0;" title="Publier l'examen pour les techniciens">
+                                    <i class="fa-solid fa-check"></i> Publier
+                                </button>
+                                {% endif %}
+                            </form>
+                            <button class="btn btn-secondary btn-sm" onclick="openEditExam({{ ex.id }}, '{{ ex.title|e }}', '{{ (ex.description or '')|e }}', {{ ex.duration }}, {{ ex.passing_score }}, '{{ ex.status }}')">
+                                <i class="fa-solid fa-pen-to-square"></i> Éditer
+                            </button>
+                            <button class="btn btn-sm" style="background:#EFF6FF; color:#1D4ED8; border:1px solid #BFDBFE;" onclick="openQuestionsEditor({{ ex.id }}, '{{ ex.title|e }}')">
+                                <i class="fa-solid fa-images"></i> Questions
+                            </button>
+                            <form method="POST" action="/admin/exam/{{ ex.id }}/delete" style="display:inline;" onsubmit="return confirm('Supprimer cet examen définitivement ?');">
+                                <button class="btn btn-danger btn-sm" title="Supprimer"><i class="fa-solid fa-trash"></i></button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div style="text-align:center; padding:40px; color:var(--text-sec);">
+            <i class="fa-solid fa-graduation-cap" style="font-size:32px; opacity:0.3;"></i>
+            <p style="margin-top:12px;">Aucun examen trouvé. Importez un .docx ou créez un nouvel examen.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- ── Manual Technician Level Override ────────────────────────────── -->
+    <div class="settings-card">
+        <div class="settings-header">
+            <div class="settings-title"><i class="fa-solid fa-user-gear"></i> Passer un Technicien Depuis l'Administration</div>
+            <div class="settings-desc">Valider directement le niveau d'un technicien — une raison obligatoire sera enregistrée dans l'audit.</div>
+        </div>
+
+        {% if technicians_for_override %}
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px;">
+            <!-- Technician selector -->
+            <div>
+                <label class="form-label">Sélectionner un Technicien</label>
+                <select id="override-tech-select" class="form-control" onchange="updateOverrideTechInfo()">
+                    <option value="">— Choisir un technicien —</option>
+                    {% for t in technicians_for_override %}
+                    <option value="{{ t.id }}" data-level="{{ t.technician_level or 'Level 1' }}" data-name="{{ t.name }}">
+                        {{ t.name }} ({{ t.matricule }}) — {{ t.technician_level or 'Level 1' }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <!-- Current level display -->
+            <div>
+                <label class="form-label">Niveau Actuel</label>
+                <div id="override-current-level" class="form-control" style="background:var(--bg-page); font-weight:700; color:var(--primary);">—</div>
+            </div>
+        </div>
+
+        <form id="override-form" method="POST" action="" onsubmit="return submitOverride(event)">
+            <input type="hidden" name="new_level" id="override-new-level-input">
+            <div style="margin-bottom:14px;">
+                <label class="form-label">Nouveau Niveau à Attribuer</label>
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    {% for lvl, pct, col in [('Level 1', 25, '#D97706'), ('Level 2', 50, '#059669'), ('Level 3', 75, '#0284C7'), ('Level 4', 100, '#6D28D9')] %}
+                    <button type="button" class="override-level-btn" data-level="{{ lvl }}"
+                            onclick="selectOverrideLevel(this, '{{ lvl }}')"
+                            style="padding:8px 16px; border-radius:8px; border:2px solid #E2E8F0; background:#fff; font-weight:700; font-size:12px; cursor:pointer; transition:all 0.15s; color:#374151;">
+                        <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:{{ col }}; margin-right:6px;"></span>
+                        {{ lvl }}
+                    </button>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Raison du Changement <span style="color:var(--danger);">*</span> <span style="color:var(--text-sec); font-weight:400;">(min. 5 caractères, consigné dans le journal d'audit)</span></label>
+                <textarea name="reason" class="form-control" rows="2" required minlength="5" placeholder="Ex: Épreuve pratique réussie / Formation externe validée / Reclassement officiel"></textarea>
+            </div>
+            <div class="form-group" style="margin-bottom:18px;">
+                <label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer;">
+                    <input type="checkbox" name="create_cert" value="1" checked style="width:16px; height:16px; accent-color:var(--primary);">
+                    <span>Générer automatiquement une validation d'examen (100%) et un certificat officiel dans son dossier</span>
+                </label>
+            </div>
+            <button type="submit" class="btn btn-primary" id="override-submit-btn" disabled>
+                <i class="fa-solid fa-graduation-cap"></i> Valider et Passer le Technicien
+            </button>
+        </form>
+        {% else %}
+        <p style="color:var(--text-sec); font-size:13px;">Aucun technicien trouvé.</p>
+        {% endif %}
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_modals %}
+<!-- ── MODAL: EDIT EXAM METADATA ─────────────────────────────────────────── -->
+<div class="modal-overlay" id="edit-exam-modal">
+    <div class="modal-box" style="max-width:520px;">
+        <div class="modal-close" onclick="closeModal('edit-exam-modal')"><i class="fa-solid fa-xmark"></i></div>
+        <h3 style="font-family:var(--font-display); font-size:16px; font-weight:800; color:var(--text); margin-bottom:20px;">
+            <i class="fa-solid fa-pen-to-square" style="color:var(--primary);"></i> Modifier l'Examen
+        </h3>
+        <form id="edit-exam-form" onsubmit="submitEditExam(event)">
+            <input type="hidden" id="edit-exam-id">
+            <div class="form-group">
+                <label class="form-label">Titre</label>
+                <input type="text" id="edit-exam-title" name="title" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Description</label>
+                <textarea id="edit-exam-desc" name="description" class="form-control" rows="2"></textarea>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px;">
+                <div class="form-group">
+                    <label class="form-label">Durée (min)</label>
+                    <input type="number" id="edit-exam-duration" name="duration" class="form-control" min="5" max="180">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Score min. (%)</label>
+                    <input type="number" id="edit-exam-passing" name="passing_score" class="form-control" min="50" max="100">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Statut</label>
+                    <select id="edit-exam-status" name="status" class="form-control">
+                        <option value="draft">Brouillon</option>
+                        <option value="published">Publié</option>
+                        <option value="archived">Archivé</option>
+                    </select>
+                </div>
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:10px;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('edit-exam-modal')">Annuler</button>
+                <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Enregistrer</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ── MODAL: CREATE EXAM ────────────────────────────────────────────────── -->
+<div class="modal-overlay" id="create-exam-modal">
+    <div class="modal-box" style="max-width:480px;">
+        <div class="modal-close" onclick="closeModal('create-exam-modal')"><i class="fa-solid fa-xmark"></i></div>
+        <h3 style="font-family:var(--font-display); font-size:16px; font-weight:800; color:var(--text); margin-bottom:20px;">
+            <i class="fa-solid fa-plus" style="color:var(--primary);"></i> Créer un Nouvel Examen
+        </h3>
+        <form method="POST" action="/admin/exam/create">
+            <div class="form-group">
+                <label class="form-label">Titre de l'examen</label>
+                <input type="text" name="title" class="form-control" required placeholder="Ex: CSwin Basic Knowledge">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Niveau Technicien</label>
+                <select name="technician_level" class="form-control">
+                    <option value="Level 1">Level 1 — CSwin Basic Knowledge</option>
+                    <option value="Level 2">Level 2 — CSwin Creation Hardware</option>
+                    <option value="Level 3">Level 3 — CSwin & Brainware & Vacuum</option>
+                    <option value="Level 4">Level 4 — CSwin & Brainware & Vacuum</option>
+                </select>
+            </div>
+            <div style="background:#FEF3C7; border:1px solid #FDE68A; border-radius:8px; padding:10px 14px; font-size:12px; color:#92400E; margin-bottom:16px;">
+                <i class="fa-solid fa-info-circle"></i> L'examen sera créé en mode <strong>brouillon</strong>. Ajoutez des questions via le bouton "Questions" puis publiez-le.
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:10px;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('create-exam-modal')">Annuler</button>
+                <button type="submit" class="btn btn-primary"><i class="fa-solid fa-plus"></i> Créer</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ── MODAL: IMPORT EXAM (.DOCX) ─────────────────────────────────────────── -->
+<div class="modal-overlay" id="import-exam-modal">
+    <div class="modal-box" style="max-width:500px;">
+        <div class="modal-close" onclick="closeModal('import-exam-modal')"><i class="fa-solid fa-xmark"></i></div>
+        <h3 style="font-family:var(--font-display); font-size:16px; font-weight:800; color:var(--text); margin-bottom:14px;">
+            <i class="fa-solid fa-file-word" style="color:#2563EB;"></i> Importer un Examen Word (.docx)
+        </h3>
+        <p style="font-size:12px; color:var(--text-sec); margin-bottom:16px;">
+            Le fichier Word sera analysé : questions, choix et schémas/illustrations inclus automatiquement.
+        </p>
+        <form method="POST" action="/admin/exam/import-docx" enctype="multipart/form-data">
+            <div class="form-group">
+                <label class="form-label">Fichier Word (.docx) *</label>
+                <input type="file" name="exam_file" class="form-control" accept=".docx" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Titre de l'examen</label>
+                <input type="text" name="title" class="form-control" placeholder="Laisser vide pour utiliser le nom du fichier">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Niveau Visé *</label>
+                <select name="technician_level" class="form-control">
+                    <option value="Level 1">Level 1 (Base)</option>
+                    <option value="Level 2">Level 2 (Intermédiaire)</option>
+                    <option value="Level 3">Level 3 (Avancé)</option>
+                    <option value="Level 4">Level 4 (Expert)</option>
+                </select>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                <div class="form-group">
+                    <label class="form-label">Durée (min)</label>
+                    <input type="number" name="duration" class="form-control" value="30" min="5" max="180">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Score min (%)</label>
+                    <input type="number" name="passing_score" class="form-control" value="75" min="50" max="100">
+                </div>
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:14px;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('import-exam-modal')">Annuler</button>
+                <button type="submit" class="btn btn-primary"><i class="fa-solid fa-cloud-arrow-up"></i> Importer</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ── MODAL: QUESTIONS EDITOR ───────────────────────────────────────────── -->
+<div class="modal-overlay" id="questions-editor-modal">
+    <div class="modal-box" style="max-width:820px; max-height:90vh; display:flex; flex-direction:column;">
+        <div class="modal-close" onclick="closeModal('questions-editor-modal')"><i class="fa-solid fa-xmark"></i></div>
+        <div style="margin-bottom:14px; flex-shrink:0; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+            <div>
+                <h3 style="font-family:var(--font-display); font-size:16px; font-weight:800; color:var(--text); margin:0 0 4px 0;" id="qeditor-title">Questions</h3>
+                <p style="font-size:12px; color:var(--text-sec); margin:0;">Éditez les types (QCM, étiquetage, etc.), schémas et réponses. Sauvegarde instantanée.</p>
+            </div>
+            <div>
+                <button type="button" class="btn btn-sm" style="background:#EEF2FF; color:var(--primary); border:1px solid #C7D2FE; font-weight:700;" onclick="autoDetectTypes(_editQExamId)" title="Détecter automatiquement les types des questions">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> Détecter types auto
+                </button>
+            </div>
+        </div>
+        <div id="qeditor-body" style="overflow-y:auto; flex:1; padding-right:4px;">
+            <div style="text-align:center; padding:40px; color:var(--text-sec);">Chargement...</div>
+        </div>
+
+        <!-- Add new question inline -->
+        <div style="margin-top:12px; padding:12px 16px; border:1px dashed var(--primary); border-radius:10px; background:#F8FAFC; flex-shrink:0;">
+            <div style="font-weight:700; font-size:12.5px; color:var(--primary); margin-bottom:8px;">
+                <i class="fa-solid fa-plus-circle"></i> Ajouter une nouvelle question
+            </div>
+            <form id="add-question-form" onsubmit="submitAddQuestion(event)">
+                <div style="margin-bottom:8px;">
+                    <input type="text" class="form-control" name="question_text" placeholder="Énoncé de la question..." required style="font-size:12.5px;">
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
+                    <div style="display:flex; align-items:center; gap:6px;">
+                        <input type="radio" name="correct_choice" value="0" checked title="Bonne réponse">
+                        <input type="text" name="choice_0" class="form-control" placeholder="Réponse A" required style="font-size:12px;">
+                    </div>
+                    <div style="display:flex; align-items:center; gap:6px;">
+                        <input type="radio" name="correct_choice" value="1" title="Bonne réponse">
+                        <input type="text" name="choice_1" class="form-control" placeholder="Réponse B" required style="font-size:12px;">
+                    </div>
+                    <div style="display:flex; align-items:center; gap:6px;">
+                        <input type="radio" name="correct_choice" value="2" title="Bonne réponse">
+                        <input type="text" name="choice_2" class="form-control" placeholder="Réponse C" style="font-size:12px;">
+                    </div>
+                    <div style="display:flex; align-items:center; gap:6px;">
+                        <input type="radio" name="correct_choice" value="3" title="Bonne réponse">
+                        <input type="text" name="choice_3" class="form-control" placeholder="Réponse D" style="font-size:12px;">
+                    </div>
+                </div>
+                <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+                    <label class="btn btn-sm" style="background:#E2E8F0; color:#334155; cursor:pointer; margin:0; font-size:11.5px;">
+                        <i class="fa-solid fa-image"></i> Illustration
+                        <input type="file" name="image" accept="image/*" style="display:none;" onchange="document.getElementById('add-q-file-lbl').textContent = this.files[0] ? this.files[0].name : ''">
+                        <span id="add-q-file-lbl" style="font-size:11px; color:var(--text-sec); margin-left:4px;"></span>
+                    </label>
+                    <button type="submit" class="btn btn-primary btn-sm" style="font-size:12px;">
+                        <i class="fa-solid fa-plus"></i> Ajouter à l'examen
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <div style="text-align:right; margin-top:12px; flex-shrink:0;">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('questions-editor-modal')">
+                <i class="fa-solid fa-check"></i> Terminer
+            </button>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -813,5 +1170,527 @@ async function previewItems(versionId, name) {
         }
     }
 })();
+
+// ══════════════════════════════════════════════════════
+//  ADMIN EXAM MANAGEMENT JS
+// ══════════════════════════════════════════════════════
+
+// ── Edit Exam Metadata Modal ──────────────────────────
+let _editExamId = null;
+
+function openEditExam(id, title, desc, duration, passingScore, status) {
+    _editExamId = id;
+    document.getElementById('edit-exam-id').value = id;
+    document.getElementById('edit-exam-title').value = title;
+    document.getElementById('edit-exam-desc').value = desc;
+    document.getElementById('edit-exam-duration').value = duration;
+    document.getElementById('edit-exam-passing').value = passingScore;
+    document.getElementById('edit-exam-status').value = status;
+    document.getElementById('edit-exam-modal').classList.add('open');
+}
+
+async function submitEditExam(event) {
+    event.preventDefault();
+    const form = document.getElementById('edit-exam-form');
+    const fd = new FormData(form);
+    const btn = form.querySelector('button[type="submit"]');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Enregistrement...';
+    try {
+        const res = await fetch(`/admin/exam/${_editExamId}/edit`, { method: 'POST', body: fd });
+        const data = await res.json();
+        if (data.success) {
+            closeModal('edit-exam-modal');
+            showToast('Examen mis à jour. Rechargement...', 'success');
+            setTimeout(() => location.reload(), 900);
+        } else {
+            showToast(data.error || 'Erreur lors de la mise à jour.', 'danger');
+        }
+    } catch(e) {
+        showToast('Erreur réseau: ' + e, 'danger');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Enregistrer';
+    }
+}
+
+// ── Create & Import Exam Modals ─────────────────────────
+function openCreateExamModal() {
+    document.getElementById('create-exam-modal').classList.add('open');
+}
+
+function openImportExamModal() {
+    document.getElementById('import-exam-modal').classList.add('open');
+}
+
+async function submitAddQuestion(event) {
+    event.preventDefault();
+    if (!_editQExamId) return;
+    const form = document.getElementById('add-question-form');
+    const fd = new FormData(form);
+    const btn = form.querySelector('button[type="submit"]');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Ajout...';
+    try {
+        const res = await fetch(`/admin/exam/${_editQExamId}/add-question`, { method: 'POST', body: fd });
+        const d = await res.json();
+        if (d.success) {
+            showToast('Question ajoutée à l\'examen.', 'success');
+            form.reset();
+            const lbl = document.getElementById('add-q-file-lbl');
+            if (lbl) lbl.textContent = '';
+            await loadQuestionsEditor(_editQExamId);
+        } else {
+            showToast('Erreur: ' + (d.error || ''), 'danger');
+        }
+    } catch(e) {
+        showToast('Erreur réseau: ' + e, 'danger');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-plus"></i> Ajouter à l\'examen';
+    }
+}
+
+// ── Questions Editor Modal ────────────────────────────
+let _editQExamId = null;
+let _currentExamData = null;
+
+async function openQuestionsEditor(examId, title) {
+    _editQExamId = examId;
+    document.getElementById('qeditor-title').textContent = title;
+    document.getElementById('qeditor-body').innerHTML = '<div style="text-align:center; padding:40px;"><i class="fa-solid fa-spinner fa-spin" style="font-size:24px; color:var(--primary);"></i><p style="margin-top:12px; color:var(--text-sec);">Chargement des questions...</p></div>';
+    document.getElementById('questions-editor-modal').classList.add('open');
+    await loadQuestionsEditor(examId);
+}
+
+async function loadQuestionsEditor(examId) {
+    try {
+        const res = await fetch(`/api/admin/exam/${examId}/questions`);
+        _currentExamData = await res.json();
+        renderQuestionsEditor(_currentExamData);
+    } catch(e) {
+        document.getElementById('qeditor-body').innerHTML = `<p style="color:var(--danger); padding:20px;">Erreur: ${e}</p>`;
+    }
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
+
+function getTypeBg(type) {
+    if (type === 'image_labeling') return '#DCFCE7';
+    if (type === 'true_false') return '#FEF3C7';
+    if (type === 'text_input') return '#EDE9FE';
+    return '#EFF6FF';
+}
+function getTypeBorder(type) {
+    if (type === 'image_labeling') return '#86EFAC';
+    if (type === 'true_false') return '#FCD34D';
+    if (type === 'text_input') return '#DDD6FE';
+    return '#BFDBFE';
+}
+function getTypeColor(type) {
+    if (type === 'image_labeling') return '#166534';
+    if (type === 'true_false') return '#92400E';
+    if (type === 'text_input') return '#5B21B6';
+    return '#1D4ED8';
+}
+
+function renderQuestionsEditor(exam) {
+    const qs = exam.questions || [];
+    if (qs.length === 0) {
+        document.getElementById('qeditor-body').innerHTML = '<p style="color:var(--text-sec); text-align:center; padding:30px;">Aucune question dans cet examen.</p>';
+        return;
+    }
+
+    // Check if any gradable question has a correct answer configured
+    const gradableTypes = ['multiple_choice', 'true_false', null, undefined];
+    const gradableQs = qs.filter(q => gradableTypes.includes(q.question_type) || q.question_type === 'qcm');
+    const hasCorrectAnswers = gradableQs.some(q => (q.answers || []).some(a => a.is_correct === 1));
+
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    let html = '';
+
+    // Warning banner when no correct answers are configured
+    if (gradableQs.length > 0 && !hasCorrectAnswers) {
+        html += `
+        <div style="background:#FEF2F2; border:2px solid #FCA5A5; border-radius:10px; padding:16px 20px; margin-bottom:20px; display:flex; gap:14px; align-items:flex-start;">
+            <i class="fa-solid fa-triangle-exclamation" style="color:#DC2626; font-size:22px; margin-top:2px; flex-shrink:0;"></i>
+            <div>
+                <div style="font-weight:800; color:#991B1B; font-size:14px; margin-bottom:4px;">⚠️ Aucune réponse correcte configurée</div>
+                <div style="color:#B91C1C; font-size:13px; line-height:1.5;">
+                    Cet examen ne peut pas être noté correctement — toutes les questions ont <strong>0/1 (mauvaise réponse)</strong> par défaut.
+                    <br>Pour chaque question QCM, <strong>sélectionnez la bonne réponse</strong> en cliquant sur le radio bouton correspondant ci-dessous.
+                </div>
+            </div>
+        </div>`;
+    }
+
+    qs.forEach((q, qi) => {
+        const hasImg = q.image && q.image.trim() !== '';
+        const qType = q.question_type || 'multiple_choice';
+        const labels = q.available_labels || [];
+
+        html += `
+        <div class="q-editor-card" id="qcard-${q.id}" style="border:1px solid var(--border); border-radius:10px; padding:18px; margin-bottom:16px; background:#FAFAFA;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <span style="font-weight:800; font-size:13px; color:var(--primary); letter-spacing:0.5px;">QUESTION ${q.question_number}</span>
+                    <select onchange="updateQuestionType(${q.id}, this.value)" style="font-size:12px; font-weight:700; padding:4px 10px; border-radius:15px; border:1px solid ${getTypeBorder(qType)}; background:${getTypeBg(qType)}; color:${getTypeColor(qType)}; cursor:pointer;">
+                        <option value="multiple_choice" ${qType === 'multiple_choice' ? 'selected' : ''}>🔘 QCM (Choix Multiple)</option>
+                        <option value="image_labeling" ${qType === 'image_labeling' ? 'selected' : ''}>🏷️ Identification / Étiquettes</option>
+                        <option value="true_false" ${qType === 'true_false' ? 'selected' : ''}>⚖️ Vrai / Faux</option>
+                        <option value="text_input" ${qType === 'text_input' ? 'selected' : ''}>📝 Réponse Libre (Texte)</option>
+                    </select>
+                </div>
+                <button type="button" onclick="deleteQuestion(${q.id})" style="background:none; border:none; color:var(--danger); cursor:pointer; font-size:13px;" title="Supprimer la question">
+                    <i class="fa-solid fa-trash"></i> Supprimer
+                </button>
+            </div>
+
+            <!-- Question text (editable) -->
+            <textarea class="form-control" id="qtext-${q.id}" rows="2" style="font-size:13px; margin-bottom:8px;">${escapeHtml(q.question_text)}</textarea>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="saveQuestionText(${q.id})" style="margin-bottom:14px;">
+                <i class="fa-solid fa-floppy-disk"></i> Sauvegarder texte
+            </button>
+
+            <!-- Image section -->
+            <div style="background:#EFF6FF; border:1px solid #BFDBFE; border-radius:8px; padding:12px; margin-bottom:12px;">
+                <div style="font-weight:700; font-size:12px; color:#1D4ED8; margin-bottom:8px;"><i class="fa-solid fa-image"></i> Image illustrative</div>
+                ${hasImg ? `
+                <div id="img-preview-${q.id}" style="margin-bottom:8px; text-align:center;">
+                    <img src="/static/exam_images/${q.image}" style="max-height:160px; max-width:100%; border-radius:6px; border:1px solid #BFDBFE;" onerror="this.parentElement.innerHTML='<span style=color:var(--text-sec);font-size:12px;>Image introuvable.</span>'">
+                    <div style="font-size:11px; color:#6B7280; margin-top:4px;">${q.image}</div>
+                </div>
+                <button type="button" class="btn btn-sm" style="background:#FEE2E2; color:#DC2626; border:1px solid #FECACA;" onclick="removeQuestionImage(${q.id})">
+                    <i class="fa-solid fa-xmark"></i> Supprimer l'image
+                </button>
+                <span style="margin-left:8px; font-size:11px; color:#6B7280; font-style:italic;">ou</span>
+                <select onchange="if(this.value) moveQuestionImage(${q.id}, parseInt(this.value))" style="font-size:12px; padding:3px 8px; border:1px solid #BFDBFE; border-radius:6px; color:#1D4ED8; background:#DBEAFE; cursor:pointer;" title="Associer l'image à une autre question">
+                    <option value="">🔀 Associer à la question...</option>
+                    ${qs.filter(other => other.id !== q.id).map(other => `<option value="${other.id}">Q${other.question_number}</option>`).join('')}
+                </select>
+                ` : `<div id="img-preview-${q.id}" style="color:var(--text-sec); font-size:12px; margin-bottom:8px;"><i class="fa-solid fa-circle-info"></i> Aucune image associée.</div>`}
+                <div style="margin-top:8px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                    <label style="cursor:pointer;">
+                        <input type="file" accept="image/*" style="display:none;" onchange="uploadQuestionImage(${q.id}, this)">
+                        <span class="btn btn-sm" style="background:#DBEAFE; color:#1D4ED8; border:1px solid #BFDBFE; cursor:pointer;">
+                            <i class="fa-solid fa-upload"></i> ${hasImg ? 'Remplacer' : 'Ajouter une image'}
+                        </span>
+                    </label>
+                    <span id="img-upload-status-${q.id}" style="font-size:11px; color:var(--text-sec);"></span>
+                </div>
+            </div>
+
+            <!-- Conditional Section based on question_type -->
+            ${qType === 'image_labeling' ? `
+            <div style="background:#F0FDF4; border:1px solid #BBF7D0; border-radius:8px; padding:14px; margin-bottom:12px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <span style="font-weight:800; font-size:12px; color:#166534; text-transform:uppercase;">
+                        <i class="fa-solid fa-tags"></i> Étiquettes / Éléments disponibles (${labels.length})
+                    </span>
+                </div>
+                <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px;">
+                    ${labels.map((lbl, li) => `
+                        <span style="display:inline-flex; align-items:center; gap:6px; background:#fff; border:1.5px solid #86EFAC; padding:4px 10px; border-radius:15px; font-size:12px; font-weight:600; color:#14532D;">
+                            <span>${escapeHtml(lbl)}</span>
+                            <i class="fa-solid fa-xmark" style="cursor:pointer; color:#DC2626;" onclick="removeLabel(${q.id}, ${li})" title="Supprimer"></i>
+                        </span>
+                    `).join('')}
+                    ${labels.length === 0 ? '<span style="font-size:12px; color:var(--text-sec); font-style:italic;">Aucune étiquette définie.</span>' : ''}
+                </div>
+                <div style="display:flex; gap:8px;">
+                    <input type="text" id="new-label-input-${q.id}" placeholder="Ajouter une étiquette..." class="form-control" style="font-size:12px; height:32px;" onkeydown="if(event.key==='Enter'){event.preventDefault(); addLabel(${q.id});}">
+                    <button type="button" class="btn btn-sm" style="background:#166534; color:#fff; white-space:nowrap;" onclick="addLabel(${q.id})">
+                        <i class="fa-solid fa-plus"></i> Ajouter
+                    </button>
+                </div>
+                <div style="margin-top:10px; font-size:11px; color:#166534; font-style:italic;">
+                    <i class="fa-solid fa-circle-info"></i> Les techniciens sélectionnent ces étiquettes lors de l'examen. Pas de QCM. Non notée automatiquement.
+                </div>
+            </div>
+            ` : qType === 'true_false' ? `
+            <div style="font-weight:700; font-size:12px; color:var(--text-sec); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px;">Bonne réponse (Vrai / Faux) :</div>
+            <div style="display:flex; gap:12px; margin-bottom:12px;">
+                ${(q.answers || []).map((a, ai) => `
+                <label style="flex:1; display:flex; align-items:center; justify-content:center; gap:10px; padding:10px 16px; border-radius:8px; border:2px solid ${a.is_correct ? '#10B981' : 'var(--border)'}; background:${a.is_correct ? '#F0FDF4' : '#fff'}; cursor:pointer;" id="ans-label-${a.id}">
+                    <input type="radio" name="correct_${q.id}" value="${a.id}" ${a.is_correct ? 'checked' : ''} onchange="markCorrect(${q.id}, ${a.id})">
+                    <span style="font-weight:700; font-size:13px;">${a.answer_text}</span>
+                    ${a.is_correct ? '<span style="color:#10B981; font-size:12px; font-weight:800;"><i class="fa-solid fa-check"></i></span>' : ''}
+                </label>
+                `).join('')}
+            </div>
+            ` : qType === 'text_input' ? `
+            <div style="background:#FFFBEB; border:1px solid #FDE68A; border-radius:8px; padding:12px; margin-bottom:12px; font-size:12px; color:#92400E;">
+                <i class="fa-solid fa-circle-info"></i> <strong>Question à réponse libre (texte) :</strong> Le technicien saisit sa réponse dans un champ texte. Non notée automatiquement.
+            </div>
+            ` : `
+            <!-- Choices with correct-answer selector -->
+            <div style="font-weight:700; font-size:12px; color:var(--text-sec); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px;">Réponses — sélectionnez la correcte :</div>
+            ${(q.answers || []).map((a, ai) => `
+            <label style="display:flex; align-items:center; gap:10px; padding:8px 12px; border-radius:6px; border:1px solid ${a.is_correct ? '#10B981' : 'var(--border)'}; background:${a.is_correct ? '#F0FDF4' : '#fff'}; margin-bottom:6px; cursor:pointer;" id="ans-label-${a.id}">
+                <input type="radio" name="correct_${q.id}" value="${a.id}" ${a.is_correct ? 'checked' : ''} onchange="markCorrect(${q.id}, ${a.id})">
+                <span style="font-weight:700; color:var(--text-sec);">${alphabet[ai]}.</span>
+                <span style="font-size:13px;">${a.answer_text}</span>
+                ${a.is_correct ? '<span style="margin-left:auto; font-size:11px; color:#10B981; font-weight:700;"><i class="fa-solid fa-check"></i> Correcte</span>' : ''}
+            </label>
+            `).join('')}
+            `}
+        </div>`;
+    });
+
+    document.getElementById('qeditor-body').innerHTML = html;
+}
+
+async function updateQuestionType(qId, newType) {
+    try {
+        const res = await fetch(`/admin/exam/question/${qId}/set-type`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ question_type: newType })
+        });
+        const d = await res.json();
+        if (d.success) {
+            showToast('Type de question mis à jour', 'success');
+            const q = (_currentExamData.questions || []).find(x => x.id === qId);
+            if (q) {
+                q.question_type = newType;
+                renderQuestionsEditor(_currentExamData);
+            }
+        } else {
+            showToast('Erreur: ' + (d.error || ''), 'danger');
+        }
+    } catch(e) {
+        showToast('Erreur réseau', 'danger');
+    }
+}
+
+async function addLabel(qId) {
+    const inp = document.getElementById(`new-label-input-${qId}`);
+    if (!inp) return;
+    const txt = inp.value.trim();
+    if (!txt) return;
+
+    const q = (_currentExamData.questions || []).find(x => x.id === qId);
+    if (!q) return;
+
+    if (!q.available_labels) q.available_labels = [];
+    if (!q.available_labels.includes(txt)) {
+        q.available_labels.push(txt);
+        await saveQuestionLabels(qId, q.available_labels);
+        renderQuestionsEditor(_currentExamData);
+    }
+}
+
+async function removeLabel(qId, labelIdx) {
+    const q = (_currentExamData.questions || []).find(x => x.id === qId);
+    if (!q || !q.available_labels) return;
+
+    q.available_labels.splice(labelIdx, 1);
+    await saveQuestionLabels(qId, q.available_labels);
+    renderQuestionsEditor(_currentExamData);
+}
+
+async function saveQuestionLabels(qId, labels) {
+    try {
+        const res = await fetch(`/admin/exam/question/${qId}/set-labels`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ labels: labels })
+        });
+        const d = await res.json();
+        if (d.success) {
+            showToast('Étiquettes sauvegardées', 'success');
+        } else {
+            showToast('Erreur: ' + (d.error || ''), 'danger');
+        }
+    } catch(e) {
+        showToast('Erreur réseau', 'danger');
+    }
+}
+
+async function autoDetectTypes(examId) {
+    try {
+        const res = await fetch(`/admin/exam/${examId}/fix-types`, { method: 'POST' });
+        const d = await res.json();
+        if (d.success) {
+            showToast(`Détection réussie : ${d.result.updated} question(s) mise(s) à jour`, 'success');
+            await loadQuestionsEditor(examId);
+        } else {
+            showToast('Erreur: ' + (d.error || ''), 'danger');
+        }
+    } catch(e) {
+        showToast('Erreur réseau', 'danger');
+    }
+}
+
+
+async function saveQuestionText(qId) {
+    const text = document.getElementById(`qtext-${qId}`).value.trim();
+    if (!text) { showToast('Le texte ne peut pas être vide.', 'danger'); return; }
+    const fd = new FormData();
+    fd.append('question_text', text);
+    const res = await fetch(`/admin/exam/question/${qId}/update-text`, { method:'POST', body: fd });
+    const d = await res.json();
+    if (d.success) showToast('Texte sauvegardé.', 'success');
+    else showToast('Erreur: ' + (d.error || ''), 'danger');
+}
+
+async function uploadQuestionImage(qId, input) {
+    const file = input.files[0];
+    if (!file) return;
+    const statusEl = document.getElementById(`img-upload-status-${qId}`);
+    statusEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Upload...';
+    const fd = new FormData();
+    fd.append('image', file);
+    try {
+        const res = await fetch(`/admin/exam/question/${qId}/upload-image`, { method:'POST', body: fd });
+        const d = await res.json();
+        if (d.success) {
+            statusEl.innerHTML = '<span style="color:#10B981;"><i class="fa-solid fa-check"></i> Image uploadée!</span>';
+            // Update preview
+            const prev = document.getElementById(`img-preview-${qId}`);
+            prev.innerHTML = `<img src="${d.url}?t=${Date.now()}" style="max-height:160px; max-width:100%; border-radius:6px; border:1px solid #BFDBFE;"><div style="font-size:11px; color:#6B7280; margin-top:4px;">${d.filename}</div>`;
+        } else {
+            statusEl.innerHTML = `<span style="color:var(--danger);">Erreur: ${d.error}</span>`;
+        }
+    } catch(e) {
+        statusEl.innerHTML = `<span style="color:var(--danger);">Erreur réseau</span>`;
+    }
+}
+
+async function removeQuestionImage(qId) {
+    if (!confirm('Supprimer l\'image de cette question ?')) return;
+    const res = await fetch(`/admin/exam/question/${qId}/remove-image`, { method:'POST' });
+    const d = await res.json();
+    if (d.success) {
+        showToast('Image supprimée.', 'success');
+        await loadQuestionsEditor(_editQExamId);
+    }
+}
+
+async function moveQuestionImage(sourceQId, targetQId) {
+    if (!confirm(`Déplacer l'image de Q${sourceQId} vers Q${targetQId} ?\n\nL'image sera retirée de la question source et attribuée à la question cible.`)) return;
+    try {
+        const res = await fetch(`/admin/exam/question/${sourceQId}/move-image-to/${targetQId}`, { method: 'POST' });
+        const d = await res.json();
+        if (d.success) {
+            showToast('Image déplacée avec succès. ✓', 'success');
+            await loadQuestionsEditor(_editQExamId);
+        } else {
+            showToast('Erreur: ' + (d.message || 'Opération impossible.'), 'danger');
+        }
+    } catch(e) {
+        showToast('Erreur réseau lors du déplacement.', 'danger');
+    }
+}
+
+async function deleteQuestion(qId) {
+    if (!confirm('Supprimer cette question et ses réponses ?')) return;
+    const res = await fetch(`/admin/exam/question/${qId}/delete`, { method:'POST' });
+    const d = await res.json();
+    if (d.success) {
+        showToast('Question supprimée.', 'success');
+        await loadQuestionsEditor(_editQExamId);
+    }
+}
+
+async function markCorrect(qId, answerId) {
+    // Update all labels in this question
+    _currentExamData.questions.forEach(q => {
+        if (q.id === qId) {
+            q.answers.forEach(a => {
+                const lbl = document.getElementById(`ans-label-${a.id}`);
+                if (!lbl) return;
+                if (a.id === answerId) {
+                    a.is_correct = 1;
+                    lbl.style.border = '1px solid #10B981';
+                    lbl.style.background = '#F0FDF4';
+                } else {
+                    a.is_correct = 0;
+                    lbl.style.border = '1px solid var(--border)';
+                    lbl.style.background = '#fff';
+                }
+            });
+        }
+    });
+
+    // Build correct_answers map and save
+    const correct_answers = {};
+    _currentExamData.questions.forEach(q => {
+        const checked = document.querySelector(`input[name="correct_${q.id}"]:checked`);
+        if (checked) correct_answers[q.id] = parseInt(checked.value);
+    });
+
+    await fetch(`/admin/exam/${_editQExamId}/set-correct-answers`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ correct_answers })
+    });
+}
+
+// ── Manual Level Override ─────────────────────────────
+let _selectedOverrideLevel = null;
+
+function updateOverrideTechInfo() {
+    const sel = document.getElementById('override-tech-select');
+    const opt = sel.options[sel.selectedIndex];
+    const lvlDisplay = document.getElementById('override-current-level');
+    if (sel.value) {
+        lvlDisplay.textContent = opt.dataset.level || '—';
+    } else {
+        lvlDisplay.textContent = '—';
+    }
+    checkOverrideReady();
+}
+
+function selectOverrideLevel(btn, level) {
+    _selectedOverrideLevel = level;
+    document.getElementById('override-new-level-input').value = level;
+    document.querySelectorAll('.override-level-btn').forEach(b => {
+        b.style.border = '2px solid #E2E8F0';
+        b.style.background = '#fff';
+        b.style.color = '#374151';
+    });
+    btn.style.border = '2px solid var(--primary)';
+    btn.style.background = '#EEF2FF';
+    btn.style.color = 'var(--primary)';
+    checkOverrideReady();
+}
+
+function checkOverrideReady() {
+    const techId = document.getElementById('override-tech-select').value;
+    const btn = document.getElementById('override-submit-btn');
+    btn.disabled = !(techId && _selectedOverrideLevel);
+}
+
+function submitOverride(event) {
+    event.preventDefault();
+    const techId = document.getElementById('override-tech-select').value;
+    if (!techId) { showToast('Sélectionnez un technicien.', 'danger'); return false; }
+    if (!_selectedOverrideLevel) { showToast('Sélectionnez un nouveau niveau.', 'danger'); return false; }
+    const form = document.getElementById('override-form');
+    form.action = `/admin/tech-level-override/${techId}`;
+    form.submit();
+    return false;
+}
+
+// ── Toast Notification ────────────────────────────────
+function showToast(msg, type='success') {
+    let t = document.getElementById('admin-toast');
+    if (!t) {
+        t = document.createElement('div');
+        t.id = 'admin-toast';
+        t.style.cssText = 'position:fixed; bottom:24px; right:24px; padding:12px 20px; border-radius:10px; font-size:13px; font-weight:600; z-index:9999; box-shadow:0 4px 20px rgba(0,0,0,0.15); transition:opacity 0.3s; max-width:340px;';
+        document.body.appendChild(t);
+    }
+    t.style.background = type === 'success' ? '#D1FAE5' : '#FEE2E2';
+    t.style.color = type === 'success' ? '#065F46' : '#991B1B';
+    t.style.opacity = '1';
+    t.textContent = msg;
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => { t.style.opacity = '0'; }, 3000);
+}
 </script>
 {% endblock %}

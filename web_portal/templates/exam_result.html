@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+
+{% block title %}Résultats de l'Examen — SEBN-TN{% endblock %}
+{% block page_title %}Résultats de l'Examen{% endblock %}
+{% block page_subtitle %}Bilan et qualification de votre habilitation technique{% endblock %}
+
+{% block extra_css %}
+<style>
+.result-card {
+    background: #FFFFFF;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 30px;
+    text-align: center;
+    max-width: 580px;
+    margin: 20px auto 30px;
+    box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05);
+}
+
+.score-circle {
+    width: 140px;
+    height: 140px;
+    border-radius: 50%;
+    margin: 0 auto 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border: 8px solid #F1F5F9;
+}
+.score-circle.passed {
+    border-color: #D1FAE5;
+    color: #10B981;
+    background: #F0FDF4;
+}
+.score-circle.failed {
+    border-color: #FEE2E2;
+    color: #EF4444;
+    background: #FEF2F2;
+}
+
+.pct-val {
+    font-size: 36px;
+    font-weight: 900;
+}
+.score-lbl {
+    font-size: 13px;
+    font-weight: 700;
+    margin-top: 2px;
+}
+
+.badge-status {
+    display: inline-block;
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    margin-bottom: 24px;
+}
+.badge-status.passed { background: #10B981; color: #FFFFFF; }
+.badge-status.failed { background: #EF4444; color: #FFFFFF; }
+
+.metric-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin: 24px 0;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 0;
+}
+.metric-box {
+    text-align: center;
+}
+.metric-val {
+    font-size: 20px;
+    font-weight: 800;
+}
+.metric-lbl {
+    font-size: 11px;
+    color: var(--text-sec);
+    margin-top: 4px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="animate-up">
+    <!-- Back buttons context aware -->
+    <div style="margin-bottom:20px;">
+        {% if session.get('role') in ['OWNER', 'ADMIN', 'admin'] %}
+        <a href="{{ url_for('training_results') }}" style="display:inline-flex; align-items:center; gap:6px; color:var(--primary); font-weight:600; text-decoration:none; font-size:13px;">
+            <i class="fa-solid fa-arrow-left"></i> Retour à tous les résultats
+        </a>
+        {% else %}
+        <a href="{{ url_for('training') }}" style="display:inline-flex; align-items:center; gap:6px; color:var(--primary); font-weight:600; text-decoration:none; font-size:13px;">
+            <i class="fa-solid fa-arrow-left"></i> Retour à mon espace formation
+        </a>
+        {% endif %}
+    </div>
+
+    <div class="result-card">
+        <!-- Badge and validation status -->
+        {% if attempt.status == 'passed' %}
+        <div class="score-circle passed animate-up">
+            <span class="pct-val">{{ attempt.percentage }}%</span>
+            <span class="score-lbl">{{ attempt.score }} / {{ exam.number_of_questions }} Correct</span>
+        </div>
+        <div class="badge-status passed">EXAMEN RÉUSSI</div>
+        <h3 style="font-size:20px; font-weight:900; color:var(--text); margin-bottom:8px;">Félicitations !</h3>
+        <p style="font-size:13px; color:var(--text-sec); line-height:1.5;">
+            Vous avez validé l'habilitation technique pour le niveau <strong>{{ exam.technician_level }}</strong> avec succès. Votre carte d'habilitation a été émise et mise à jour.
+        </p>
+        {% else %}
+        <div class="score-circle failed animate-up">
+            <span class="pct-val">{{ attempt.percentage }}%</span>
+            <span class="score-lbl">{{ attempt.score }} / {{ exam.number_of_questions }} Correct</span>
+        </div>
+        <div class="badge-status failed">EXAMEN ÉCHOUÉ</div>
+        <h3 style="font-size:20px; font-weight:900; color:var(--text); margin-bottom:8px;">Échec à la certification</h3>
+        <p style="font-size:13px; color:var(--text-sec); line-height:1.5;">
+            Le seuil de réussite pour cet examen est de <strong>{{ exam.passing_score }}%</strong>. Vous n'avez pas atteint ce seuil. Nous vous encourageons à réviser la documentation et à retenter l'épreuve.
+        </p>
+        {% endif %}
+
+        <!-- Breakdown metrics -->
+        <div class="metric-row">
+            <div class="metric-box" style="color:#10B981;">
+                <div class="metric-val">{{ attempt.correct_answers }}</div>
+                <div class="metric-lbl">Correctes</div>
+            </div>
+            <div class="metric-box" style="color:#EF4444;">
+                <div class="metric-val">{{ attempt.incorrect_answers }}</div>
+                <div class="metric-lbl">Incorrectes</div>
+            </div>
+            <div class="metric-box" style="color:#64748B;">
+                <div class="metric-val">{{ attempt.unanswered }}</div>
+                <div class="metric-lbl">Sans réponse</div>
+            </div>
+        </div>
+
+        <div style="font-size:12px; color:var(--text-sec); margin-bottom:24px;">
+            Examen complété par <strong>{{ tech.name }}</strong> (Matricule: {{ tech.matricule }}) le {{ attempt.submitted_at }}.
+        </div>
+
+        <!-- Call to actions -->
+        <div style="display:flex; justify-content:center; gap:12px; flex-wrap:wrap;">
+            {% if attempt.status == 'passed' %}
+            <a href="{{ url_for('tech_card_view', user_id=tech.id) }}" class="btn btn-primary">
+                <i class="fa-solid fa-id-card"></i> Voir ma Carte
+            </a>
+            <a href="{{ url_for('tech_card_print', user_id=tech.id) }}" target="_blank" class="btn btn-glass" style="color:var(--primary); border-color:var(--primary-light);">
+                <i class="fa-solid fa-print"></i> Imprimer / Télécharger (PDF)
+            </a>
+            {% else %}
+            <a href="{{ url_for('training') }}" class="btn btn-primary">
+                Retour à l'Espace Formation
+            </a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

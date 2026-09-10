@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+
+{% block title %}Carte d'Habilitation Technique — SEBN-TN{% endblock %}
+{% block page_title %}Carte d'Habilitation Technique{% endblock %}
+{% block page_subtitle %}Habilitation officielle de maintenance pour le personnel qualifié{% endblock %}
+
+{% block extra_css %}
+<style>
+.badge-container {
+    max-width: 420px;
+    margin: 20px auto;
+}
+
+.habilitation-badge {
+    border: 3px solid #2E008B;
+    border-radius: 14px;
+    background: #FFFFFF;
+    overflow: hidden;
+    box-shadow: 0 10px 25px -5px rgba(46,0,139,0.25);
+    position: relative;
+}
+
+.badge-header {
+    background: #2E008B;
+    color: #FFFFFF;
+    padding: 16px;
+    text-align: center;
+    border-bottom: 3px solid #2E008B;
+}
+
+.badge-body {
+    display: flex;
+    padding: 20px;
+    gap: 20px;
+    align-items: start;
+}
+
+.badge-photo-wrap {
+    flex-shrink: 0;
+}
+.badge-photo {
+    width: 110px;
+    height: 130px;
+    border-radius: 8px;
+    border: 1px solid #CBD5E1;
+    object-fit: cover;
+}
+.badge-photo-placeholder {
+    width: 110px;
+    height: 130px;
+    border-radius: 8px;
+    background: #F1F5F9;
+    border: 2px dashed #94A3B8;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #64748B;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.badge-info-table {
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text);
+}
+.info-lbl {
+    color: var(--text-sec);
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: 6px;
+}
+.info-val {
+    font-weight: 700;
+}
+
+.badge-level {
+    background: #2E008B;
+    color: #FFFFFF;
+    padding: 10px;
+    text-align: center;
+    font-weight: 800;
+    font-size: 13px;
+    letter-spacing: 0.5px;
+}
+
+.badge-footer {
+    padding: 14px 20px;
+    background: #F8FAFC;
+    border-top: 1px solid #E2E8F0;
+    font-size: 11px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="animate-up">
+    <!-- Context Aware Back Link -->
+    <div style="margin-bottom:20px;">
+        {% if session.get('role') in ['OWNER', 'ADMIN', 'admin'] %}
+        <a href="{{ url_for('training_cards') }}" style="display:inline-flex; align-items:center; gap:6px; color:var(--primary); font-weight:600; text-decoration:none; font-size:13px;">
+            <i class="fa-solid fa-arrow-left"></i> Retour aux cartes techniciens
+        </a>
+        {% else %}
+        <a href="{{ url_for('training') }}" style="display:inline-flex; align-items:center; gap:6px; color:var(--primary); font-weight:600; text-decoration:none; font-size:13px;">
+            <i class="fa-solid fa-arrow-left"></i> Retour à mon espace formation
+        </a>
+        {% endif %}
+    </div>
+
+    <div class="badge-container">
+        
+        <!-- Printable physical card mockup -->
+        <div class="habilitation-badge">
+            <div class="badge-header">
+                <div style="font-weight:900; font-size:15px; letter-spacing:1px; line-height:1.2;">SEBN-TN MAINTENANCE</div>
+                <div style="font-size:9px; color:#C7D2FE; font-weight:600; margin-top:2px;">CARTE D'HABILITATION TECHNIQUE</div>
+            </div>
+            
+            <div class="badge-body">
+                <div class="badge-photo-wrap">
+                    {% if card.photo %}
+                    <img src="{{ url_for('static_photo_download', filename=card.photo) }}" class="badge-photo" alt="Photo Technicien">
+                    {% else %}
+                    <div class="badge-photo-placeholder">
+                        <i class="fa-solid fa-user-gear" style="font-size:36px; margin-bottom:6px; color:#94A3B8;"></i>
+                        <span>PHOTO</span>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <div class="badge-info-table">
+                    <div class="info-lbl">Nom &amp; Prénom</div>
+                    <div class="info-val" style="font-size:14px; text-transform:uppercase;">{{ card.name }}</div>
+                    
+                    <div class="info-lbl">Matricule</div>
+                    <div class="info-val">{{ card.matricule }}</div>
+                    
+                    <div class="info-lbl">Équipe (Shift)</div>
+                    <div class="info-val">Shift {{ card.shift }}</div>
+                </div>
+            </div>
+
+            <!-- Level banner -->
+            <div class="badge-level">
+                {% set tech_level = card.technician_level or 'Level 1' %}
+                {{ tech_level }}
+                {% set level_desc = "CSwin Basic Knowledge" %}
+                {% if "2" in tech_level or "50%" in tech_level %}{% set level_desc = "CSwin Creation Hardware" %}{% elif "3" in tech_level or "75%" in tech_level %}{% set level_desc = "CSwin & Brainware & Vacuum" %}{% elif "4" in tech_level or "100%" in tech_level %}{% set level_desc = "CSwin & Brainware & Vacuum" %}{% endif %}
+                <div style="font-size:9.5px; font-weight:400; color:#C7D2FE; margin-top:2px;">{{ level_desc }}</div>
+            </div>
+
+            <!-- Footer statistics -->
+            <div class="badge-footer">
+                <div style="display:grid; grid-template-columns:1.2fr 0.8fr; gap:10px; margin-bottom:8px;">
+                    <div>
+                        <span style="color:var(--text-sec); font-weight:600;">Dernier examen :</span>
+                        <div style="font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="{{ card.exam_title }}">{{ card.exam_title }}</div>
+                    </div>
+                    <div>
+                        <span style="color:var(--text-sec); font-weight:600;">Décision :</span>
+                        <div style="font-weight:800; color:{% if card.status == 'RÉUSSI' %}#10B981{% elif card.status == 'ÉCHOUÉ' %}#EF4444{% else %}#3B82F6{% endif %};">{{ card.status }}</div>
+                    </div>
+                </div>
+                
+                <div style="display:flex; justify-content:space-between; border-top:1px solid #E2E8F0; padding-top:8px; font-size:10px; color:#64748B;">
+                    <span>Délivrée le : <strong>{{ card.date }}</strong></span>
+                    <span>Score : <strong>{{ card.score }} ({{ card.percentage }}%)</strong></span>
+                </div>
+                
+                <div style="text-align:right; font-family:monospace; font-weight:700; color:#94A3B8; font-size:9px; margin-top:6px;">
+                    {{ card.card_id }}
+                </div>
+            </div>
+        </div>
+
+        <!-- Controls panel below card -->
+        <div class="card" style="padding:20px; margin-top:20px; display:flex; flex-direction:column; gap:12px;">
+            <a href="{{ url_for('tech_card_print', user_id=card.id) }}" target="_blank" class="btn btn-primary" style="width:100%; justify-content:center;">
+                <i class="fa-solid fa-print"></i> Imprimer / Télécharger (PDF)
+            </a>
+
+            <!-- Photo Upload tool for Admin/Owner -->
+            {% if session.get('role') in ['OWNER', 'ADMIN', 'admin'] %}
+            <div style="border-top:1px solid var(--border); padding-top:14px; margin-top:6px;">
+                <h4 style="font-weight:700; font-size:13px; color:var(--text); margin-bottom:8px;"><i class="fa-solid fa-camera"></i> Ajouter / Remplacer la Photo</h4>
+                
+                <form method="POST" action="{{ url_for('tech_card_upload_photo', user_id=card.id) }}" enctype="multipart/form-data" style="display:flex; gap:8px;">
+                    <input type="file" name="photo_file" accept=".jpg,.jpeg,.png" class="form-control" required style="padding:6px; font-size:11px; flex:1; height:auto;">
+                    <button type="submit" class="btn btn-glass" style="color:var(--primary); font-size:12px;"><i class="fa-solid fa-upload"></i> Envoyer</button>
+                </form>
+            </div>
+            {% endif %}
+        </div>
+
+    </div>
+</div>
+{% endblock %}

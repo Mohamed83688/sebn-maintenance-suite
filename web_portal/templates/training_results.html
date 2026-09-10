@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block title %}Résultats des Examens — SEBN-TN{% endblock %}
+{% block page_title %}Historique des Examens{% endblock %}
+{% block page_subtitle %}Suivi des résultats et scores obtenus aux épreuves de qualification{% endblock %}
+
+{% block extra_css %}
+<style>
+.badge-res {
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+}
+.badge-res.passed { background: #D1FAE5; color: #065F46; }
+.badge-res.failed { background: #FEE2E2; color: #991B1B; }
+
+.filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    background: #FFFFFF;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 24px;
+}
+.filter-item {
+    flex: 1 1 200px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="animate-up">
+    <!-- Sub navigation tab items -->
+    <div style="display:flex; gap:12px; border-bottom:1px solid var(--border); margin-bottom:28px; padding-bottom:8px;">
+        <a href="{{ url_for('training') }}" style="color:var(--text-sec); font-weight:600; font-size:13px; text-decoration:none; padding:6px 12px; border-radius:6px;">
+            <i class="fa-solid fa-graduation-cap"></i> Liste des Techniciens
+        </a>
+        <a href="{{ url_for('training_exams') }}" style="color:var(--text-sec); font-weight:600; font-size:13px; text-decoration:none; padding:6px 12px; border-radius:6px;">
+            <i class="fa-solid fa-file-signature"></i> Gestion des Examens
+        </a>
+        <a href="{{ url_for('training_results') }}" style="color:var(--primary); font-weight:700; font-size:13px; text-decoration:none; padding:6px 12px; border-radius:6px; background:rgba(46,0,139,0.06);">
+            <i class="fa-solid fa-square-poll-vertical"></i> Résultats des examens
+        </a>
+        <a href="{{ url_for('training_cards') }}" style="color:var(--text-sec); font-weight:600; font-size:13px; text-decoration:none; padding:6px 12px; border-radius:6px;">
+            <i class="fa-solid fa-id-card"></i> Cartes Techniciens
+        </a>
+    </div>
+
+    <!-- Filters form -->
+    <form method="GET" action="{{ url_for('training_results') }}">
+        <div class="filter-bar">
+            <div class="filter-item">
+                <label class="form-label" style="font-size:11px;">Nom Technicien</label>
+                <input type="text" name="technician" class="form-control" placeholder="Rechercher..." value="{{ filters.technician or '' }}" style="padding:6px 12px; font-size:12.5px;">
+            </div>
+            <div class="filter-item">
+                <label class="form-label" style="font-size:11px;">Matricule</label>
+                <input type="text" name="matricule" class="form-control" placeholder="Rechercher..." value="{{ filters.matricule or '' }}" style="padding:6px 12px; font-size:12.5px;">
+            </div>
+            <div class="filter-item">
+                <label class="form-label" style="font-size:11px;">Niveau Habilité</label>
+                <select name="level" class="form-control" style="padding:6px 12px; font-size:12.5px;">
+                    <option value="">Tous les niveaux</option>
+                    <option value="Level 1" {% if filters.level == 'Level 1' %}selected{% endif %}>Level 1</option>
+                    <option value="Level 2" {% if filters.level == 'Level 2' %}selected{% endif %}>Level 2</option>
+                    <option value="Level 3" {% if filters.level == 'Level 3' %}selected{% endif %}>Level 3</option>
+                    <option value="Level 4" {% if filters.level == 'Level 4' %}selected{% endif %}>Level 4</option>
+                </select>
+            </div>
+            <div class="filter-item">
+                <label class="form-label" style="font-size:11px;">Examen</label>
+                <select name="exam_id" class="form-control" style="padding:6px 12px; font-size:12.5px;">
+                    <option value="">Tous les examens</option>
+                    {% for ex in exams %}
+                    <option value="{{ ex.id }}" {% if filters.exam_id == ex.id|string %}selected{% endif %}>{{ ex.title }} ({{ ex.technician_level }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="filter-item">
+                <label class="form-label" style="font-size:11px;">Décision</label>
+                <select name="status" class="form-control" style="padding:6px 12px; font-size:12.5px;">
+                    <option value="">Toutes</option>
+                    <option value="passed" {% if filters.status == 'passed' %}selected{% endif %}>RÉUSSI</option>
+                    <option value="failed" {% if filters.status == 'failed' %}selected{% endif %}>ÉCHOUÉ</option>
+                </select>
+            </div>
+            
+            <div style="display:flex; align-items:flex-end; gap:8px;">
+                <button type="submit" class="btn btn-primary" style="padding:8px 16px; font-size:12.5px;"><i class="fa-solid fa-filter"></i> Filtrer</button>
+                <a href="{{ url_for('training_results') }}" class="btn btn-glass" style="padding:8px 16px; font-size:12.5px; color:#475569; border-color:#CBD5E1;"><i class="fa-solid fa-arrow-rotate-left"></i> Rétablir</a>
+            </div>
+        </div>
+    </form>
+
+    <!-- Results Table -->
+    <div class="card" style="padding:0; overflow:hidden;">
+        <div style="padding:16px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; background:#FAFAFA;">
+            <div style="font-weight:600; font-size:14px; color:var(--text);">
+                <i class="fa-solid fa-list-ol" style="color:var(--text-sec); margin-right:6px;"></i> Bilan des épreuves passées
+            </div>
+            <span class="badge badge-info">{{ results|length }} tentatives terminées</span>
+        </div>
+
+        <div style="overflow-x:auto;">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Technicien</th>
+                        <th>Matricule</th>
+                        <th>Niveau Habilité</th>
+                        <th>Examen Technique</th>
+                        <th>Date Soumission</th>
+                        <th style="text-align:center;">Score</th>
+                        <th style="text-align:center;">Pourcentage</th>
+                        <th style="text-align:right;">Décision</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in results %}
+                    <tr>
+                        <td><strong>{{ row.tech_name }}</strong></td>
+                        <td><code style="font-weight:700;">{{ row.tech_mat }}</code></td>
+                        <td>{{ row.technician_level }}</td>
+                        <td>{{ row.exam_title }}</td>
+                        <td>{{ row.submitted_at }}</td>
+                        <td style="text-align:center; font-weight:700;">{{ row.score }} / {{ row.number_of_questions }}</td>
+                        <td style="text-align:center; font-weight:700;">{{ row.percentage }}%</td>
+                        <td style="text-align:right;">
+                            <a href="{{ url_for('exam_result_view', attempt_id=row.attempt_id) }}" class="badge-res {% if row.status == 'passed' %}passed{% else %}failed{% endif %}" style="text-decoration:none;">
+                                {% if row.status == 'passed' %}RÉUSSI{% else %}ÉCHOUÉ{% endif %}
+                            </a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="8" style="text-align:center; color:var(--text-sec); padding:30px;">Aucun historique de tentative d'examen trouvé.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,7 +1,7 @@
 {
     "owner_username": "owner",
-    "owner_password_hash": "scrypt:32768:8:1$9lg0WjZQpMenrUv0$f105b52597cb6069d891a1ed5fc63fdbbd060d32222a3d14167cde3bf932d3baaf22da31af55ead7604de96831f5a7363bc7a22c5565340d4546162c5d99b61f",
-    "admin_session_epoch": 1787524429.1061854,
-    "created_at": "2026-08-23 23:33:49",
-    "last_recovery": null
+    "owner_password_hash": "scrypt:32768:8:1$siWuvngG0s4iNXY7$fc562e4764dc3aea188e2046874ddd564dc01c13faf32c9acb3c8ad75f15a7d2efd971c754900925e259c174e80e89e98ea394553811b49da76c254f8321d98d",
+    "admin_session_epoch": 1787327503.0586946,
+    "created_at": "2026-08-21 16:51:03",
+    "last_recovery": "2026-08-21 16:51:43"
 }

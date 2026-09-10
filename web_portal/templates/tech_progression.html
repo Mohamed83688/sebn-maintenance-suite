@@ -1,0 +1,439 @@
+{% extends "base.html" %}
+
+{% block title %}Progression — {{ progression.user.name }} — SEBN-TN{% endblock %}
+{% block page_title %}Progression Technique{% endblock %}
+{% block page_subtitle %}Parcours de qualification par niveau d'habilitation{% endblock %}
+
+{% block extra_css %}
+<style>
+.prog-layout {
+    display: grid;
+    grid-template-columns: 360px 1fr;
+    gap: 24px;
+    align-items: start;
+}
+@media (max-width: 960px) {
+    .prog-layout { grid-template-columns: 1fr; }
+}
+
+/* Progression Ladder */
+.prog-ladder {
+    background: #FFFFFF;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.04);
+}
+.prog-ladder-header {
+    background: #2E008B;
+    color: #FFFFFF;
+    padding: 16px 20px;
+    font-weight: 800;
+    font-size: 13px;
+    letter-spacing: 0.5px;
+}
+
+.prog-step {
+    padding: 18px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    gap: 14px;
+    align-items: start;
+    transition: background 0.15s ease;
+}
+.prog-step:last-child { border-bottom: none; }
+
+.prog-step.current {
+    background: linear-gradient(135deg, #F5F3FF 0%, #EDE9FE 100%);
+    border-left: 3px solid #2E008B;
+}
+.prog-step.unlocked {
+    background: #F0FDF4;
+    border-left: 3px solid #10B981;
+}
+.prog-step.locked {
+    background: #FAFAFA;
+    opacity: 0.75;
+}
+
+.step-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+.step-icon.current  { background: #2E008B; color: #FFFFFF; }
+.step-icon.unlocked { background: #10B981; color: #FFFFFF; }
+.step-icon.locked   { background: #E2E8F0; color: #94A3B8; }
+
+.step-connector {
+    width: 2px;
+    height: 22px;
+    background: #E2E8F0;
+    margin: 4px auto;
+}
+.step-connector.done { background: #10B981; }
+
+.step-label {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 3px;
+}
+.step-label.current  { color: #2E008B; }
+.step-label.unlocked { color: #10B981; }
+.step-label.locked   { color: #94A3B8; }
+
+.step-desc {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+}
+.step-sub {
+    font-size: 11px;
+    color: var(--text-sec);
+    margin-top: 3px;
+}
+
+/* History Table */
+.history-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 10px;
+    font-weight: 800;
+}
+.history-badge.exam     { background: #EEF2FF; color: #4338CA; }
+.history-badge.override { background: #FEF3C7; color: #92400E; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="animate-up">
+
+    <!-- Back navigation -->
+    <div style="margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+        <a href="{{ url_for('training') }}" style="display:inline-flex; align-items:center; gap:6px; color:var(--primary); font-weight:600; text-decoration:none; font-size:13px;">
+            <i class="fa-solid fa-arrow-left"></i> Retour aux techniciens
+        </a>
+        <a href="{{ url_for('tech_card_view', user_id=progression.user.id) }}" class="btn btn-glass" style="font-size:12px; color:var(--primary); border-color:var(--primary-light);">
+            <i class="fa-solid fa-id-card"></i> Voir la Carte d'Habilitation
+        </a>
+    </div>
+
+    <!-- Technician header -->
+    <div class="card" style="padding:20px; margin-bottom:24px; display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+        <div style="width:52px; height:52px; border-radius:12px; background:#2E008B; display:flex; align-items:center; justify-content:center; color:#FFFFFF; font-size:20px; font-weight:900; flex-shrink:0;">
+            {{ progression.user.name[0]|upper }}
+        </div>
+        <div style="flex:1; min-width:0;">
+            <h2 style="font-size:18px; font-weight:900; color:var(--text); text-transform:uppercase; margin:0;">{{ progression.user.name }}</h2>
+            <div style="font-size:12px; color:var(--text-sec); margin-top:3px;">
+                Matricule : <code style="font-weight:700;">{{ progression.user.matricule or '—' }}</code>
+            </div>
+        </div>
+        <div style="text-align:right;">
+            <div style="font-size:11px; color:var(--text-sec); font-weight:600; text-transform:uppercase; letter-spacing:1px;">Niveau Actuel</div>
+            <div style="font-size:20px; font-weight:900; color:#2E008B; margin-top:2px;">{{ progression.current_level }}</div>
+            <div style="font-size:11px; color:var(--text-sec); margin-top:2px;">{{ progression.current_description }}</div>
+        </div>
+    </div>
+
+    <!-- Next Level Exam Unlock Callout -->
+    {% if progression.next_exam %}
+    <div class="card" style="padding:18px 24px; margin-bottom:24px; background:linear-gradient(135deg, #EEF2FF, #FAF5FF); border:1px solid #C7D2FE; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
+        <div>
+            <div style="font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:1px; color:#4338CA;">
+                <i class="fa-solid fa-graduation-cap"></i> Examen de Qualification Disponible sur le Web
+            </div>
+            <h3 style="font-size:16px; font-weight:800; color:#1E1B4B; margin:2px 0 4px;">
+                Débloquer le niveau supérieur : <strong>{{ progression.next_level }}</strong>
+            </h3>
+            <div style="font-size:12px; color:#4B5563;">
+                Épreuve : <strong>{{ progression.next_exam.title }}</strong> · Durée : {{ progression.next_exam.duration }} min · {{ progression.next_exam.number_of_questions }} questions · Seuil requis : {{ progression.next_exam.passing_score }}%
+            </div>
+        </div>
+        <div>
+            <a href="{{ url_for('exam_start', exam_id=progression.next_exam.id, technician_id=progression.user.id) }}" class="btn btn-primary" style="padding:10px 20px; font-weight:700; font-size:13px; background:#059669; border-color:#059669;">
+                <i class="fa-solid fa-play"></i> Passer l'Examen Maintenant
+            </a>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="prog-layout">
+
+        <!-- LEFT: Progression Ladder -->
+        <div>
+            <div class="prog-ladder">
+                <div class="prog-ladder-header">
+                    <i class="fa-solid fa-stairs" style="margin-right:8px;"></i> Parcours de Qualification
+                </div>
+
+                {% for lvl in progression.levels %}
+                <!-- Step connector (not before first) -->
+                {% if not loop.first %}
+                <div style="padding: 0 20px;">
+                    <div class="step-connector {% if lvl.status in ('current','unlocked') %}done{% endif %}"></div>
+                </div>
+                {% endif %}
+
+                <div class="prog-step {{ lvl.status }}">
+                    <!-- Icon -->
+                    <div class="step-icon {{ lvl.status }}">
+                        {% if lvl.status == 'current' %}
+                            <i class="fa-solid fa-star"></i>
+                        {% elif lvl.status == 'unlocked' %}
+                            <i class="fa-solid fa-circle-check"></i>
+                        {% else %}
+                            <i class="fa-solid fa-lock"></i>
+                        {% endif %}
+                    </div>
+
+                    <!-- Info -->
+                    <div style="flex:1; min-width:0;">
+                        <div class="step-label {{ lvl.status }}">
+                            {% if lvl.status == 'current' %}⬤ NIVEAU ACTUEL
+                            {% elif lvl.status == 'unlocked' %}✓ VALIDÉ
+                            {% else %}🔒 NON DÉBLOQUÉ{% endif %}
+                        </div>
+                        <div class="step-desc">{{ lvl.level }}</div>
+                        <div class="step-sub">{{ lvl.description }}</div>
+
+                        {% if lvl.best_attempt %}
+                        <div style="margin-top:8px; background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.2); border-radius:6px; padding:6px 10px; font-size:11px;">
+                            <i class="fa-solid fa-circle-check" style="color:#10B981; margin-right:4px;"></i>
+                            Examen réussi le {{ lvl.best_attempt.submitted_at[:10] if lvl.best_attempt.submitted_at else '—' }}
+                            — Note : <strong>{{ lvl.best_attempt.percentage }}%</strong>
+                        </div>
+                        {% elif lvl.latest_attempt and lvl.status == 'locked' %}
+                        <div style="margin-top:8px; background:#FEF2F2; border:1px solid #FEE2E2; border-radius:6px; padding:6px 10px; font-size:11px;">
+                            <i class="fa-solid fa-circle-xmark" style="color:#EF4444; margin-right:4px;"></i>
+                            Dernière tentative : <strong>{{ lvl.latest_attempt.percentage }}%</strong>
+                            — <span style="color:#EF4444; font-weight:700;">ÉCHOUÉ</span>
+                        </div>
+                        {% elif lvl.status == 'locked' %}
+                        <div style="margin-top:8px; font-size:11px; color:#94A3B8; font-style:italic;">
+                            Aucune tentative pour ce niveau.
+                        </div>
+                        {% endif %}
+
+                        <!-- Direct Exam Button for this Level -->
+                        {% if lvl.exam %}
+                        <div style="margin-top:10px;">
+                            {% if lvl.status == 'locked' %}
+                            <a href="{{ url_for('exam_start', exam_id=lvl.exam.id, technician_id=progression.user.id) }}" class="btn btn-xs" style="background:#059669; color:white; font-weight:700;">
+                                <i class="fa-solid fa-play"></i> Passer l'Examen {{ lvl.level }}
+                            </a>
+                            {% elif lvl.status == 'current' %}
+                            <a href="{{ url_for('exam_start', exam_id=lvl.exam.id, technician_id=progression.user.id) }}" class="btn btn-glass btn-xs" style="color:var(--primary); border-color:var(--primary-light);">
+                                <i class="fa-solid fa-rotate-right"></i> Repasser l'Épreuve
+                            </a>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Owner-Only: Manual Override Panel -->
+            {% if session.get('role') == 'OWNER' %}
+            <div class="card" style="padding:20px; margin-top:20px; border:1px solid #FCD34D; background:#FFFBEB;">
+                <h4 style="font-weight:800; font-size:13px; color:#92400E; margin-bottom:4px;">
+                    <i class="fa-solid fa-triangle-exclamation" style="margin-right:6px;"></i>
+                    Modification Manuelle du Niveau (PROPRIÉTAIRE)
+                </h4>
+                <p style="font-size:11px; color:#92400E; line-height:1.5; margin-bottom:14px;">
+                    Cette action est réservée aux situations d'urgence. Le changement sera enregistré dans l'historique d'audit avec votre identifiant, la date, et la raison fournie.
+                </p>
+
+                <form method="POST" action="{{ url_for('tech_level_override', user_id=progression.user.id) }}"
+                      onsubmit="return confirmOverride(this);">
+                    <div class="form-grid-2" style="margin-bottom:12px;">
+                        <div class="form-group">
+                            <label class="form-label" style="font-size:11px;">Nouveau Niveau</label>
+                            <select name="new_level" class="form-control" required style="font-size:12px; padding:7px 10px;">
+                                <option value="">-- Choisir --</option>
+                                {% for lvl in ['Level 1','Level 2','Level 3','Level 4'] %}
+                                <option value="{{ lvl }}" {% if lvl == progression.current_level %}disabled style="color:#94A3B8;"{% endif %}>
+                                    {{ lvl }}{% if lvl == progression.current_level %} (actuel){% endif %}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-bottom:12px;">
+                        <label class="form-label" style="font-size:11px;">Raison (obligatoire, min. 5 caractères)</label>
+                        <textarea name="reason" class="form-control" rows="2" required minlength="5"
+                                  placeholder="Ex: Certification externe reconnue, erreur administrative, etc."
+                                  style="font-size:12px;"></textarea>
+                    </div>
+                    <button type="submit" class="btn" style="background:#D97706; color:#FFFFFF; font-size:12px; padding:8px 16px;">
+                        <i class="fa-solid fa-pen-to-square"></i> Modifier le Niveau Manuellement
+                    </button>
+                </form>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- RIGHT: History + Exam Attempts -->
+        <div style="display:flex; flex-direction:column; gap:20px;">
+
+            <!-- Level Change Audit History -->
+            <div class="card" style="padding:0; overflow:hidden;">
+                <div style="padding:14px 20px; background:#FAFAFA; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+                    <div style="font-weight:700; font-size:13px; color:var(--text);">
+                        <i class="fa-solid fa-clock-rotate-left" style="color:var(--text-sec); margin-right:6px;"></i>
+                        Historique des Changements de Niveau
+                    </div>
+                    <span class="badge badge-info">{{ history|length }} événement(s)</span>
+                </div>
+
+                {% if history %}
+                <div style="overflow-x:auto;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Avant</th>
+                                <th></th>
+                                <th>Après</th>
+                                <th>Par</th>
+                                <th>Type</th>
+                                <th>Raison</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for h in history %}
+                            <tr>
+                                <td style="font-size:11px; white-space:nowrap;">{{ h.changed_at[:16] if h.changed_at else '—' }}</td>
+                                <td>
+                                    <span style="font-size:11px; font-weight:700; color:#64748B;">{{ h.previous_level or '—' }}</span>
+                                </td>
+                                <td style="text-align:center; color:#94A3B8;"><i class="fa-solid fa-arrow-right" style="font-size:10px;"></i></td>
+                                <td>
+                                    <span style="font-size:11px; font-weight:800; color:#2E008B;">{{ h.new_level }}</span>
+                                </td>
+                                <td style="font-size:11px; font-weight:700;">{{ h.changed_by }}</td>
+                                <td>
+                                    <span class="history-badge {% if h.change_type == 'EXAM' %}exam{% else %}override{% endif %}">
+                                        {% if h.change_type == 'EXAM' %}EXAMEN{% else %}OVERRIDE{% endif %}
+                                    </span>
+                                </td>
+                                <td style="font-size:11px; color:var(--text-sec); max-width:200px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="{{ h.reason or '' }}">
+                                    {{ h.reason or '—' }}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div style="padding:30px; text-align:center; color:var(--text-sec); font-size:13px;">
+                    <i class="fa-solid fa-clock-rotate-left" style="font-size:32px; color:#CBD5E1; margin-bottom:10px;"></i>
+                    <div style="font-weight:700;">Aucun changement de niveau enregistré</div>
+                    <div style="font-size:11px; margin-top:4px;">Le niveau sera mis à jour automatiquement lors de la réussite d'un examen.</div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- All exam attempts for this technician -->
+            <div class="card" style="padding:0; overflow:hidden;">
+                <div style="padding:14px 20px; background:#FAFAFA; border-bottom:1px solid var(--border);">
+                    <div style="font-weight:700; font-size:13px; color:var(--text);">
+                        <i class="fa-solid fa-list-check" style="color:var(--text-sec); margin-right:6px;"></i>
+                        Historique des Tentatives d'Examens
+                    </div>
+                </div>
+
+                {% set all_attempts = [] %}
+                {% for lvl in progression.levels %}
+                    {% if lvl.latest_attempt %}
+                        {% set _ = all_attempts.append(lvl) %}
+                    {% endif %}
+                {% endfor %}
+
+                {% set has_attempts = progression.levels | selectattr('latest_attempt') | list %}
+
+                {% if has_attempts %}
+                <div style="overflow-x:auto;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Niveau Ciblé</th>
+                                <th>Dernière Tentative</th>
+                                <th style="text-align:center;">Dernier Score</th>
+                                <th style="text-align:right;">Résultat</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for lvl in progression.levels %}
+                            {% if lvl.latest_attempt %}
+                            <tr>
+                                <td>
+                                    <div style="font-weight:700; font-size:13px;">{{ lvl.level }}</div>
+                                    <div style="font-size:10px; color:var(--text-sec);">{{ lvl.description }}</div>
+                                </td>
+                                <td style="font-size:11px; color:var(--text-sec);">
+                                    {{ lvl.latest_attempt.submitted_at[:10] if lvl.latest_attempt.submitted_at else '—' }}
+                                    <div style="font-size:10px;">{{ lvl.latest_attempt.exam_title }}</div>
+                                </td>
+                                <td style="text-align:center; font-weight:800; font-size:14px;
+                                    color: {% if lvl.latest_attempt.attempt_status == 'passed' %}#10B981{% else %}#EF4444{% endif %};">
+                                    {{ lvl.latest_attempt.percentage }}%
+                                </td>
+                                <td style="text-align:right;">
+                                    {% if lvl.latest_attempt.attempt_status == 'passed' %}
+                                    <span style="display:inline-block; padding:3px 10px; background:#D1FAE5; color:#065F46; border-radius:12px; font-size:11px; font-weight:800;">RÉUSSI</span>
+                                    {% else %}
+                                    <span style="display:inline-block; padding:3px 10px; background:#FEE2E2; color:#991B1B; border-radius:12px; font-size:11px; font-weight:800;">ÉCHOUÉ</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endif %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div style="padding:24px; text-align:center; color:var(--text-sec); font-size:13px;">
+                    <i class="fa-solid fa-graduation-cap" style="font-size:32px; color:#CBD5E1; margin-bottom:10px;"></i>
+                    <div style="font-weight:700;">Aucune tentative d'examen</div>
+                    <div style="font-size:11px; margin-top:4px;">Ce technicien n'a pas encore passé d'examen dans le système.</div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function confirmOverride(form) {
+    const level = form.new_level.value;
+    const reason = form.reason.value.trim();
+    if (!level) {
+        alert('Veuillez sélectionner un niveau cible.');
+        return false;
+    }
+    if (!reason || reason.length < 5) {
+        alert('Veuillez saisir une raison (minimum 5 caractères).');
+        return false;
+    }
+    return confirm(
+        `⚠️ MODIFICATION MANUELLE DU NIVEAU\n\n` +
+        `Nouveau niveau : ${level}\nRaison : ${reason}\n\n` +
+        `Cette action sera enregistrée dans l'historique d'audit.\n` +
+        `Confirmez-vous cette modification ?`
+    );
+}
+</script>
+{% endblock %}

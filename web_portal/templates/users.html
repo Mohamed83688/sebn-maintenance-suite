@@ -240,6 +240,7 @@
                             <span class="badge badge-primary">ADMIN</span>
                             {% elif u.role == 'TECHNICIAN' %}
                             <span class="badge badge-warning">TECHNICIEN</span>
+                            <div style="font-size:10px; font-weight:700; color:var(--primary); margin-top:2px;">{{ u.technician_level or 'Level 1' }}</div>
                             {% else %}
                             <span class="badge badge-secondary">{{ u.role }}</span>
                             {% endif %}
@@ -260,7 +261,7 @@
                         <td style="text-align:right;">
                             <div style="display:flex; justify-content:flex-end; gap:6px;">
                                 <button class="btn btn-secondary btn-xs" title="Modifier" 
-                                        onclick="openEditModal({{ u.id }}, '{{ u.name|replace("'", "\\'") }}', '{{ u.username }}', '{{ u.matricule or '' }}', '{{ u.role }}', '{{ u.shift or 'A' }}')">
+                                        onclick="openEditModal({{ u.id }}, '{{ u.name|replace("'", "\\'") }}', '{{ u.username }}', '{{ u.matricule or '' }}', '{{ u.role }}', '{{ u.shift or 'A' }}', '{{ u.technician_level or 'Level 1' }}')">
                                     <i class="fa-solid fa-pen-to-square"></i>
                                 </button>
                                 <button class="btn btn-warning btn-xs" title="Réinitialiser mot de passe" 
@@ -326,7 +327,7 @@
             <div class="form-grid-2">
                 <div class="form-group">
                     <label class="form-label">Rôle *</label>
-                    <select name="role" class="form-control" required>
+                    <select name="role" id="create_role_select" class="form-control" required onchange="toggleCreateLevelField()">
                         <option value="TECHNICIAN" selected>TECHNICIEN</option>
                         <option value="ADMIN">ADMINISTRATEUR</option>
                         <option value="USER">UTILISATEUR</option>
@@ -343,6 +344,15 @@
                         </button>
                     </div>
                 </div>
+            </div>
+            <div class="form-group" id="create_level_group">
+                <label class="form-label">Niveau Habilité *</label>
+                <select name="technician_level" class="form-control">
+                    <option value="Level 1">Level 1 (CSwin Basic Knowledge)</option>
+                    <option value="Level 2">Level 2 (CSwin Creation Hardware)</option>
+                    <option value="Level 3">Level 3 (CSwin & Brainware & Vacuum)</option>
+                    <option value="Level 4">Level 4 (CSwin & Brainware & Vacuum)</option>
+                </select>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" onclick="closeModal('createModal')">Annuler</button>
@@ -391,14 +401,27 @@
                     </select>
                 </div>
             </div>
-            <div class="form-group">
-                <label class="form-label">Rôle *</label>
-                <select name="role" id="edit_role" class="form-control" required>
-                    <option value="TECHNICIAN">TECHNICIEN</option>
-                    <option value="ADMIN">ADMINISTRATEUR</option>
-                    <option value="USER">UTILISATEUR STANDARD</option>
-                    <option value="OWNER">PROPRIÉTAIRE (OWNER)</option>
-                </select>
+            <div class="form-grid-2">
+                <div class="form-group">
+                    <label class="form-label">Rôle *</label>
+                    <select name="role" id="edit_role" class="form-control" required>
+                        <option value="TECHNICIAN">TECHNICIEN</option>
+                        <option value="ADMIN">ADMINISTRATEUR</option>
+                        <option value="USER">UTILISATEUR STANDARD</option>
+                        <option value="OWNER">PROPRIÉTAIRE (OWNER)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Niveau Actuel</label>
+                    <div id="edit_level_display" style="background:#F1F5F9; border:1px solid #CBD5E1; border-radius:8px; padding:8px 12px; font-size:12px; color:#475569; display:flex; align-items:center; gap:8px; min-height:38px;">
+                        <i class="fa-solid fa-lock" style="color:#94A3B8; font-size:10px;"></i>
+                        <span id="edit_level_text" style="font-weight:700; color:#2E008B;">—</span>
+                        <span style="font-size:10px; color:#94A3B8;">(contrôlé par les examens)</span>
+                    </div>
+                    <div style="font-size:10px; color:#94A3B8; margin-top:4px;">
+                        Modifiable via <a href="#" onclick="return false;" style="color:#2E008B;" id="edit_prog_link">Voir Progression</a>
+                    </div>
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" onclick="closeModal('editModal')">Annuler</button>
@@ -481,15 +504,31 @@ document.addEventListener('keydown', function(e) {
         document.querySelectorAll('.modal-overlay.open').forEach(el => closeModal(el.id));
     }
 });
-function openEditModal(id, name, username, matricule, role, shift) {
+function openEditModal(id, name, username, matricule, role, shift, level) {
     document.getElementById('editForm').action = `/admin/users/edit/${id}`;
     document.getElementById('edit_name').value = name;
     document.getElementById('edit_username').value = username;
     document.getElementById('edit_matricule').value = matricule;
     document.getElementById('edit_role').value = role;
     document.getElementById('edit_shift').value = shift;
+    // Show current level as read-only (controlled by exams)
+    const lvlText = document.getElementById('edit_level_text');
+    const lvlLink = document.getElementById('edit_prog_link');
+    if (lvlText) lvlText.textContent = level || 'Level 1';
+    if (lvlLink) lvlLink.href = `/training/progression/${id}`;
     openModal('editModal');
 }
+function toggleCreateLevelField() {
+    const role = document.getElementById('create_role_select').value;
+    const group = document.getElementById('create_level_group');
+    if (group) group.style.display = (role === 'TECHNICIAN') ? 'block' : 'none';
+}
+// Initial run
+document.addEventListener('DOMContentLoaded', () => {
+    if (document.getElementById('create_role_select')) {
+        toggleCreateLevelField();
+    }
+});
 function openResetModal(id, name, username) {
     document.getElementById('resetForm').action = `/admin/users/reset-password/${id}`;
     document.getElementById('reset-user-label').innerHTML =

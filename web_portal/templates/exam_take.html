@@ -1,0 +1,993 @@
+{% extends "base.html" %}
+
+{% block title %}Examen : {{ exam.title }} — SEBN-TN{% endblock %}
+{% block page_title %}{{ exam.title }}{% endblock %}
+{% block page_subtitle %}Examen Officiel de Validation de Niveau — {{ exam.technician_level }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.exam-layout {
+    display: grid;
+    grid-template-columns: 1fr 280px;
+    gap: 24px;
+    align-items: start;
+}
+@media (max-width: 900px) {
+    .exam-layout { grid-template-columns: 1fr; }
+}
+
+.sticky-panel {
+    position: sticky;
+    top: 20px;
+    background: #FFFFFF;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+}
+
+.timer-box {
+    text-align: center;
+    background: #FEF2F2;
+    border: 1px solid #FEE2E2;
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 20px;
+}
+.timer-val {
+    font-family: monospace;
+    font-size: 32px;
+    font-weight: 800;
+    color: #DC2626;
+    letter-spacing: 1px;
+}
+.timer-warn {
+    animation: pulse 1s infinite alternate;
+}
+@keyframes pulse {
+    from { opacity: 1; transform: scale(1); }
+    to { opacity: 0.8; transform: scale(1.03); }
+}
+
+.question-card {
+    background: #FFFFFF;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 20px;
+}
+
+.option-btn {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    margin-top: 10px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.option-btn:hover {
+    background: #F8FAFC;
+    border-color: #CBD5E1;
+}
+.option-btn.selected {
+    background: #EEF2FF;
+    border-color: var(--primary-light);
+    color: var(--primary);
+    font-weight: 600;
+}
+.option-btn input[type="radio"] {
+    margin-right: 12px;
+}
+
+/* ── Image Labeling Interactive Styles ── */
+.labeling-canvas-wrapper {
+    position: relative;
+    width: 100%;
+    max-width: 980px;
+    margin: 0 auto 16px auto;
+    border-radius: 12px;
+    overflow: visible;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.07);
+    background: #FFFFFF;
+    border: 1.5px solid #E2E8F0;
+    user-select: none;
+}
+
+.labeling-canvas-inner {
+    position: relative;
+    width: 100%;
+    overflow: hidden;
+    border-radius: 11px;
+}
+
+.labeling-canvas-inner img {
+    width: 100%;
+    height: auto;
+    display: block;
+    user-select: none;
+    -webkit-user-drag: none;
+}
+
+.image-label-box {
+    position: absolute;
+    background: rgba(255, 255, 255, 0.94);
+    border: 2px dashed #2563EB;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px 4px;
+    box-sizing: border-box;
+    transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 10;
+}
+.image-label-box:hover {
+    border-color: #1D4ED8;
+    background: #EFF6FF;
+    transform: scale(1.03);
+    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+    z-index: 25;
+}
+.image-label-box.ready-to-fill {
+    border-color: #059669;
+    border-style: dashed;
+    background: rgba(209, 250, 229, 0.92);
+    animation: boxPulse 1.2s infinite alternate;
+}
+@keyframes boxPulse {
+    from { box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.4); }
+    to { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0.7); }
+}
+
+.image-label-box.filled {
+    border: 2px solid #2563EB;
+    background: #FFFFFF;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+.image-label-box.filled:hover {
+    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3);
+}
+
+.box-inner-unfilled {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 800;
+    color: #2563EB;
+    pointer-events: none;
+    text-align: center;
+}
+.box-inner-filled {
+    display: none;
+    width: 100%;
+    height: 100%;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    font-size: 10.5px;
+    font-weight: 700;
+    color: #0F172A;
+    line-height: 1.15;
+    word-break: break-word;
+    pointer-events: none;
+    padding: 0 2px;
+}
+.box-remove-btn {
+    display: none;
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #EF4444;
+    color: #FFFFFF;
+    border: 2px solid #FFFFFF;
+    font-size: 10px;
+    font-weight: 900;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.25);
+    z-index: 30;
+    transition: transform 0.15s ease, background 0.15s ease;
+}
+.box-remove-btn:hover {
+    background: #DC2626;
+    transform: scale(1.15);
+}
+
+/* ── Label Chips below ── */
+.label-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    background: #FFFFFF;
+    border: 1.5px solid #CBD5E1;
+    border-radius: 20px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #1E293B;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.label-chip:hover {
+    border-color: var(--primary) !important;
+    background: #F8FAFC !important;
+    transform: translateY(-1px);
+}
+.label-chip.active-selected {
+    background: #EEF2FF !important;
+    border-color: #4F46E5 !important;
+    color: #4338CA !important;
+    font-weight: 700 !important;
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.25) !important;
+    transform: translateY(-2px);
+}
+.label-chip.used {
+    background: #F1F5F9 !important;
+    border-color: #E2E8F0 !important;
+    color: #94A3B8 !important;
+    text-decoration: line-through;
+    opacity: 0.7;
+    cursor: pointer;
+}
+.label-chip.used:hover {
+    text-decoration: none;
+    color: #64748B !important;
+    opacity: 0.9;
+}
+
+/* ── Inline Contextual Dropdown Popup ── */
+.box-context-dropdown {
+    position: absolute;
+    background: #FFFFFF;
+    border: 1px solid #CBD5E1;
+    border-radius: 10px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+    width: 280px;
+    max-height: 260px;
+    overflow-y: auto;
+    padding: 6px;
+    display: none;
+    animation: fadeInDown 0.15s ease;
+}
+@keyframes fadeInDown {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.box-context-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #1E293B;
+    cursor: pointer;
+    transition: background 0.12s ease;
+}
+.box-context-item:hover {
+    background: #EEF2FF;
+    color: #4338CA;
+}
+.box-context-item.clear-item {
+    color: #DC2626;
+    border-top: 1px solid #E2E8F0;
+    margin-top: 4px;
+}
+.box-context-item.clear-item:hover {
+    background: #FEF2F2;
+}
+
+.nav-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+    margin-top: 14px;
+}
+.nav-dot {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 32px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    background: #FFFFFF;
+    color: var(--text-sec);
+    transition: all 0.15s ease;
+}
+.nav-dot.answered {
+    background: var(--primary);
+    color: #FFFFFF;
+    border-color: var(--primary);
+}
+.nav-dot.active {
+    outline: 2px solid var(--primary-light);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="animate-up">
+    
+    <div class="exam-layout">
+        
+        <!-- Left: Questions list -->
+        <div>
+            <form id="exam-form" method="POST" action="{{ url_for('exam_submit', attempt_id=attempt.id) }}">
+                {% set alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' %}
+                {% for q in exam.questions %}
+                <div class="question-card" id="q-card-{{ q.id }}">
+                    <div style="font-weight:700; font-size:13px; color:var(--text-sec); margin-bottom:8px;">
+                        QUESTION {{ q.question_number }} SUR {{ exam.questions|length }}
+                    </div>
+                    
+                    <p style="font-size:15px; font-weight:700; color:var(--text); line-height:1.5; white-space:pre-line; margin-bottom:14px;">
+                        {{ q.question_text }}
+                    </p>
+
+                    <!-- Type-aware Question Rendering -->
+                    {% if q.question_type == 'image_labeling' %}
+                        <!-- ═══════════════════════════════════════════════════════════════ -->
+                        <!-- IMAGE LABELING / INTERACTIVE BOX FILLING                       -->
+                        <!-- ═══════════════════════════════════════════════════════════════ -->
+                        <div class="image-labeling-zone" id="labeling-zone-{{ q.id }}" style="margin-top:12px;">
+                            
+                            <!-- Helpful instruction banner -->
+                            <div style="background:#EFF6FF; border:1px solid #BFDBFE; border-radius:8px; padding:10px 14px; font-size:12.5px; color:#1E40AF; display:flex; align-items:center; gap:10px; margin-bottom:14px;">
+                                <i class="fa-solid fa-hand-pointer" style="font-size:16px; color:#2563EB;"></i>
+                                <span>
+                                    <strong>Comment remplir l'image :</strong> Cliquez directement sur un <strong>cadre vide (#1 à #11)</strong> dans l'image pour choisir sa réponse, ou sélectionnez une <strong>étiquette ci-dessous</strong> puis cliquez sur le cadre correspondant.
+                                </span>
+                            </div>
+
+                            <!-- Interactive Image with Overlay Boxes -->
+                            <div class="labeling-canvas-wrapper" id="canvas-wrap-{{ q.id }}">
+                                <div class="labeling-canvas-inner" id="canvas-inner-{{ q.id }}">
+                                    <img src="/static/exam_images/{{ q.image }}"
+                                         id="labeling-img-{{ q.id }}"
+                                         alt="Illustration interactive — Question {{ q.question_number }}"
+                                         onerror="this.parentElement.style.display='none'">
+                                    
+                                    <!-- Dynamic Interactive Boxes Overlaid on Image -->
+                                    {% if q.labeling_boxes %}
+                                        {% for box in q.labeling_boxes %}
+                                        <div class="image-label-box"
+                                             id="box-{{ q.id }}-{{ box.id }}"
+                                             data-qid="{{ q.id }}"
+                                             data-boxid="{{ box.id }}"
+                                             data-num="{{ box.num }}"
+                                             data-target="{{ box.target }}"
+                                             title="{{ box.hint or ('Cadre #' ~ box.num) }}"
+                                             onclick="handleImageLabelBoxClick(event, {{ q.id }}, {{ box.id }})"
+                                             style="left:{{ box.left }}%; top:{{ box.top }}%; width:{{ box.width }}%; height:{{ box.height }}%;">
+                                            <div class="box-inner-unfilled">
+                                                <i class="fa-solid fa-pen-to-square" style="font-size:10px;"></i>
+                                                <span>#{{ box.num }}</span>
+                                            </div>
+                                            <div class="box-inner-filled">
+                                                <span class="filled-label-text"></span>
+                                            </div>
+                                            <button type="button" 
+                                                    class="box-remove-btn" 
+                                                    onclick="removeBoxAssignment(event, {{ q.id }}, {{ box.id }})"
+                                                    title="Effacer ce cadre">✕</button>
+                                        </div>
+                                        {% endfor %}
+                                    {% endif %}
+                                </div>
+
+                                <!-- Floating Contextual Dropdown Menu -->
+                                <div class="box-context-dropdown" id="dropdown-{{ q.id }}">
+                                    <!-- Injected via JS -->
+                                </div>
+                            </div>
+
+                            <!-- Below Image: Available Labels Cloud -->
+                            <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; padding:16px;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+                                    <div style="font-size:12px; font-weight:800; color:#334155; text-transform:uppercase; letter-spacing:0.5px; display:flex; align-items:center; gap:8px;">
+                                        <i class="fa-solid fa-tags" style="color:var(--primary);"></i>
+                                        <span>Éléments disponibles à identifier</span>
+                                        <span id="counter-{{ q.id }}" style="background:#E0E7FF; color:#4338CA; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:700;">
+                                            0 / {{ q.labeling_boxes|length if q.labeling_boxes else (q.available_labels|length) }} complétés
+                                        </span>
+                                    </div>
+                                    <button type="button" 
+                                            onclick="resetAllImageBoxes({{ q.id }})" 
+                                            class="btn btn-sm" 
+                                            style="background:#FFFFFF; border:1px solid #CBD5E1; color:#64748B; font-size:11px; font-weight:600; border-radius:6px; padding:4px 10px; cursor:pointer;">
+                                        <i class="fa-solid fa-rotate-left"></i> Réinitialiser les cadres
+                                    </button>
+                                </div>
+
+                                <div class="active-label-prompt" id="active-prompt-{{ q.id }}" style="display:none; background:#FEF3C7; border:1px solid #FCD34D; color:#92400E; font-size:12px; font-weight:700; padding:6px 12px; border-radius:6px; margin-bottom:10px;">
+                                    <i class="fa-solid fa-arrow-up"></i> Cliquez maintenant sur un cadre vide (#1 à #11) dans l'image pour y placer cette étiquette.
+                                </div>
+
+                                <div class="labels-cloud" id="labels-cloud-{{ q.id }}" style="display:flex; flex-wrap:wrap; gap:8px;">
+                                    {% for lbl in q.available_labels %}
+                                    <button type="button" 
+                                            class="label-chip" 
+                                            id="chip-{{ q.id }}-{{ loop.index0 }}"
+                                            data-qid="{{ q.id }}"
+                                            data-idx="{{ loop.index0 }}"
+                                            data-label="{{ lbl }}"
+                                            onclick="handleLabelChipClick(this, {{ q.id }})">
+                                        <i class="fa-regular fa-square"></i>
+                                        <span>{{ lbl }}</span>
+                                    </button>
+                                    {% endfor %}
+                                </div>
+
+                                <!-- Hidden Serialized Value for Form Submit -->
+                                <input type="hidden" name="labeling_answers_{{ q.id }}" id="labeling-val-{{ q.id }}" value="">
+                            </div>
+
+                        </div>
+
+                    {% else %}
+                        <!-- Standard Images for normal questions -->
+                        {% if q.images %}
+                        <div style="margin-bottom:18px;">
+                            {% for img_file in q.images %}
+                            <div style="text-align:center; background:#F8FAFC; border:1px solid var(--border); border-radius:10px; padding:12px; {% if not loop.last %}margin-bottom:10px;{% endif %}">
+                                <img src="/static/exam_images/{{ img_file }}"
+                                     alt="Illustration — Question {{ q.question_number }}"
+                                     style="max-width:100%; max-height:400px; border-radius:8px; object-fit:contain; box-shadow:0 2px 10px rgba(0,0,0,0.08);"
+                                     onerror="this.parentElement.style.display='none'">
+                                {% if q.images|length > 1 %}
+                                <div style="font-size:11px; color:var(--text-sec); margin-top:6px; font-style:italic;">
+                                    <i class="fa-solid fa-image"></i> Illustration {{ loop.index }} / {{ q.images|length }} — Question {{ q.question_number }}
+                                </div>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% elif q.image %}
+                        <div style="margin-bottom:18px; text-align:center; background:#F8FAFC; border:1px solid var(--border); border-radius:10px; padding:12px;">
+                            <img src="/static/exam_images/{{ q.image }}"
+                                 alt="Image pour la question {{ q.question_number }}"
+                                 style="max-width:100%; max-height:380px; border-radius:8px; object-fit:contain; box-shadow:0 2px 10px rgba(0,0,0,0.08);"
+                                 onerror="this.parentElement.style.display='none'">
+                            <div style="font-size:11px; color:var(--text-sec); margin-top:6px; font-style:italic;">
+                                <i class="fa-solid fa-image"></i> Illustration — Question {{ q.question_number }}
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        {% if q.question_type == 'true_false' %}
+                            <!-- Question Type: True / False -->
+                            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:12px;">
+                                {% for ans in q.answers %}
+                                {% set is_saved = (saved_answers.get(q.id) == ans.id) %}
+                                {% set is_vrai = 'vrai' in ans.answer_text.lower() or 'true' in ans.answer_text.lower() or 'oui' in ans.answer_text.lower() %}
+                                <label class="option-btn {% if is_saved %}selected{% endif %}" onclick="selectOption(this, {{ q.id }}, {{ ans.id }})" style="justify-content:center; padding:14px; font-size:14px; font-weight:700; border-radius:8px;">
+                                    <input type="radio" name="question_{{ q.id }}" value="{{ ans.id }}" {% if is_saved %}checked{% endif %} style="display:none;">
+                                    <i class="fa-solid {% if is_vrai %}fa-circle-check text-success{% else %}fa-circle-xmark text-danger{% endif %}" style="margin-right:8px; font-size:16px;"></i>
+                                    <span>{{ ans.answer_text }}</span>
+                                </label>
+                                {% endfor %}
+                            </div>
+                        {% elif q.question_type == 'text_input' %}
+                            <!-- Question Type: Open Text Input -->
+                            <div style="margin-top:12px;">
+                                <textarea name="text_answer_{{ q.id }}" class="form-control" rows="3" placeholder="Écrivez votre réponse ici..." style="width:100%; border-radius:8px; border:1px solid var(--border); padding:12px; font-size:13px;" oninput="markTextAnswered({{ q.id }})">{{ saved_text_answers.get(q.id) if saved_text_answers else '' }}</textarea>
+                                <div style="margin-top:6px; font-size:11px; color:var(--text-sec); display:flex; align-items:center; gap:6px;">
+                                    <i class="fa-solid fa-circle-info" style="color:var(--primary);"></i> Question libre — fera l'objet d'une revue pédagogique par le formateur.
+                                </div>
+                            </div>
+                        {% else %}
+                            <!-- Standard QCM (multiple_choice) -->
+                            {% for ans in q.answers %}
+                            {% set is_saved = (saved_answers.get(q.id) == ans.id) %}
+                            <label class="option-btn {% if is_saved %}selected{% endif %}" onclick="selectOption(this, {{ q.id }}, {{ ans.id }})">
+                                <input type="radio" name="question_{{ q.id }}" value="{{ ans.id }}" {% if is_saved %}checked{% endif %} style="display:none;">
+                                <span style="font-weight:700; margin-right:10px;">{{ alphabet[loop.index0] }}.</span>
+                                <span style="font-size:13px;">{{ ans.answer_text }}</span>
+                            </label>
+                            {% endfor %}
+                        {% endif %}
+
+                    {% endif %}
+                </div>
+                {% endfor %}
+                
+                <div style="padding:20px 0 40px; display:flex; justify-content:space-between; align-items:center;">
+                    <span style="color:var(--text-sec); font-size:13px; font-weight:600;"><i class="fa-solid fa-cloud-arrow-up"></i> Vos réponses sont enregistrées automatiquement.</span>
+                    <button type="submit" class="btn btn-primary" onclick="confirmSubmit(event)" style="padding:10px 24px; font-size:14px; font-weight:700;">
+                        <i class="fa-solid fa-square-check"></i> Terminer l'Examen
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Right: Timer and Nav Panel -->
+        <div class="sticky-panel">
+            <div class="timer-box" id="timer-wrapper">
+                <div style="font-size:10px; font-weight:800; letter-spacing:1px; color:#991B1B; text-transform:uppercase; margin-bottom:6px;">TEMPS RESTANT</div>
+                <div class="timer-val" id="time-val">--:--</div>
+            </div>
+
+            <h4 style="font-weight:700; font-size:13px; color:var(--text); margin-bottom:10px;">Navigation</h4>
+            <p style="font-size:11px; color:var(--text-sec); line-height:1.4;">Cliquez sur un numéro de question pour y faire défiler directement.</p>
+            
+            <div class="nav-grid">
+                {% for q in exam.questions %}
+                {% set is_saved = (q.id in saved_answers) or (saved_text_answers and q.id in saved_text_answers and saved_text_answers.get(q.id)) %}
+                <div class="nav-dot {% if is_saved %}answered{% endif %}" id="nav-dot-{{ q.id }}" onclick="scrollToQuestion({{ q.id }})">
+                    {{ q.question_number }}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Remaining seconds calculated server side
+let remainingSeconds = {{ remaining_seconds }};
+const attemptId = {{ attempt.id }};
+const savedTextAnswers = {{ saved_text_answers|tojson if saved_text_answers else '{}' }};
+
+function startTimer() {
+    const timeVal = document.getElementById('time-val');
+    const timerWrapper = document.getElementById('timer-wrapper');
+    
+    function tick() {
+        if (remainingSeconds <= 0) {
+            timeVal.innerText = "00:00";
+            timerWrapper.classList.add('timer-warn');
+            autoSubmit();
+            return;
+        }
+        
+        let m = Math.floor(remainingSeconds / 60);
+        let s = remainingSeconds % 60;
+        
+        m = m < 10 ? '0' + m : m;
+        s = s < 10 ? '0' + s : s;
+        
+        timeVal.innerText = `${m}:${s}`;
+        
+        if (remainingSeconds < 120) {
+            timerWrapper.classList.add('timer-warn');
+        }
+        
+        remainingSeconds--;
+        setTimeout(tick, 1000);
+    }
+    
+    tick();
+}
+
+function selectOption(labelEl, questionId, answerId) {
+    const card = document.getElementById(`q-card-${questionId}`);
+    
+    // Deselect other options in this question card
+    card.querySelectorAll('.option-btn').forEach(btn => {
+        btn.classList.remove('selected');
+        const radio = btn.querySelector('input[type="radio"]');
+        if (radio) radio.checked = false;
+    });
+    
+    // Select this option
+    labelEl.classList.add('selected');
+    const clickedRadio = labelEl.querySelector('input[type="radio"]');
+    if (clickedRadio) clickedRadio.checked = true;
+    
+    // Update navigation indicator dot
+    const dot = document.getElementById(`nav-dot-${questionId}`);
+    if (dot) dot.classList.add('answered');
+    
+    // AJAX call to auto-save selected answer on the server
+    saveAnswerAJAX(questionId, answerId, null);
+}
+
+function saveAnswerAJAX(questionId, selectedAnswerId, answerText) {
+    const payload = {
+        attempt_id: attemptId,
+        question_id: questionId,
+        selected_answer_id: selectedAnswerId,
+        answer_text: answerText
+    };
+    
+    fetch('/training/exam/save-answer', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+    })
+    .catch(err => console.error('Failed to auto-save answer:', err));
+}
+
+function scrollToQuestion(questionId) {
+    const el = document.getElementById(`q-card-${questionId}`);
+    if (el) {
+        document.querySelectorAll('.nav-dot').forEach(d => d.classList.remove('active'));
+        const dot = document.getElementById(`nav-dot-${questionId}`);
+        if (dot) dot.classList.add('active');
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+}
+
+function confirmSubmit(event) {
+    event.preventDefault();
+    
+    const total = document.querySelectorAll('.nav-dot').length;
+    const answered = document.querySelectorAll('.nav-dot.answered').length;
+    const unanswered = total - answered;
+    
+    let msg = "Voulez-vous vraiment terminer et soumettre l'examen ?";
+    if (unanswered > 0) {
+        msg = `Attention ! Vous n'avez pas répondu à ${unanswered} question(s) sur ${total}.\n\nVoulez-vous vraiment terminer l'examen ?`;
+    }
+    
+    if (confirm(msg)) {
+        document.getElementById('exam-form').submit();
+    }
+}
+
+function markTextAnswered(questionId) {
+    const card = document.getElementById(`q-card-${questionId}`);
+    const ta = card.querySelector('textarea');
+    const dot = document.getElementById(`nav-dot-${questionId}`);
+    if (dot && ta) {
+        const val = ta.value.trim();
+        if (val.length > 0) dot.classList.add('answered');
+        else dot.classList.remove('answered');
+        saveAnswerAJAX(questionId, null, val);
+    }
+}
+
+function autoSubmit() {
+    alert("Le temps est écoulé ! Vos réponses vont être soumises automatiquement.");
+    document.getElementById('exam-form').submit();
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// IMAGE LABELING INTERACTIVE ENGINE (CLICK CHIP -> CLICK BOX OR CLICK BOX DIRECTLY)
+// ═════════════════════════════════════════════════════════════════════════════
+const LabelingState = {};
+
+function initLabelingQuestion(questionId) {
+    if (!LabelingState[questionId]) {
+        LabelingState[questionId] = {
+            activeLabel: null,
+            assignments: {} // boxId -> labelText
+        };
+    }
+}
+
+// User clicks on a label chip below the picture
+function handleLabelChipClick(chipEl, questionId) {
+    initLabelingQuestion(questionId);
+    const state = LabelingState[questionId];
+    const label = chipEl.getAttribute('data-label');
+    const prompt = document.getElementById(`active-prompt-${questionId}`);
+
+    // If already active, toggle off
+    if (state.activeLabel === label) {
+        state.activeLabel = null;
+        chipEl.classList.remove('active-selected');
+        if (prompt) prompt.style.display = 'none';
+        unhighlightBoxes(questionId);
+        return;
+    }
+
+    // Set as active
+    state.activeLabel = label;
+    const card = document.getElementById(`q-card-${questionId}`);
+    card.querySelectorAll('.label-chip').forEach(c => c.classList.remove('active-selected'));
+    chipEl.classList.add('active-selected');
+
+    if (prompt) {
+        prompt.innerHTML = `<i class="fa-solid fa-arrow-up"></i> <strong>Étiquette sélectionnée :</strong> "${label}". Cliquez sur un cadre (#1 à #11) sur l'image pour la placer.`;
+        prompt.style.display = 'block';
+    }
+
+    highlightAvailableBoxes(questionId);
+}
+
+function highlightAvailableBoxes(questionId) {
+    const card = document.getElementById(`q-card-${questionId}`);
+    card.querySelectorAll('.image-label-box').forEach(b => {
+        b.classList.add('ready-to-fill');
+    });
+}
+
+function unhighlightBoxes(questionId) {
+    const card = document.getElementById(`q-card-${questionId}`);
+    card.querySelectorAll('.image-label-box').forEach(b => {
+        b.classList.remove('ready-to-fill');
+    });
+}
+
+// User clicks directly on a box in the picture!
+function handleImageLabelBoxClick(event, questionId, boxId) {
+    event.stopPropagation();
+    initLabelingQuestion(questionId);
+    const state = LabelingState[questionId];
+
+    // Mode 1: An active label was chosen from below -> place it immediately!
+    if (state.activeLabel) {
+        assignLabelToBox(questionId, boxId, state.activeLabel);
+        
+        // Clear active selection
+        state.activeLabel = null;
+        const card = document.getElementById(`q-card-${questionId}`);
+        card.querySelectorAll('.label-chip').forEach(c => c.classList.remove('active-selected'));
+        const prompt = document.getElementById(`active-prompt-${questionId}`);
+        if (prompt) prompt.style.display = 'none';
+        unhighlightBoxes(questionId);
+        closeAllDropdowns();
+        return;
+    }
+
+    // Mode 2: No active label -> show contextual dropdown at this box!
+    showBoxDropdown(event, questionId, boxId);
+}
+
+// Show dropdown menu at clicked box
+function showBoxDropdown(event, questionId, boxId) {
+    closeAllDropdowns();
+    initLabelingQuestion(questionId);
+    const state = LabelingState[questionId];
+    const dropdown = document.getElementById(`dropdown-${questionId}`);
+    const boxEl = document.getElementById(`box-${questionId}-${boxId}`);
+    if (!dropdown || !boxEl) return;
+
+    // Get all available labels
+    const card = document.getElementById(`q-card-${questionId}`);
+    const chips = card.querySelectorAll('.label-chip');
+    const usedLabels = new Set(Object.values(state.assignments));
+    const currentBoxLabel = state.assignments[boxId];
+
+    let html = `<div style="font-size:11px; font-weight:800; color:#64748B; padding:4px 8px; text-transform:uppercase; letter-spacing:0.5px; border-bottom:1px solid #E2E8F0; margin-bottom:4px;">Choisir pour le cadre #${boxEl.getAttribute('data-num')}</div>`;
+
+    let count = 0;
+    chips.forEach(chip => {
+        const lbl = chip.getAttribute('data-label');
+        const isAssignedHere = (currentBoxLabel === lbl);
+        const isAssignedElse = (!isAssignedHere && usedLabels.has(lbl));
+
+        if (!isAssignedElse) {
+            count++;
+            const activeStyle = isAssignedHere ? 'background:#EEF2FF; color:#4338CA; font-weight:700;' : '';
+            const checkIcon = isAssignedHere ? '<i class="fa-solid fa-check" style="color:#4338CA;"></i>' : '<i class="fa-regular fa-circle" style="color:#94A3B8; font-size:10px;"></i>';
+            html += `
+                <div class="box-context-item" style="${activeStyle}" onclick="selectFromDropdown(${questionId}, ${boxId}, '${lbl.replace(/'/g, "\\'")}')">
+                    ${checkIcon}
+                    <span style="flex:1;">${lbl}</span>
+                </div>
+            `;
+        }
+    });
+
+    if (count === 0) {
+        html += `<div style="padding:10px; font-size:11px; color:#94A3B8; text-align:center;">Toutes les étiquettes sont déjà placées.</div>`;
+    }
+
+    if (currentBoxLabel) {
+        html += `
+            <div class="box-context-item clear-item" onclick="removeBoxAssignment(event, ${questionId}, ${boxId})">
+                <i class="fa-solid fa-trash-can"></i>
+                <span>Effacer ce cadre</span>
+            </div>
+        `;
+    }
+
+    dropdown.innerHTML = html;
+
+    // Position dropdown near the box
+    const boxRect = boxEl.getBoundingClientRect();
+    const canvasRect = boxEl.parentElement.getBoundingClientRect();
+
+    let left = boxRect.left - canvasRect.left;
+    let top = boxRect.bottom - canvasRect.top + 4;
+
+    // Prevent overflow right
+    if (left + 280 > canvasRect.width) {
+        left = Math.max(8, canvasRect.width - 288);
+    }
+    // Prevent overflow bottom
+    if (top + 200 > canvasRect.height) {
+        top = Math.max(8, (boxRect.top - canvasRect.top) - 210);
+    }
+
+    dropdown.style.left = `${left}px`;
+    dropdown.style.top = `${top}px`;
+    dropdown.style.display = 'block';
+}
+
+function selectFromDropdown(questionId, boxId, label) {
+    assignLabelToBox(questionId, boxId, label);
+    closeAllDropdowns();
+}
+
+function closeAllDropdowns() {
+    document.querySelectorAll('.box-context-dropdown').forEach(d => {
+        d.style.display = 'none';
+    });
+}
+
+document.addEventListener('click', () => {
+    closeAllDropdowns();
+});
+
+// Assign a label into a specific box
+function assignLabelToBox(questionId, boxId, label) {
+    initLabelingQuestion(questionId);
+    const state = LabelingState[questionId];
+
+    // If another box has this label, clear it from that box first
+    for (const [otherBoxId, otherLbl] of Object.entries(state.assignments)) {
+        if (otherLbl === label && parseInt(otherBoxId) !== boxId) {
+            clearBoxUI(questionId, parseInt(otherBoxId));
+            delete state.assignments[otherBoxId];
+        }
+    }
+
+    state.assignments[boxId] = label;
+    updateBoxUI(questionId, boxId, label);
+    syncLabelingState(questionId);
+}
+
+function updateBoxUI(questionId, boxId, label) {
+    const boxEl = document.getElementById(`box-${questionId}-${boxId}`);
+    if (!boxEl) return;
+
+    boxEl.classList.add('filled');
+    boxEl.classList.remove('ready-to-fill');
+
+    const unfilled = boxEl.querySelector('.box-inner-unfilled');
+    const filled = boxEl.querySelector('.box-inner-filled');
+    const textSpan = boxEl.querySelector('.filled-label-text');
+    const removeBtn = boxEl.querySelector('.box-remove-btn');
+
+    if (unfilled) unfilled.style.display = 'none';
+    if (filled) filled.style.display = 'flex';
+    if (textSpan) textSpan.innerText = label;
+    if (removeBtn) removeBtn.style.display = 'flex';
+}
+
+function clearBoxUI(questionId, boxId) {
+    const boxEl = document.getElementById(`box-${questionId}-${boxId}`);
+    if (!boxEl) return;
+
+    boxEl.classList.remove('filled', 'ready-to-fill');
+
+    const unfilled = boxEl.querySelector('.box-inner-unfilled');
+    const filled = boxEl.querySelector('.box-inner-filled');
+    const textSpan = boxEl.querySelector('.filled-label-text');
+    const removeBtn = boxEl.querySelector('.box-remove-btn');
+
+    if (unfilled) unfilled.style.display = 'flex';
+    if (filled) filled.style.display = 'none';
+    if (textSpan) textSpan.innerText = '';
+    if (removeBtn) removeBtn.style.display = 'none';
+}
+
+function removeBoxAssignment(event, questionId, boxId) {
+    if (event) event.stopPropagation();
+    initLabelingQuestion(questionId);
+    const state = LabelingState[questionId];
+
+    delete state.assignments[boxId];
+    clearBoxUI(questionId, boxId);
+    syncLabelingState(questionId);
+    closeAllDropdowns();
+}
+
+function resetAllImageBoxes(questionId) {
+    if (!confirm("Voulez-vous réinitialiser tous les cadres de cette question ?")) return;
+    initLabelingQuestion(questionId);
+    const state = LabelingState[questionId];
+
+    for (const boxId of Object.keys(state.assignments)) {
+        clearBoxUI(questionId, parseInt(boxId));
+    }
+    state.assignments = {};
+    syncLabelingState(questionId);
+}
+
+// Sync UI and persist to hidden input and server
+function syncLabelingState(questionId) {
+    const state = LabelingState[questionId];
+    const assignments = state.assignments;
+    const usedLabels = new Set(Object.values(assignments));
+
+    // Update chips styling below
+    const card = document.getElementById(`q-card-${questionId}`);
+    card.querySelectorAll('.label-chip').forEach(chip => {
+        const lbl = chip.getAttribute('data-label');
+        const icon = chip.querySelector('i');
+
+        if (usedLabels.has(lbl)) {
+            chip.classList.add('used');
+            chip.classList.remove('active-selected');
+            if (icon) icon.className = 'fa-solid fa-circle-check text-success';
+        } else {
+            chip.classList.remove('used');
+            if (icon) icon.className = 'fa-regular fa-square';
+        }
+    });
+
+    // Update Counter
+    const count = Object.keys(assignments).length;
+    const totalBoxes = card.querySelectorAll('.image-label-box').length;
+    const counter = document.getElementById(`counter-${questionId}`);
+    if (counter) {
+        counter.innerText = `${count} / ${totalBoxes} complétés`;
+        if (count === totalBoxes && totalBoxes > 0) {
+            counter.style.background = '#D1FAE5';
+            counter.style.color = '#065F46';
+        } else {
+            counter.style.background = '#E0E7FF';
+            counter.style.color = '#4338CA';
+        }
+    }
+
+    // Update Hidden Input Value
+    const serialized = JSON.stringify(assignments);
+    const hiddenInp = document.getElementById(`labeling-val-${questionId}`);
+    if (hiddenInp) hiddenInp.value = (count > 0) ? serialized : '';
+
+    // Update Navigation Indicator Dot
+    const dot = document.getElementById(`nav-dot-${questionId}`);
+    if (dot) {
+        if (count > 0) dot.classList.add('answered');
+        else dot.classList.remove('answered');
+    }
+
+    // Auto-save via AJAX to server
+    saveAnswerAJAX(questionId, null, serialized);
+}
+
+// Restore any saved answers on page load
+function restoreLabelingAnswers() {
+    for (const [qidStr, rawVal] of Object.entries(savedTextAnswers)) {
+        const qid = parseInt(qidStr);
+        const card = document.getElementById(`q-card-${qid}`);
+        if (!card || !rawVal) continue;
+
+        try {
+            const data = (typeof rawVal === 'string') ? JSON.parse(rawVal) : rawVal;
+            if (typeof data === 'object' && data !== null) {
+                initLabelingQuestion(qid);
+                for (const [boxIdStr, labelText] of Object.entries(data)) {
+                    const boxId = parseInt(boxIdStr);
+                    if (boxId && labelText) {
+                        assignLabelToBox(qid, boxId, labelText);
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn('Could not restore labeling answer for Q' + qid, e);
+        }
+    }
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', () => {
+    startTimer();
+    restoreLabelingAnswers();
+});
+</script>
+{% endblock %}

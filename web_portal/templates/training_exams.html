@@ -1,0 +1,309 @@
+{% extends "base.html" %}
+
+{% block title %}Gestion des Examens — SEBN-TN{% endblock %}
+{% block page_title %}Gestion des Examens{% endblock %}
+{% block page_subtitle %}Importation, configuration et publication des épreuves techniques{% endblock %}
+
+{% block topbar_actions %}
+<button class="btn btn-primary btn-sm" onclick="document.getElementById('import-modal').classList.add('open')">
+    <i class="fa-solid fa-file-arrow-up"></i> Importer un examen (.docx)
+</button>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.exam-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+.exam-card {
+    background: #FFFFFF;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.25s ease;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02), 0 2px 4px -1px rgba(0,0,0,0.01);
+}
+.exam-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05), 0 4px 6px -2px rgba(0,0,0,0.02);
+    border-color: var(--primary-light);
+}
+.exam-badge {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+}
+.exam-badge.draft { background: #FEF3C7; color: #D97706; }
+.exam-badge.published { background: #D1FAE5; color: #065F46; }
+.exam-badge.archived { background: #F1F5F9; color: #475569; }
+
+.level-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    margin-bottom: 12px;
+}
+.level-badge.l25 { background: #EFF6FF; color: #2563EB; }
+.level-badge.l50 { background: #EEF2F6; color: #475569; }
+.level-badge.l75 { background: #F5F3FF; color: #7C3AED; }
+.level-badge.l100 { background: #ECFDF5; color: #059669; }
+
+.exam-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 8px;
+}
+.exam-desc {
+    font-size: 12px;
+    color: var(--text-sec);
+    line-height: 1.5;
+    margin-bottom: 16px;
+    flex-grow: 1;
+}
+.exam-meta {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text-sec);
+    border-top: 1px solid var(--border);
+    padding-top: 12px;
+    margin-bottom: 16px;
+}
+.exam-meta-item i {
+    color: var(--primary);
+    margin-right: 6px;
+    width: 14px;
+    text-align: center;
+}
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.55);
+    backdrop-filter: blur(4px);
+    z-index: 9999;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+.modal-overlay.open { display: flex; }
+.modal-card {
+    background: #FFFFFF;
+    border-radius: 12px;
+    width: 100%;
+    max-width: 460px;
+    padding: 24px;
+    box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="animate-up">
+    <!-- Sub navigation tab items -->
+    <div style="display:flex; gap:12px; border-bottom:1px solid var(--border); margin-bottom:28px; padding-bottom:8px;">
+        <a href="{{ url_for('training') }}" style="color:var(--text-sec); font-weight:600; font-size:13px; text-decoration:none; padding:6px 12px; border-radius:6px;">
+            <i class="fa-solid fa-graduation-cap"></i> Liste des Techniciens
+        </a>
+        <a href="{{ url_for('training_exams') }}" style="color:var(--primary); font-weight:700; font-size:13px; text-decoration:none; padding:6px 12px; border-radius:6px; background:rgba(46,0,139,0.06);">
+            <i class="fa-solid fa-file-signature"></i> Gestion des Examens
+        </a>
+        <a href="{{ url_for('training_results') }}" style="color:var(--text-sec); font-weight:600; font-size:13px; text-decoration:none; padding:6px 12px; border-radius:6px;">
+            <i class="fa-solid fa-square-poll-vertical"></i> Résultats des examens
+        </a>
+        <a href="{{ url_for('training_cards') }}" style="color:var(--text-sec); font-weight:600; font-size:13px; text-decoration:none; padding:6px 12px; border-radius:6px;">
+            <i class="fa-solid fa-id-card"></i> Cartes Techniciens
+        </a>
+    </div>
+
+    <!-- Stats row -->
+    <div class="grid-4" style="margin-bottom:24px;">
+        <div class="card kpi-card">
+            <div class="kpi-icon" style="background:#EFF6FF; color:#2563EB;">
+                <i class="fa-solid fa-folder-open"></i>
+            </div>
+            <div class="kpi-data">
+                <div class="kpi-value">{{ exams|length }}</div>
+                <div class="kpi-label">Examens Totaux</div>
+            </div>
+        </div>
+        <div class="card kpi-card">
+            <div class="kpi-icon" style="background:#ECFDF5; color:#059669;">
+                <i class="fa-solid fa-square-check"></i>
+            </div>
+            <div class="kpi-data">
+                <div class="kpi-value">{{ exams|selectattr('status', 'equalto', 'published')|list|length }}</div>
+                <div class="kpi-label">Publiés (Actifs)</div>
+            </div>
+        </div>
+        <div class="card kpi-card">
+            <div class="kpi-icon" style="background:#FEF3C7; color:#D97706;">
+                <i class="fa-solid fa-file-pen"></i>
+            </div>
+            <div class="kpi-data">
+                <div class="kpi-value">{{ exams|selectattr('status', 'equalto', 'draft')|list|length }}</div>
+                <div class="kpi-label">Brouillons (Draft)</div>
+            </div>
+        </div>
+        <div class="card kpi-card">
+            <div class="kpi-icon" style="background:#F1F5F9; color:#475569;">
+                <i class="fa-solid fa-clock"></i>
+            </div>
+            <div class="kpi-data">
+                <div class="kpi-value">30 min</div>
+                <div class="kpi-label">Durée standard</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Grid List -->
+    <div class="exam-grid">
+        {% for exam in exams %}
+        <div class="exam-card">
+            <div>
+                <span class="level-badge {% if '25%' in exam.technician_level %}l25{% elif '50%' in exam.technician_level %}l50{% elif '75%' in exam.technician_level %}l75{% else %}l100{% endif %}">
+                    {{ exam.technician_level }}
+                </span>
+                
+                <span class="exam-badge {{ exam.status }}">
+                    {% if exam.status == 'published' %}PUBLIÉ{% elif exam.status == 'draft' %}BROUILLON{% else %}ARCHIVÉ{% endif %}
+                </span>
+                
+                <h3 class="exam-title">{{ exam.title }}</h3>
+                <p class="exam-desc">{{ exam.description or 'Aucune description disponible.' }}</p>
+                
+                <div class="exam-meta">
+                    <div class="exam-meta-item">
+                        <i class="fa-solid fa-clipboard-question"></i> <strong>{{ exam.number_of_questions }}</strong> questions
+                    </div>
+                    <div class="exam-meta-item">
+                        <i class="fa-solid fa-hourglass-half"></i> <strong>{{ exam.duration }}</strong> minutes
+                    </div>
+                    <div class="exam-meta-item">
+                        <i class="fa-solid fa-percent"></i> Seuil : <strong>{{ exam.passing_score }}%</strong>
+                    </div>
+                    <div class="exam-meta-item" style="grid-column: span 2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ exam.source_file }}">
+                        <i class="fa-solid fa-file-word"></i> {{ exam.source_file }}
+                    </div>
+                </div>
+            </div>
+            
+            <div style="display:flex; gap:8px; width:100%; flex-wrap:wrap;">
+                <button type="button" class="btn btn-sm" style="flex:1.2; background:#059669; color:white; font-weight:700; justify-content:center;" onclick="openExamStartModal({{ exam.id }}, '{{ exam.title|escape }}', '{{ exam.technician_level|escape }}')">
+                    <i class="fa-solid fa-play"></i> Passer l'Examen
+                </button>
+                <a href="{{ url_for('exam_preview', exam_id=exam.id) }}" class="btn btn-primary btn-sm" style="flex:1; font-size:12px; text-align:center; padding:8px 0; justify-content:center;">
+                    <i class="fa-solid fa-sliders"></i> Configurer
+                </a>
+                <form action="{{ url_for('exam_delete', exam_id=exam.id) }}" method="POST" onsubmit="return confirm('Voulez-vous vraiment supprimer cet examen ? Toutes les questions et réponses seront effacées.')" style="margin:0;">
+                    <button type="submit" class="btn btn-glass" style="color:#EF4444; border-color:#FCA5A5; height:34px; width:34px; padding:0; justify-content:center;">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                </form>
+            </div>
+        </div>
+        {% else %}
+        <div class="card" style="grid-column: 1 / -1; padding:40px; text-align:center; color:var(--text-sec);">
+            <i class="fa-solid fa-file-circle-xmark" style="font-size:48px; color:#CBD5E1; margin-bottom:16px;"></i>
+            <h4 style="font-weight:700; margin-bottom:6px;">Aucun examen disponible</h4>
+            <p style="font-size:13px; margin-bottom:16px;">Importez les fichiers épreuves `.docx` téléchargés pour configurer vos examens de validation de niveau.</p>
+            <button class="btn btn-primary" onclick="document.getElementById('import-modal').classList.add('open')" style="margin:0 auto;">
+                <i class="fa-solid fa-file-arrow-up"></i> Importer
+            </button>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Modal: Passer l'Examen pour un Technicien -->
+<div id="start-exam-modal" class="modal-overlay">
+    <div class="modal-card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px; padding-bottom:12px; border-bottom:1px solid var(--border);">
+            <h3 style="font-weight:800; font-size:16px; margin:0; color:var(--text);">
+                <i class="fa-solid fa-graduation-cap" style="color:var(--primary); margin-right:6px;"></i>
+                Faire passer l'examen
+            </h3>
+            <button class="modal-close" onclick="document.getElementById('start-exam-modal').classList.remove('open')" style="background:none; border:none; cursor:pointer; font-size:18px; color:var(--text-sec);"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        
+        <form id="startExamModalForm" method="POST" action="">
+            <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px; padding:12px; margin-bottom:16px;">
+                <div style="font-size:10px; font-weight:800; text-transform:uppercase; color:#059669;" id="modal_exam_lvl">LEVEL</div>
+                <div style="font-size:14px; font-weight:800; color:var(--text);" id="modal_exam_name">Titre</div>
+            </div>
+
+            <div class="form-group" style="margin-bottom:18px;">
+                <label class="form-label" style="font-weight:700;">Sélectionner le Technicien *</label>
+                <select name="technician_id" class="form-control" required style="font-size:13px;">
+                    <option value="">-- Choisir un Technicien --</option>
+                    {% for t in techs %}
+                    <option value="{{ t.id }}">
+                        {{ t.name }} ({{ t.matricule or 'Sans matricule' }}) — Actuel : {{ t.technician_level or 'Level 1' }}
+                    </option>
+                    {% endfor %}
+                </select>
+                <p style="font-size:11px; color:var(--text-sec); margin-top:4px;">
+                    L'examen se déroulera directement dans le navigateur et sera automatiquement noté et archivé.
+                </p>
+            </div>
+            
+            <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:20px; padding-top:14px; border-top:1px solid var(--border);">
+                <button type="button" class="btn btn-glass" onclick="document.getElementById('start-exam-modal').classList.remove('open')">Annuler</button>
+                <button type="submit" class="btn btn-primary" style="font-weight:700;"><i class="fa-solid fa-play"></i> Démarrer l'Épreuve</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Import Exam -->
+<div id="import-modal" class="modal-overlay">
+    <div class="modal-card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px; padding-bottom:12px; border-bottom:1px solid var(--border);">
+            <h3 style="font-weight:700; font-size:16px; margin:0;"><i class="fa-solid fa-file-word" style="color:var(--primary);"></i> Importer un examen</h3>
+            <button class="modal-close" onclick="document.getElementById('import-modal').classList.remove('open')" style="background:none; border:none; cursor:pointer; font-size:16px; color:var(--text-sec);"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        
+        <form method="POST" action="{{ url_for('exam_import') }}" enctype="multipart/form-data">
+            <div class="form-group">
+                <label class="form-label">Sélectionner le fichier épreuve (.docx) *</label>
+                <input type="file" name="exam_file" class="form-control" accept=".docx" required style="padding:10px 12px; height:auto;">
+                <p style="font-size:11px; color:#64748B; margin-top:6px; line-height:1.4;">
+                    Le fichier sera automatiquement analysé par le système. Il doit respecter la numérotation standard (ex: Q1, Q2, etc.) avec des choix à puce A, B, C, D. Les niveaux de compétences (25%, 50%, 75%, 100%) seront mappés selon le titre du fichier.
+                </p>
+            </div>
+            
+            <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:20px; padding-top:14px; border-top:1px solid var(--border);">
+                <button type="button" class="btn btn-secondary" onclick="document.getElementById('import-modal').classList.remove('open')">Annuler</button>
+                <button type="submit" class="btn btn-primary"><i class="fa-solid fa-upload"></i> Importer et Analyser</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function openExamStartModal(examId, examTitle, examLevel) {
+    document.getElementById('startExamModalForm').action = `/training/exam/start/${examId}`;
+    document.getElementById('modal_exam_lvl').textContent = examLevel;
+    document.getElementById('modal_exam_name').textContent = examTitle;
+    document.getElementById('start-exam-modal').classList.add('open');
+}
+</script>
+{% endblock %}
