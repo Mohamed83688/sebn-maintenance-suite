@@ -26,6 +26,21 @@ DEFAULT_CSWIN_Q6_BOXES = [
     {"id": 11, "num": 11, "target": "Close CS WIN nx", "left": 81.37, "top": 77.96, "width": 17.21, "height": 9.36, "hint": "Quitter (✖)"}
 ]
 
+DEFAULT_CSWIN_Q6_LABELS = [
+    "Start Test Mode",
+    "Log Off registered User",
+    "Open Setup CS WIN nx",
+    "Open Expert Mode",
+    "Start CS WIN nx Helpsheet",
+    "Edit / Create TesterConfiguration",
+    "Edit / Create Programs",
+    "Edit / Create Connector Library",
+    "Edit / Create Labels",
+    "Edit / Create Projects",
+    "Close CS WIN nx"
+]
+
+
 class ExamManager:
     """
     Manages Exams, QCM Questions, Options, Attempts, and Scoring for SEBN-TN.
@@ -207,6 +222,88 @@ class ExamManager:
             cur.execute("ALTER TABLE exam_attempt_answers ADD COLUMN answer_text TEXT")
             conn.commit()
             logger.info("[DB] Migration: added answer_text column.")
+
+        # Migration 6: Repair and ensure all image_labeling / CS WIN Q6 questions have boxes_json and available_labels set
+        try:
+            cur.execute("""
+                SELECT id, question_number, question_text, question_type, available_labels, boxes_json 
+                FROM exam_questions 
+                WHERE question_type = 'image_labeling' 
+                   OR question_text LIKE '%cadre vide%' 
+                   OR question_text LIKE '%remplissez le cadre%'
+            """)
+            q_rows = cur.fetchall()
+            for qr in q_rows:
+                qid = qr['id']
+                raw_b = qr['boxes_json']
+                raw_l = qr['available_labels']
+                q_text = (qr['question_text'] or '').lower()
+                
+                if 'cadre' in q_text:
+                    needs_update = False
+                    new_b = raw_b
+                    new_l = raw_l
+                    if not raw_b or len(str(raw_b)) < 20:
+                        new_b = json.dumps(DEFAULT_CSWIN_Q6_BOXES, ensure_ascii=False)
+                        needs_update = True
+                    has_merged = any(k in str(raw_l) for k in ['Log Off registered User/Start', 'Create Projects/Close', 'TesterConfiguration/Open', 'Libary/Edit', 'Labels/Edit'])
+                    if not raw_l or len(str(raw_l)) < 20 or has_merged or '/' in str(raw_l):
+                        new_l = json.dumps(DEFAULT_CSWIN_Q6_LABELS, ensure_ascii=False)
+                        needs_update = True
+                    if needs_update or qr['question_type'] != 'image_labeling':
+                        cur.execute("""
+                            UPDATE exam_questions 
+                            SET question_type = 'image_labeling', available_labels = ?, boxes_json = ? 
+                            WHERE id = ?
+                        """, (new_l, new_b, qid))
+
+            # Ensure correct answers are set for CS WIN QCM questions if none are marked
+            correct_keywords = {
+                1: 'log off',
+                2: 'tsk',
+                3: 'porta',
+                4: 'db manager',
+                5: 'user manager',
+                7: 'network range',
+                8: 'test point cards',
+                9: 'pin definitions',
+                10: 'ok or not ok',
+                11: 'closed for ok',
+                12: 'current status of the switches',
+                13: 'enter a new name',
+                14: 'sks',
+                15: '24v',
+                16: 'force de ressort',
+                17: 'seiri'
+            }
+            cur.execute("""
+                SELECT DISTINCT exam_id FROM exam_questions WHERE question_number = 6 AND (question_type = 'image_labeling' OR question_text LIKE '%cadre%')
+            """)
+            cswin_exam_ids = [r['exam_id'] for r in cur.fetchall()]
+            for eid in cswin_exam_ids:
+                cur.execute("""
+                    SELECT SUM(a.is_correct) FROM exam_questions q 
+                    JOIN exam_answers a ON a.question_id = q.id 
+                    WHERE q.exam_id = ?
+                """, (eid,))
+                sum_row = cur.fetchone()
+                if not sum_row or not sum_row[0] or sum_row[0] == 0:
+                    for qnum, kw in correct_keywords.items():
+                        cur.execute("""
+                            SELECT a.id, a.answer_text FROM exam_questions q 
+                            JOIN exam_answers a ON a.question_id = q.id 
+                            WHERE q.exam_id = ? AND q.question_number = ?
+                        """, (eid, qnum))
+                        ans_list = cur.fetchall()
+                        for aid, atxt in ans_list:
+                            if kw in (atxt or '').lower():
+                                cur.execute("UPDATE exam_answers SET is_correct = 1 WHERE id = ?", (aid,))
+                                break
+            conn.commit()
+            logger.info("[DB] Migration 6: checked and repaired image_labeling questions and answers.")
+        except Exception as e:
+            logger.warning(f"[DB] Migration 6 warning: {e}")
+
 
     # ── Parsing & Auto-import Logic ──────────────────────────────────────────
 
@@ -471,17 +568,22 @@ class ExamManager:
             # For image_labeling: convert choices → available_labels
             # and pull in any textbox lines as additional labels
             if q['question_type'] == 'image_labeling':
-                # Gather label candidates: A/B/C/D lines + textbox lines
-                label_set = []
-                for c in q['choices']:
-                    label_set.append(c['answer_text'])
-                for tl in q['_txbx_lines']:
-                    # Textbox lines may be slash-separated: split them
-                    for part in tl.split(' / '):
-                        part = part.strip().rstrip('/')
-                        if part and part not in label_set:
-                            label_set.append(part)
-                q['available_labels'] = label_set
+                # For CS WIN Question 6 (or image labeling with cadre vide), use 11 clean labels and predefined box coordinates
+                if q.get('question_number') == 6 or 'cadre vide' in q.get('question_text', '').lower():
+                    q['available_labels'] = list(DEFAULT_CSWIN_Q6_LABELS)
+                    q['boxes_json'] = json.dumps(DEFAULT_CSWIN_Q6_BOXES, ensure_ascii=False)
+                else:
+                    # Gather label candidates: A/B/C/D lines + textbox lines
+                    label_set = []
+                    for c in q['choices']:
+                        label_set.append(c['answer_text'])
+                    for tl in q['_txbx_lines']:
+                        # Textbox lines may be slash-separated: split them
+                        for part in tl.split(' / '):
+                            part = part.strip().rstrip('/')
+                            if part and part not in label_set:
+                                label_set.append(part)
+                    q['available_labels'] = label_set
                 q['choices'] = []   # NOT radio choices
             else:
                 q['available_labels'] = []
@@ -574,11 +676,19 @@ class ExamManager:
             import json as _json
             for q in parsed_questions:
                 q_type = q.get('question_type', 'multiple_choice')
-                labels_json = _json.dumps(q.get('available_labels', []), ensure_ascii=False) if q.get('available_labels') else None
+                labels = q.get('available_labels', [])
+                if q_type == 'image_labeling' and (not labels or len(labels) < 10):
+                    labels = DEFAULT_CSWIN_Q6_LABELS
+                labels_json = _json.dumps(labels, ensure_ascii=False) if labels else None
+
+                boxes = q.get('boxes_json')
+                if q_type == 'image_labeling' and not boxes:
+                    boxes = _json.dumps(DEFAULT_CSWIN_Q6_BOXES, ensure_ascii=False)
+
                 cur.execute("""
-                    INSERT INTO exam_questions (exam_id, question_number, question_text, question_type, image, available_labels)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                """, (exam_id, q['question_number'], q['question_text'], q_type, q.get('image'), labels_json))
+                    INSERT INTO exam_questions (exam_id, question_number, question_text, question_type, image, available_labels, boxes_json)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, (exam_id, q['question_number'], q['question_text'], q_type, q.get('image'), labels_json, boxes))
                 q_id = cur.lastrowid
 
                 # Persist extra images
@@ -656,10 +766,25 @@ class ExamManager:
                     except Exception:
                         q['labeling_boxes'] = []
                 else:
-                    if q.get('image') and ('12fe25f03f' in str(q['image']) or 'level25_q6' in str(q['image'])):
-                        q['labeling_boxes'] = DEFAULT_CSWIN_Q6_BOXES
-                    else:
-                        q['labeling_boxes'] = []
+                    q['labeling_boxes'] = []
+
+                # Check if this question is CS WIN Question 6 (or image labeling with cadre vide)
+                q_text_low = (q.get('question_text') or '').lower()
+                is_cswin_q6 = (
+                    q.get('question_type') == 'image_labeling'
+                    or 'cadre vide' in q_text_low
+                    or (q.get('question_number') == 6 and any(k in q_text_low for k in ['cadre', 'réponse', 'reponse', 'ci-dessous']))
+                    or (q.get('question_number') == 6 and 'cswin' in (exam.get('title') or '').lower())
+                )
+
+                if is_cswin_q6:
+                    q['question_type'] = 'image_labeling'
+                    if not q['labeling_boxes']:
+                        q['labeling_boxes'] = list(DEFAULT_CSWIN_Q6_BOXES)
+                    # Clean available_labels if empty or contains merged labels (e.g. slashes/Edit combined)
+                    has_merged_labels = any('/' in str(lbl) and 'Edit' in str(lbl) for lbl in q['available_labels'])
+                    if not q['available_labels'] or len(q['available_labels']) < 10 or has_merged_labels:
+                        q['available_labels'] = list(DEFAULT_CSWIN_Q6_LABELS)
 
                 # Normalise legacy question_type
                 if not q.get('question_type') or q['question_type'] == 'qcm':
