@@ -230,15 +230,21 @@ class IMADatabase:
         return [dict(r) for r in rows]
 
     def get_machines_enriched(self) -> list[dict]:
-        """Returns machines joined with their intervention counts and last timestamp for status sorting."""
+        """Returns machines joined with their intervention counts and last intervention date.
+        
+        Field names are aligned with what machines.html and machine_detail.html expect:
+          - intervention_count: total interventions for this machine (all statuses)
+          - open_count: number of OPEN interventions
+          - last_intervention_date: timestamp of the most recent intervention (closed_at if CLOSED, else created_at)
+        """
         with self._conn() as conn:
             rows = conn.execute("""
                 SELECT m.*, 
-                       (SELECT COUNT(*) FROM interventions WHERE machine_id = m.machine_id) as total_count,
+                       (SELECT COUNT(*) FROM interventions WHERE machine_id = m.machine_id) as intervention_count,
                        (SELECT COUNT(*) FROM interventions WHERE machine_id = m.machine_id AND status = 'OPEN') as open_count,
-                       (SELECT MAX(COALESCE(closed_at, created_at)) FROM interventions WHERE machine_id = m.machine_id) as last_ts
+                       (SELECT MAX(COALESCE(closed_at, created_at)) FROM interventions WHERE machine_id = m.machine_id) as last_intervention_date
                 FROM machines m
-                ORDER BY total_count DESC, machine_id ASC
+                ORDER BY intervention_count DESC, machine_id ASC
             """).fetchall()
         return [dict(r) for r in rows]
 
