@@ -619,127 +619,6 @@ input:checked + .slider:before { transform: translateX(20px); }
             </div>
         </div>
 
-    </div><!-- /admin-main -->
-</div><!-- /admin-layout -->
-
-<!-- ── MODAL: UPLOAD / UPDATE CHECKLIST EXCEL ───────────────────────────── -->
-<div class="modal-overlay" id="upload-checklist-modal">
-    <div class="modal-box" style="max-width: 520px;">
-        <div class="modal-close" onclick="closeModal('upload-checklist-modal')">
-            <i class="fa-solid fa-xmark"></i>
-        </div>
-        <div style="display:flex; align-items:center; gap:12px; margin-bottom:18px;">
-            <div style="width:42px; height:42px; border-radius:10px; background:var(--primary-light); color:var(--primary); display:flex; align-items:center; justify-content:center; font-size:18px;">
-                <i class="fa-solid fa-file-excel"></i>
-            </div>
-            <div>
-                <h3 style="font-family:var(--font-display); font-size:16px; font-weight:800; color:var(--text);" id="modal-form-title">Importer une Checklist Excel</h3>
-                <p style="font-size:12px; color:var(--text-sec);">Configuration de la fiche d'inspection préventive.</p>
-            </div>
-        </div>
-
-        <form method="POST" action="{{ url_for('upload_ppe_template') }}" enctype="multipart/form-data">
-            <input type="hidden" name="checklist_code" id="modal-chk-code" value="">
-
-            <div class="form-group">
-                <label class="form-label">Titre / Nom de la Checklist</label>
-                <input type="text" name="checklist_name" id="modal-chk-name" class="form-control" placeholder="Ex: Checklist Mensuelle Presse Schuler" required>
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">Équipement / Machine Cible</label>
-                <input type="text" name="equipment_pattern" id="modal-chk-pattern" class="form-control" placeholder="Ex: TS1300, VAN, ou ALL" value="ALL" required>
-                <small style="font-size:11px; color:var(--text-dim); margin-top:3px; display:block;">Indiquez le code machine ou 'ALL' pour s'appliquer à tous les équipements.</small>
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">Fichier Excel (.xlsx / .xls)</label>
-                <input type="file" name="ppe_file" accept=".xlsx,.xls,.xlsm" required class="form-control" style="padding:8px;">
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">Notes de version / Changements (optionnel)</label>
-                <input type="text" name="change_summary" class="form-control" placeholder="Ex: Ajout de 2 points de contrôle pneumatique">
-            </div>
-
-            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:24px;">
-                <button type="button" class="btn btn-secondary" onclick="closeModal('upload-checklist-modal')">Annuler</button>
-                <button type="submit" class="btn btn-primary">
-                    <i class="fa-solid fa-check"></i> Valider &amp; Activer
-                </button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<!-- ── MODAL: CONFIRM DEACTIVATE ────────────────────────────────────────── -->
-<div class="modal-overlay" id="deactivate-modal">
-    <div class="modal-box" style="max-width: 480px;">
-        <div class="modal-close" onclick="closeModal('deactivate-modal')">
-            <i class="fa-solid fa-xmark"></i>
-        </div>
-        <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
-            <div style="width:42px; height:42px; border-radius:10px; background:var(--warning-bg); color:var(--warning); display:flex; align-items:center; justify-content:center; font-size:20px;">
-                <i class="fa-solid fa-triangle-exclamation"></i>
-            </div>
-            <div>
-                <h3 style="font-family:var(--font-display); font-size:16px; font-weight:800; color:var(--text);">Désactiver cette Checklist ?</h3>
-                <p style="font-size:12px; color:var(--text-sec);" id="deact-modal-subtitle"></p>
-            </div>
-        </div>
-
-        <div style="background:var(--bg-page); border:1px solid var(--border); border-radius:8px; padding:14px; margin-bottom:20px; font-size:13px; color:var(--text-sec); line-height:1.5;">
-            <strong style="color:var(--text);"><i class="fa-solid fa-shield-halved" style="color:var(--success);"></i> Préservation des données historiques :</strong><br>
-            Cette checklist ne sera plus proposée aux techniciens pour les <strong>nouvelles</strong> opérations préventives.<br>
-            Toutes les fiches historiques déjà remplies dans le passé <strong>restent conservées et consultables</strong>.
-        </div>
-
-        <form method="POST" action="{{ url_for('toggle_ppe_template') }}">
-            <input type="hidden" name="version_id" id="deact-version-id" value="">
-            <input type="hidden" name="action" value="deactivate">
-
-            <div style="display:flex; justify-content:flex-end; gap:10px;">
-                <button type="button" class="btn btn-secondary" onclick="closeModal('deactivate-modal')">Annuler</button>
-                <button type="submit" class="btn btn-danger">
-                    <i class="fa-solid fa-power-off"></i> Désactiver la Checklist
-                </button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<!-- ── MODAL: PREVIEW CHECKLIST ITEMS ───────────────────────────────────── -->
-<div class="modal-overlay" id="preview-items-modal">
-    <div class="modal-box" style="max-width: 720px; max-height: 85vh; display:flex; flex-direction:column;">
-        <div class="modal-close" onclick="closeModal('preview-items-modal')">
-            <i class="fa-solid fa-xmark"></i>
-        </div>
-        <div style="margin-bottom:16px;">
-            <h3 style="font-family:var(--font-display); font-size:16px; font-weight:800; color:var(--text);" id="preview-modal-title">Points de Contrôle</h3>
-            <p style="font-size:12px; color:var(--text-sec);">Liste des points extraits de la définition active.</p>
-        </div>
-
-        <div style="overflow-y:auto; flex:1; border:1px solid var(--border); border-radius:8px; margin-bottom:16px;">
-            <table class="data-table" id="preview-items-table">
-                <thead>
-                    <tr>
-                        <th style="width:40px; text-align:center;">#</th>
-                        <th>Point de Contrôle / Tâche</th>
-                        <th style="width:180px;">Méthode</th>
-                    </tr>
-                </thead>
-                <tbody id="preview-items-tbody">
-                    <tr><td colspan="3" style="text-align:center; padding:20px;">Chargement...</td></tr>
-                </tbody>
-            </table>
-        </div>
-
-        <div style="text-align:right;">
-            <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('preview-items-modal')">Fermer</button>
-        </div>
-    </div>
-</div>
-
 <!-- ══ ADMIN EXAMENS PANEL ════════════════════════════════════════════════ -->
 <div id="panel-exams" class="admin-panel">
 
@@ -756,10 +635,10 @@ input:checked + .slider:before { transform: translateX(20px); }
                         <i class="fa-solid fa-arrows-rotate"></i> Sync Officiels (.docx)
                     </button>
                 </form>
-                <button class="btn btn-secondary btn-sm" onclick="openImportExamModal()">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="openImportExamModal()">
                     <i class="fa-solid fa-file-arrow-up"></i> Importer (.docx)
                 </button>
-                <button class="btn btn-primary btn-sm" onclick="openCreateExamModal()">
+                <button type="button" class="btn btn-primary btn-sm" onclick="openCreateExamModal()">
                     <i class="fa-solid fa-plus"></i> Nouvel Examen
                 </button>
             </div>
@@ -903,9 +782,127 @@ input:checked + .slider:before { transform: translateX(20px); }
     </div>
 </div>
 
-{% endblock %}
+    </div><!-- /admin-main -->
+</div><!-- /admin-layout -->
 
-{% block extra_modals %}
+<!-- ── MODAL: UPLOAD / UPDATE CHECKLIST EXCEL ───────────────────────────── -->
+<div class="modal-overlay" id="upload-checklist-modal">
+    <div class="modal-box" style="max-width: 520px;">
+        <div class="modal-close" onclick="closeModal('upload-checklist-modal')">
+            <i class="fa-solid fa-xmark"></i>
+        </div>
+        <div style="display:flex; align-items:center; gap:12px; margin-bottom:18px;">
+            <div style="width:42px; height:42px; border-radius:10px; background:var(--primary-light); color:var(--primary); display:flex; align-items:center; justify-content:center; font-size:18px;">
+                <i class="fa-solid fa-file-excel"></i>
+            </div>
+            <div>
+                <h3 style="font-family:var(--font-display); font-size:16px; font-weight:800; color:var(--text);" id="modal-form-title">Importer une Checklist Excel</h3>
+                <p style="font-size:12px; color:var(--text-sec);">Configuration de la fiche d'inspection préventive.</p>
+            </div>
+        </div>
+
+        <form method="POST" action="{{ url_for('upload_ppe_template') }}" enctype="multipart/form-data">
+            <input type="hidden" name="checklist_code" id="modal-chk-code" value="">
+
+            <div class="form-group">
+                <label class="form-label">Titre / Nom de la Checklist</label>
+                <input type="text" name="checklist_name" id="modal-chk-name" class="form-control" placeholder="Ex: Checklist Mensuelle Presse Schuler" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Équipement / Machine Cible</label>
+                <input type="text" name="equipment_pattern" id="modal-chk-pattern" class="form-control" placeholder="Ex: TS1300, VAN, ou ALL" value="ALL" required>
+                <small style="font-size:11px; color:var(--text-dim); margin-top:3px; display:block;">Indiquez le code machine ou 'ALL' pour s'appliquer à tous les équipements.</small>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Fichier Excel (.xlsx / .xls)</label>
+                <input type="file" name="ppe_file" accept=".xlsx,.xls,.xlsm" required class="form-control" style="padding:8px;">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Notes de version / Changements (optionnel)</label>
+                <input type="text" name="change_summary" class="form-control" placeholder="Ex: Ajout de 2 points de contrôle pneumatique">
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:24px;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('upload-checklist-modal')">Annuler</button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fa-solid fa-check"></i> Valider &amp; Activer
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ── MODAL: CONFIRM DEACTIVATE ────────────────────────────────────────── -->
+<div class="modal-overlay" id="deactivate-modal">
+    <div class="modal-box" style="max-width: 480px;">
+        <div class="modal-close" onclick="closeModal('deactivate-modal')">
+            <i class="fa-solid fa-xmark"></i>
+        </div>
+        <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+            <div style="width:42px; height:42px; border-radius:10px; background:var(--warning-bg); color:var(--warning); display:flex; align-items:center; justify-content:center; font-size:20px;">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <div>
+                <h3 style="font-family:var(--font-display); font-size:16px; font-weight:800; color:var(--text);">Désactiver cette Checklist ?</h3>
+                <p style="font-size:12px; color:var(--text-sec);" id="deact-modal-subtitle"></p>
+            </div>
+        </div>
+
+        <div style="background:var(--bg-page); border:1px solid var(--border); border-radius:8px; padding:14px; margin-bottom:20px; font-size:13px; color:var(--text-sec); line-height:1.5;">
+            <strong style="color:var(--text);"><i class="fa-solid fa-shield-halved" style="color:var(--success);"></i> Préservation des données historiques :</strong><br>
+            Cette checklist ne sera plus proposée aux techniciens pour les <strong>nouvelles</strong> opérations préventives.<br>
+            Toutes les fiches historiques déjà remplies dans le passé <strong>restent conservées et consultables</strong>.
+        </div>
+
+        <form method="POST" action="{{ url_for('toggle_ppe_template') }}">
+            <input type="hidden" name="version_id" id="deact-version-id" value="">
+            <input type="hidden" name="action" value="deactivate">
+
+            <div style="display:flex; justify-content:flex-end; gap:10px;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('deactivate-modal')">Annuler</button>
+                <button type="submit" class="btn btn-danger">
+                    <i class="fa-solid fa-power-off"></i> Désactiver la Checklist
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ── MODAL: PREVIEW CHECKLIST ITEMS ───────────────────────────────────── -->
+<div class="modal-overlay" id="preview-items-modal">
+    <div class="modal-box" style="max-width: 720px; max-height: 85vh; display:flex; flex-direction:column;">
+        <div class="modal-close" onclick="closeModal('preview-items-modal')">
+            <i class="fa-solid fa-xmark"></i>
+        </div>
+        <div style="margin-bottom:16px;">
+            <h3 style="font-family:var(--font-display); font-size:16px; font-weight:800; color:var(--text);" id="preview-modal-title">Points de Contrôle</h3>
+            <p style="font-size:12px; color:var(--text-sec);">Liste des points extraits de la définition active.</p>
+        </div>
+
+        <div style="overflow-y:auto; flex:1; border:1px solid var(--border); border-radius:8px; margin-bottom:16px;">
+            <table class="data-table" id="preview-items-table">
+                <thead>
+                    <tr>
+                        <th style="width:40px; text-align:center;">#</th>
+                        <th>Point de Contrôle / Tâche</th>
+                        <th style="width:180px;">Méthode</th>
+                    </tr>
+                </thead>
+                <tbody id="preview-items-tbody">
+                    <tr><td colspan="3" style="text-align:center; padding:20px;">Chargement...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div style="text-align:right;">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('preview-items-modal')">Fermer</button>
+        </div>
+    </div>
+</div>
+
 <!-- ── MODAL: EDIT EXAM METADATA ─────────────────────────────────────────── -->
 <div class="modal-overlay" id="edit-exam-modal">
     <div class="modal-box" style="max-width:520px;">
@@ -1692,5 +1689,17 @@ function showToast(msg, type='success') {
     clearTimeout(t._timer);
     t._timer = setTimeout(() => { t.style.opacity = '0'; }, 3000);
 }
+
+// Modal overlay backdrop & Escape key handling
+document.querySelectorAll('.modal-overlay').forEach(el => {
+    el.addEventListener('click', function(e) {
+        if (e.target === this) closeModal(this.id);
+    });
+});
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        document.querySelectorAll('.modal-overlay.open').forEach(el => closeModal(el.id));
+    }
+});
 </script>
 {% endblock %}

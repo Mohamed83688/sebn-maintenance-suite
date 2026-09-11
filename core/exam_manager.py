@@ -1377,14 +1377,6 @@ class ExamManager:
             conn.commit()
             return True
 
-    def remove_question_image(self, question_id: int):
-        """Clears the image for a question."""
-        with self._get_conn() as conn:
-            cur = conn.cursor()
-            cur.execute("UPDATE exam_questions SET image = NULL WHERE id = ?", (question_id,))
-            conn.commit()
-            return True
-
     def update_question_text(self, question_id: int, question_text: str):
         """Updates the text of a question."""
         with self._get_conn() as conn:
