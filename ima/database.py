@@ -222,6 +222,48 @@ class IMADatabase:
         self._retry_write(_do)
         return len(machines)
 
+    def replace_machines(self, machines: list[dict]) -> tuple[int, int]:
+        """Replace the machine list to match the provided list exactly.
+
+        - Upserts every machine in the list (insert or update name/group).
+        - Deletes every machine in the DB whose machine_id is NOT in the list.
+        - Never touches the interventions table — intervention history is preserved.
+
+        Safety guard: if `machines` is empty the method does nothing and returns
+        (0, 0). This prevents a catastrophic full wipe when an Excel file fails
+        to parse and returns zero machines.
+
+        Returns:
+            (upserted_count, deleted_count)
+        """
+        if not machines:
+            return (0, 0)
+
+        deleted_count = [0]  # mutable container for closure
+
+        def _do():
+            with self._conn() as conn:
+                # Step 1 — upsert all machines from the new Excel
+                conn.executemany("""
+                    INSERT INTO machines (group_name, machine_id, machine_name)
+                    VALUES (:group_name, :machine_id, :machine_name)
+                    ON CONFLICT(machine_id) DO UPDATE SET
+                        group_name   = excluded.group_name,
+                        machine_name = excluded.machine_name
+                """, machines)
+
+                # Step 2 — delete any machine NOT in the new list
+                placeholders = ','.join('?' * len(machines))
+                keep_ids = [m['machine_id'] for m in machines]
+                result = conn.execute(
+                    f"DELETE FROM machines WHERE machine_id NOT IN ({placeholders})",
+                    keep_ids
+                )
+                deleted_count[0] = result.rowcount
+
+        self._retry_write(_do)
+        return (len(machines), deleted_count[0])
+
     def get_all_machines(self) -> list[dict]:
         with self._conn() as conn:
             rows = conn.execute(

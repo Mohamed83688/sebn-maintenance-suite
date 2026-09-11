@@ -209,6 +209,95 @@ def sync_pma_machines_to_ima(df=None):
 
 # (Machine sync happens on-demand per request, not at startup)
 
+
+def replace_pma_machines_to_ima(df=None) -> tuple[int, int]:
+    """Destructive sync: replaces the machine list to exactly match the active Excel.
+
+    Machines in the new Excel   → kept / added / updated.
+    Machines NOT in new Excel   → deleted from the machines table.
+    Interventions               → NEVER touched, always preserved.
+
+    Uses the same Excel-reading logic as sync_pma_machines_to_ima() but calls
+    ima_db.replace_machines() instead of ima_db.upsert_machines().
+
+    Safety: if the Excel yields zero machines (parse error / empty file) the
+    function falls back to the additive sync and returns (0, 0) to avoid a wipe.
+
+    Returns:
+        (upserted_count, deleted_count)
+    """
+    try:
+        machine_map = {}
+
+        # 1. Direct DataEngine DataFrame inspection (most accurate)
+        try:
+            target_df = df
+            if target_df is None or (hasattr(target_df, 'empty') and target_df.empty):
+                eng = get_pma_engine()
+                target_df = eng.current_df
+
+            if target_df is not None and not target_df.empty:
+                col_equip = ('Equipment' if 'Equipment' in target_df.columns
+                             else ('equipment' if 'equipment' in target_df.columns else None))
+                if col_equip:
+                    for _, r in target_df.iterrows():
+                        mid = str(r.get(col_equip, '')).strip()
+                        if not mid or mid.lower() in ['nan', 'none', '']:
+                            continue
+                        mname = str(r.get('Machine_Name', mid)).strip()
+                        grp   = str(r.get('Sheet', 'Général')).strip()
+                        machine_map[mid] = {
+                            "machine_id":   mid,
+                            "machine_name": mname if mname and mname.lower() != 'nan' else mid,
+                            "group_name":   grp   if grp   and grp.lower()   != 'nan' else "Général",
+                            "location":     "",
+                            "description":  ""
+                        }
+        except Exception as e:
+            logger.warning(f"replace_pma: DataEngine parse step error: {e}")
+
+        # 2. Also read via CalendrierReader to catch additional machines
+        try:
+            from ima.excel_reader import CalendrierReader
+            reader = CalendrierReader()
+            paths  = pma_config.get_all_excel_paths()
+            for p in paths:
+                try:
+                    c_df = reader.read_calendrier(p)
+                    if not c_df.empty:
+                        for _, r in c_df.iterrows():
+                            mid   = str(r.get('ID Machine', '')).strip()
+                            mname = str(r.get('Nom Machine', mid)).strip()
+                            grp   = str(r.get('Groupe', '')).strip()
+                            if mid and mid.lower() not in ['nan', 'none', '']:
+                                if mid not in machine_map:
+                                    machine_map[mid] = {
+                                        "machine_id":   mid,
+                                        "machine_name": mname if mname and mname.lower() != 'nan' else mid,
+                                        "group_name":   grp   if grp   and grp.lower()   != 'nan' else "Général",
+                                        "location":     "",
+                                        "description":  ""
+                                    }
+                except Exception as ex:
+                    logger.warning(f"replace_pma: CalendrierReader on {p} warning: {ex}")
+        except Exception as e:
+            logger.warning(f"replace_pma: CalendrierReader step error: {e}")
+
+        if not machine_map:
+            # Yield gracefully — no machines parsed means we do NOT wipe the list
+            logger.warning("replace_pma: zero machines found in Excel — skipping destructive sync to protect existing data")
+            return (0, 0)
+
+        upserted, deleted = ima_db.replace_machines(list(machine_map.values()))
+        logger.info(f"replace_pma: {upserted} machines kept/updated, {deleted} machines removed from Parc Machines")
+        return (upserted, deleted)
+
+    except Exception as e:
+        logger.error(f"replace_pma: FATAL ERROR: {e}")
+        return (0, 0)
+
+
+
 # ── Diagnostic endpoint (public, read-only) ────────────────────────────────
 @app.route('/diag')
 def diagnostic():
@@ -2397,9 +2486,12 @@ def machines():
 @app.route('/machines/sync-pma', methods=['POST', 'GET'])
 @login_required
 def machines_sync_pma():
-    count = sync_pma_machines_to_ima()
-    if count > 0:
-        flash(f"{count} machines synchronisées avec succès depuis le planning PMA.", "success")
+    upserted, deleted = replace_pma_machines_to_ima()
+    if upserted > 0:
+        msg = f"{upserted} machines synchronisées depuis le planning PMA."
+        if deleted > 0:
+            msg += f" {deleted} machine(s) absente(s) du nouveau fichier supprimée(s) du parc."
+        flash(msg, "success")
     else:
         flash("Aucune machine trouvée dans le planning actuel. Vérifiez que le fichier Excel est bien chargé.", "warning")
     return redirect(url_for('machines'))
@@ -2416,8 +2508,11 @@ def machines_import():
         invalidate_pma_cache()
         try:
             eng = get_pma_engine(force=True)
-            c = sync_pma_machines_to_ima(eng.current_df)
-            flash(f"{c} machines importées et synchronisées avec succès.", "success")
+            upserted, deleted = replace_pma_machines_to_ima(eng.current_df)
+            msg = f"{upserted} machines importées et synchronisées avec succès."
+            if deleted > 0:
+                msg += f" {deleted} machine(s) absente(s) du nouveau fichier supprimée(s) du parc."
+            flash(msg, "success")
         except Exception as e:
             logger.error(f"Machines import error: {e}")
             flash(f"Erreur lors de l'importation : {e}", "danger")
@@ -2805,8 +2900,11 @@ def pma_upload():
         pma_config.set_last_excel_path(path)
         invalidate_pma_cache()
         eng = get_pma_engine(force=True)
-        count = sync_pma_machines_to_ima(eng.current_df)
-        flash(f"Planning '{safe_filename}' ajouté avec succès ({count} machines synchronisées pour les interventions).", "success")
+        upserted, deleted = replace_pma_machines_to_ima(eng.current_df)
+        msg = f"Planning '{safe_filename}' ajouté avec succès ({upserted} machines synchronisées pour les interventions)."
+        if deleted > 0:
+            msg += f" {deleted} machine(s) absente(s) du nouveau fichier supprimée(s) du parc."
+        flash(msg, "success")
     else:
         flash("Aucun fichier sélectionné.", "danger")
     return redirect(url_for('admin'))
