@@ -70,40 +70,36 @@ class IMADatabase:
                     pass  # Cannot remove — another instance may be running, that's fine
 
     def _conn(self, timeout=30):
-        """Return a new connection with multi-user safe settings.
-
-        timeout=30  — SQLite will wait up to 30 s for another writer to finish
-                      before raising an error.  This covers normal factory use.
-        journal_mode=DELETE — reliable on Windows network shares (SMB/CIFS).
-        busy_timeout is set via PRAGMA as an extra safety net.
-        """
-        conn = sqlite3.connect(self.db_path, timeout=timeout)
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA journal_mode=DELETE")   # safe on network drives
-        conn.execute("PRAGMA foreign_keys=ON")
-        conn.execute(f"PRAGMA busy_timeout={timeout * 1000}")  # ms
-        return conn
+        """Return a database connection (MySQL when configured, SQLite fallback)."""
+        try:
+            from core.db_mysql import get_db_connection
+            return get_db_connection(sqlite_fallback_path=self.db_path)
+        except Exception:
+            conn = sqlite3.connect(self.db_path, timeout=timeout)
+            conn.row_factory = sqlite3.Row
+            try:
+                conn.execute("PRAGMA journal_mode=DELETE")
+                conn.execute("PRAGMA foreign_keys=ON")
+                conn.execute(f"PRAGMA busy_timeout={timeout * 1000}")
+            except Exception:
+                pass
+            return conn
 
     def _retry_write(self, fn, *args, retries=5, **kwargs):
-        """Execute a write function with exponential-backoff retry.
-
-        If SQLite is locked by another user, wait a short random time and
-        try again up to `retries` times before raising the error to the UI.
-        This is the core of multi-user safety.
-        """
+        """Execute a write function with exponential-backoff retry."""
         last_err = None
         for attempt in range(retries):
             try:
                 return fn(*args, **kwargs)
-            except sqlite3.OperationalError as e:
-                if "locked" in str(e).lower() or "busy" in str(e).lower():
+            except Exception as e:
+                err_lower = str(e).lower()
+                if "locked" in err_lower or "busy" in err_lower:
                     last_err = e
-                    # Jittered back-off: 0.1s, 0.3s, 0.7s, 1.5s, 3.1s …
                     wait = (2 ** attempt) * 0.1 + random.uniform(0, 0.05)
                     time.sleep(wait)
                 else:
                     raise
-        raise sqlite3.OperationalError(
+        raise Exception(
             f"La base de données est occupée par un autre poste.\n"
             f"Veuillez réessayer dans quelques secondes.\n"
             f"(Détail technique : {last_err})"
@@ -188,19 +184,19 @@ class IMADatabase:
             # Migration: Add code_asp if missing
             try:
                 conn.execute("ALTER TABLE interventions ADD COLUMN code_asp TEXT NOT NULL DEFAULT ''")
-            except sqlite3.OperationalError:
-                pass  # Already exists
+            except Exception:
+                pass
 
             # Migration: Add checklist_results if missing
             try:
                 conn.execute("ALTER TABLE interventions ADD COLUMN checklist_results TEXT NOT NULL DEFAULT '[]'")
-            except sqlite3.OperationalError:
+            except Exception:
                 pass
 
             # Migration: Add file_path to machine_plans if missing
             try:
                 conn.execute("ALTER TABLE machine_plans ADD COLUMN file_path TEXT")
-            except sqlite3.OperationalError:
+            except Exception:
                 pass
 
 

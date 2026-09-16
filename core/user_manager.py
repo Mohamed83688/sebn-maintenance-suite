@@ -21,9 +21,13 @@ class UserManager:
         self._migrate_existing_technicians()
 
     def _get_conn(self):
-        conn = sqlite3.connect(self.db_path, timeout=15)
-        conn.row_factory = sqlite3.Row
-        return conn
+        try:
+            from core.db_mysql import get_db_connection
+            return get_db_connection(sqlite_fallback_path=self.db_path)
+        except Exception:
+            conn = sqlite3.connect(self.db_path, timeout=15)
+            conn.row_factory = sqlite3.Row
+            return conn
 
     def _init_db(self):
         os.makedirs(os.path.dirname(os.path.abspath(self.db_path)), exist_ok=True)

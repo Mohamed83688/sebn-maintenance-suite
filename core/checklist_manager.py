@@ -35,11 +35,18 @@ class ChecklistManager:
         self._init_db()
         self._seed_existing_templates()
 
-    def _get_conn(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA foreign_keys = ON")
-        return conn
+    def _get_conn(self):
+        try:
+            from core.db_mysql import get_db_connection
+            return get_db_connection(sqlite_fallback_path=self.db_path)
+        except Exception:
+            conn = sqlite3.connect(self.db_path)
+            conn.row_factory = sqlite3.Row
+            try:
+                conn.execute("PRAGMA foreign_keys = ON")
+            except Exception:
+                pass
+            return conn
 
     def _init_db(self):
         """Create database tables if they do not exist."""

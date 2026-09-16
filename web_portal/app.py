@@ -3606,9 +3606,7 @@ def admin_documents_add():
         return redirect(url_for('admin_documents'))
 
     # 3. Update DB row with real path + is_active
-    from core.document_manager import DocumentManager as _DM
-    import sqlite3 as _sq3
-    with _sq3.connect(IMA_DB_PATH) as _conn:
+    with doc_mgr._get_conn() as _conn:
         _conn.execute(
             "UPDATE documents SET storage_path=?, file_name=?, file_type=?, is_active=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
             (rel_path, DocumentManager.safe_filename(request.files['file'].filename), file_type, is_active, doc_id)
