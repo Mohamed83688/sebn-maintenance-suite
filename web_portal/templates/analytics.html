@@ -29,12 +29,13 @@
 
 .filter-grid-6 {
     display: grid;
-    grid-template-columns: repeat(6, 1fr);
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: 12px;
     align-items: flex-end;
 }
-@media (max-width: 1300px) { .filter-grid-6 { grid-template-columns: repeat(3, 1fr); } }
-@media (max-width: 768px) { .filter-grid-6 { grid-template-columns: 1fr; } }
+@media (max-width: 1440px) { .filter-grid-6 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 900px)  { .filter-grid-6 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px)  { .filter-grid-6 { grid-template-columns: 1fr; } }
 
 .filter-label {
     display: block;
@@ -65,12 +66,13 @@
 /* ── KPI TILES ──────────────────────────────────────── */
 .kpi-grid-6 {
     display: grid;
-    grid-template-columns: repeat(6, 1fr);
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: 16px;
     margin-bottom: 24px;
 }
-@media (max-width: 1200px) { .kpi-grid-6 { grid-template-columns: repeat(3, 1fr); } }
-@media (max-width: 640px) { .kpi-grid-6 { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 1440px) { .kpi-grid-6 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 900px)  { .kpi-grid-6 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 540px)  { .kpi-grid-6 { grid-template-columns: 1fr; } }
 
 .kpi-tile {
     background: var(--bg-card);
@@ -130,7 +132,7 @@
 .kpi-cyan .kpi-icon-wrap   { background: var(--cyan-bg);       color: var(--cyan); }
 
 .kpi-value {
-    font-size: 1.85rem;
+    font-size: clamp(1.4rem, 2vw, 1.85rem);
     font-weight: 800;
     color: var(--text);
     line-height: 1.1;

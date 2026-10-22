@@ -50,11 +50,11 @@
             <div class="kpi-data">
                 <div class="kpi-value" style="color:#059669;">
                     {% if kpis.total_items > 0 %}
-                    {{ "%.1f"|format((kpis.validated_count / kpis.total_items) * 100) }}%
+                    {{ "%.1f"|format(((kpis.validated_count + kpis.delivered_count) / kpis.total_items) * 100) }}%
                     {% else %}0.0%{% endif %}
                 </div>
                 <div class="kpi-label">Taux d'Approbation</div>
-                <div style="font-size:11px; color:var(--text-sec); margin-top:2px;">{{ kpis.validated_count }}/{{ kpis.total_items }} équipements</div>
+                <div style="font-size:11px; color:var(--text-sec); margin-top:2px;">{{ kpis.validated_count + kpis.delivered_count }}/{{ kpis.total_items }} équipements</div>
             </div>
         </div>
 
@@ -64,7 +64,7 @@
             </div>
             <div class="kpi-data">
                 <div class="kpi-value" style="color:#2563EB;">
-                    {{ "{:,.0f}".format(kpis.validated_amount) }} €
+                    {{ "{:,.0f}".format(kpis.committed_amount or kpis.validated_amount) }} €
                 </div>
                 <div class="kpi-label">Budget Engagé</div>
                 <div style="font-size:11px; color:var(--text-sec); margin-top:2px;">Sur {{ "{:,.0f}".format(kpis.total_budget) }} € total</div>

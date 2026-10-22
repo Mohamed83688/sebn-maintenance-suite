@@ -244,16 +244,93 @@ class EBMManager:
                 "recent_items": []
             }
 
+    def get_validations(self) -> Dict[str, Dict[str, Any]]:
+        """Retrieves manual validation overrides from the database."""
+        try:
+            with self._get_conn() as conn:
+                cur = conn.cursor()
+                cur.execute("SELECT item_id, status, validated_by, comment, validated_at FROM ebm_validations")
+                return {str(r["item_id"]): dict(r) for r in cur.fetchall()}
+        except Exception as e:
+            logger.error(f"[EBM] Error fetching validations: {e}")
+            return {}
+
+    def set_item_validation(self, item_id: str, status: str, validated_by: str = "Owner", comment: str = "") -> bool:
+        """Sets or updates manual validation override for an EBM item."""
+        try:
+            with self._get_conn() as conn:
+                cur = conn.cursor()
+                cur.execute("""
+                    INSERT OR REPLACE INTO ebm_validations (item_id, status, validated_by, comment, validated_at)
+                    VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                """, (str(item_id), status, validated_by, comment))
+                conn.commit()
+                return True
+        except Exception as e:
+            logger.error(f"[EBM] Error saving validation override for item {item_id}: {e}")
+            return False
+
+    def remove_item_validation(self, item_id: str) -> bool:
+        """Removes manual validation override, returning item to Excel-calculated status."""
+        try:
+            with self._get_conn() as conn:
+                cur = conn.cursor()
+                cur.execute("DELETE FROM ebm_validations WHERE item_id = ?", (str(item_id),))
+                conn.commit()
+                return True
+        except Exception as e:
+            logger.error(f"[EBM] Error removing validation override for item {item_id}: {e}")
+            return False
+
+    def get_kpis(self) -> Dict[str, Any]:
+        """Calculates comprehensive EBM KPIs and metrics with accurate status categorization and validation overrides."""
+        df, sheet_name, cols = self.read_ebm_data()
+        if df is None or df.empty:
+            return {
+                "file_loaded": False,
+                "file_name": "",
+                "total_items": 0,
+                "total_budget": 0.0,
+                "validated_count": 0,
+                "validated_amount": 0.0,
+                "committed_count": 0,
+                "committed_amount": 0.0,
+                "pending_count": 0,
+                "pending_amount": 0.0,
+                "rejected_count": 0,
+                "rejected_amount": 0.0,
+                "delivered_count": 0,
+                "delivered_amount": 0.0,
+                "projects_breakdown": [],
+                "status_breakdown": [],
+                "items_list": []
+            }
+
         price_col = cols.get('price')
         status_col = cols.get('status')
         proj_col = cols.get('project')
+        po_col = cols.get('po')
+        date_col = cols.get('date')
+        desc_col = cols.get('desc')
+        resp_col = cols.get('resp')
+
+        # Detect columns for Comment and Delivery Date if present
+        comment_col = None
+        delivery_col = None
+        for c in df.columns:
+            cl = str(c).lower().strip()
+            if 'comment' in cl:
+                comment_col = c
+            elif 'delevry' in cl or 'delivery' in cl or 'livraison' in cl:
+                delivery_col = c
 
         total_items = len(df)
         total_budget = 0.0
         if price_col and price_col in df.columns:
             total_budget = df[price_col].apply(clean_currency).sum()
 
-        # Categorize
+        validations = self.get_validations()
+
         validated_count = 0
         validated_amount = 0.0
         pending_count = 0
@@ -263,58 +340,105 @@ class EBMManager:
         delivered_count = 0
         delivered_amount = 0.0
 
-        status_counts = {}
+        status_counts = {"Validé": 0, "Livré": 0, "En cours": 0, "Refusé": 0}
         project_data = {}
+        items = []
 
-        for _, row in df.iterrows():
-            st_raw = str(row.get(status_col, "")).lower().strip() if status_col else ""
+        for idx, row in df.iterrows():
+            item_id = str(idx + 1)
             pr = clean_currency(row.get(price_col, 0)) if price_col else 0.0
             proj = str(row.get(proj_col, "Autre")).strip() if proj_col else "Autre"
-            if not proj or proj.lower() == 'nan': proj = "Non Spécifié"
+            if not proj or proj.lower() == 'nan':
+                proj = "Non Spécifié"
 
-            if any(k in st_raw for k in ['valid', 'ok', 'approuv', 'conforme']):
-                cat = "Validé"
+            st_raw = str(row.get(status_col, "")).strip() if status_col else ""
+            if st_raw.lower() == 'nan':
+                st_raw = ""
+
+            cm_raw = str(row.get(comment_col, "")).strip() if comment_col else ""
+            if cm_raw.lower() == 'nan':
+                cm_raw = ""
+
+            po_raw = str(row.get(po_col, "")).strip() if po_col else ""
+            if po_raw.lower() == 'nan':
+                po_raw = ""
+
+            deliv_raw = str(row.get(delivery_col, "")).strip() if delivery_col else ""
+            if deliv_raw.lower() == 'nan':
+                deliv_raw = ""
+
+            is_override = False
+            validated_by = ""
+
+            # Check for manual override from database
+            if item_id in validations:
+                cat = validations[item_id].get("status", "En cours")
+                is_override = True
+                validated_by = validations[item_id].get("validated_by", "Owner")
+            else:
+                # Combined text for keyword matching
+                combo = f"{st_raw.lower()} {cm_raw.lower()} {deliv_raw.lower()}"
+
+                # 1. Refusé / Rejeté / Canceled
+                if any(k in combo for k in ['rejet', 'refus', 'reject', 'cancel', 'annul', 'nok']):
+                    cat = "Refusé"
+                # 2. Livré (Delivered) - must not be negative ("not yet delivred", "waiting", etc.)
+                elif not any(k in combo for k in ['not yet', 'not deliv', 'pas encore', 'non livr', 'waiting', 'attente']) and \
+                     (any(k in combo for k in ['delivred', 'delivered', 'livré', 'livre', 'reçu', 'received', 'delivery in complited']) or st_raw.lower() == 'done'):
+                    cat = "Livré"
+                # 3. Validé / Engagé (PO released, document accepted, or valid PO number exists)
+                elif any(k in combo for k in ['valid', 'approuv', 'conforme', 'document accepted', 'po released']) or \
+                     (po_raw and po_raw not in ['0', 'nan', 'NaN', 'None', '', '0.0']):
+                    cat = "Validé"
+                # 4. En attente / En cours
+                else:
+                    cat = "En cours"
+
+            # Tally metrics
+            if cat == "Validé":
                 validated_count += 1
                 validated_amount += pr
-            elif any(k in st_raw for k in ['rejet', 'refus', 'nok', 'annul', 'non']):
-                cat = "Refusé"
-                rejected_count += 1
-                rejected_amount += pr
-            elif any(k in st_raw for k in ['livr', 'deliv', 'reçu', 'reception']):
-                cat = "Livré"
+            elif cat == "Livré":
                 delivered_count += 1
                 delivered_amount += pr
+            elif cat == "Refusé":
+                rejected_count += 1
+                rejected_amount += pr
             else:
                 cat = "En cours"
                 pending_count += 1
                 pending_amount += pr
 
             status_counts[cat] = status_counts.get(cat, 0) + 1
+
             if proj not in project_data:
                 project_data[proj] = {"count": 0, "amount": 0.0}
             project_data[proj]["count"] += 1
             project_data[proj]["amount"] += pr
 
-        # Format project breakdown
+            items.append({
+                "id": idx + 1,
+                "project": proj,
+                "description": str(row.get(desc_col, proj) if desc_col else proj),
+                "price": pr,
+                "status": cat,
+                "raw_status": st_raw or cm_raw or "–",
+                "po": po_raw,
+                "responsible": str(row.get(resp_col, '') if resp_col else ''),
+                "date": str(row.get(date_col, '') if date_col else ''),
+                "comment": cm_raw,
+                "delivery_date": deliv_raw,
+                "is_override": is_override,
+                "validated_by": validated_by
+            })
+
         projects_breakdown = [
-            {"project": k, "count": v["count"], "amount": v["amount"]}
+            {"project": k, "count": v["count"], "amount": round(v["amount"], 2)}
             for k, v in sorted(project_data.items(), key=lambda x: x[1]["amount"], reverse=True)
         ]
 
-        # Recent 25 items
-        items = []
-        for idx, row in df.head(50).iterrows():
-            item_dict = {
-                "id": idx + 1,
-                "project": str(row.get(cols.get('project', ''), '')),
-                "description": str(row.get(cols.get('desc', ''), row.get(cols.get('project', ''), ''))),
-                "price": clean_currency(row.get(cols.get('price', 0))),
-                "status": str(row.get(cols.get('status', ''), 'En cours')),
-                "po": str(row.get(cols.get('po', ''), '')),
-                "responsible": str(row.get(cols.get('resp', ''), '')),
-                "date": str(row.get(cols.get('date', ''), ''))
-            }
-            items.append(item_dict)
+        committed_count = validated_count + delivered_count
+        committed_amount = round(validated_amount + delivered_amount, 2)
 
         path = self.get_active_excel_path()
         return {
@@ -324,6 +448,8 @@ class EBMManager:
             "total_budget": round(total_budget, 2),
             "validated_count": validated_count,
             "validated_amount": round(validated_amount, 2),
+            "committed_count": committed_count,
+            "committed_amount": committed_amount,
             "pending_count": pending_count,
             "pending_amount": round(pending_amount, 2),
             "rejected_count": rejected_count,

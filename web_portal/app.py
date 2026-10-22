@@ -1815,6 +1815,60 @@ def ebm_reception():
     kpis = ebm_mgr.get_kpis()
     return render_template('ebm_validation.html', kpis=kpis)
 
+@app.route('/ebm/item/<item_id>/validate', methods=['POST'])
+@app.route('/ebm/validation/item/<item_id>', methods=['POST'])
+@owner_required
+def ebm_item_validate(item_id: str):
+    data = request.get_json(silent=True) or request.form
+    status = data.get('status', '').strip()
+    comment = data.get('comment', '').strip()
+    user_name = session.get('name') or session.get('username') or 'Owner'
+
+    allowed_statuses = ['Validé', 'Refusé', 'Livré', 'En cours']
+    if status not in allowed_statuses:
+        if request.is_json:
+            return jsonify({"success": False, "error": f"Statut non valide. Choix: {allowed_statuses}"}), 400
+        flash(f"Statut non valide.", "danger")
+        return redirect(url_for('ebm_validation'))
+
+    ok = ebm_mgr.set_item_validation(item_id, status, validated_by=user_name, comment=comment)
+    if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        if ok:
+            kpis = ebm_mgr.get_kpis()
+            return jsonify({
+                "success": True,
+                "item_id": item_id,
+                "status": status,
+                "kpis": {
+                    "validated_count": kpis["validated_count"],
+                    "validated_amount": kpis["validated_amount"],
+                    "delivered_count": kpis["delivered_count"],
+                    "delivered_amount": kpis["delivered_amount"],
+                    "committed_count": kpis["committed_count"],
+                    "committed_amount": kpis["committed_amount"],
+                    "pending_count": kpis["pending_count"],
+                    "pending_amount": kpis["pending_amount"],
+                    "rejected_count": kpis["rejected_count"],
+                    "rejected_amount": kpis["rejected_amount"],
+                }
+            })
+        return jsonify({"success": False, "error": "Échec de l'enregistrement."}), 500
+
+    if ok:
+        flash(f"Ligne #{item_id} mise à jour avec succès : {status}.", "success")
+    else:
+        flash(f"Erreur lors de la mise à jour de la ligne #{item_id}.", "danger")
+    return redirect(url_for('ebm_validation'))
+
+@app.route('/ebm/item/<item_id>/reset', methods=['POST'])
+@owner_required
+def ebm_item_reset(item_id: str):
+    ok = ebm_mgr.remove_item_validation(item_id)
+    if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({"success": ok, "item_id": item_id})
+    flash(f"Statut réinitialisé pour la ligne #{item_id}.", "info")
+    return redirect(url_for('ebm_validation'))
+
 @app.route('/ebm/plan-action')
 @owner_required
 def ebm_plan_action():

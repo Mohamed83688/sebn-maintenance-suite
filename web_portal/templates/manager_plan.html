@@ -40,16 +40,17 @@
 .plan-panel.active { display: block; }
 
 /* KPI row */
-.plan-kpi-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; margin-bottom: 28px; }
+.plan-kpi-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 28px; }
 
 /* Kanban */
-.kanban-board { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; }
+.kanban-board { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
 .kanban-col {
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     overflow: hidden;
     min-height: 300px;
+    min-width: 0;
 }
 .kanban-col-header {
     padding: 14px 18px;
@@ -66,12 +67,13 @@
     padding: 14px;
     transition: var(--transition);
     position: relative;
+    word-break: break-word;
 }
 .action-card:hover { border-color: var(--border-h); transform: translateY(-2px); box-shadow: var(--shadow-sm); }
 .action-card.overdue { border-left: 3px solid var(--danger); }
 
 .action-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 8px; line-height: 1.4; }
-.action-meta  { font-size: 11px; color: var(--text-sec); display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+.action-meta  { font-size: 11px; color: var(--text-sec); display: flex; align-items: center; gap: 6px; margin-bottom: 4px; flex-wrap: wrap; }
 .action-meta i { width: 12px; color: var(--text-dim); }
 
 .action-actions { display: flex; gap: 4px; margin-top: 10px; flex-wrap: wrap; }
@@ -104,18 +106,74 @@
 }
 .empty-col i { font-size: 28px; opacity: 0.3; }
 
-@media(max-width: 1024px) {
-    .kanban-board { grid-template-columns: repeat(2,1fr); }
-    .plan-kpi-row { grid-template-columns: repeat(2,1fr); }
+@media(max-width: 1360px) {
+    .kanban-board { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .plan-kpi-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
-@media(max-width: 640px) {
+@media(max-width: 680px) {
     .kanban-board { grid-template-columns: 1fr; }
-    .plan-kpi-row { grid-template-columns: 1fr 1fr; }
+    .plan-kpi-row { grid-template-columns: 1fr; }
 }
 </style>
 {% endblock %}
 
 {% block content %}
+{# ═══════════════════════════════════════════════════════════
+     MACRO: Action Card  (must be defined before first use)
+═══════════════════════════════════════════════════════════════ #}
+{% macro _action_card(a) %}
+<div class="action-card {% if a.overdue %}overdue{% endif %}">
+    <div class="action-title">{{ a.Action }}</div>
+
+    <div class="action-meta">
+        <i class="fa-solid fa-user"></i>
+        <span>{{ a.Responsable or '—' }}</span>
+    </div>
+    {% if a['Échéance'] %}
+    <div class="action-meta" style="{% if a.overdue %}color:var(--danger);{% endif %}">
+        <i class="fa-solid fa-calendar-day"></i>
+        <span>{{ a['Échéance'] }}</span>
+        {% if a.overdue %}<span class="badge badge-danger" style="padding:2px 6px; font-size:9px;">RETARD</span>{% endif %}
+    </div>
+    {% endif %}
+    {% if a['Réunion_Ref'] %}
+    <div class="action-meta">
+        <i class="fa-solid fa-link"></i>
+        <span style="font-size:10px;">{{ a['Réunion_Ref'] }}</span>
+    </div>
+    {% endif %}
+    {% if a.Notes %}
+    <div style="font-size:11px; color:var(--text-sec); margin-top:8px; padding-top:8px; border-top:1px solid var(--border); line-height:1.5;">{{ a.Notes }}</div>
+    {% endif %}
+
+    <div class="action-actions">
+        {# Move to next status #}
+        {% set next_map = {'Backlog': 'En cours', 'En cours': 'Terminée', 'Bloquée': 'En cours'} %}
+        {% if next_map.get(a.Statut) %}
+        <form method="POST" action="{{ url_for('manager_plan_update_action', action_id=a.ID) }}" style="display:inline;">
+            <input type="hidden" name="statut" value="{{ next_map[a.Statut] }}">
+            <button type="submit" class="btn btn-glass btn-xs" title="Avancer">
+                <i class="fa-solid fa-arrow-right"></i>
+            </button>
+        </form>
+        {% endif %}
+        {% if a.Statut != 'Bloquée' %}
+        <form method="POST" action="{{ url_for('manager_plan_update_action', action_id=a.ID) }}" style="display:inline;">
+            <input type="hidden" name="statut" value="Bloquée">
+            <button type="submit" class="btn btn-glass btn-xs" title="Marquer bloquée" style="color:var(--danger);">
+                <i class="fa-solid fa-ban"></i>
+            </button>
+        </form>
+        {% endif %}
+        <form method="POST" action="{{ url_for('manager_plan_delete_action', action_id=a.ID) }}"
+              onsubmit="return confirm('Supprimer cette action ?');" style="display:inline;">
+            <button type="submit" class="btn btn-glass btn-xs" title="Supprimer" style="color:var(--danger);">
+                <i class="fa-solid fa-trash"></i>
+            </button>
+        </form>
+    </div>
+</div>
+{% endmacro %}
 <!-- KPI Cards -->
 <div class="plan-kpi-row stagger">
     <div class="kpi-card" style="--kpi-accent: var(--primary);">
@@ -327,62 +385,6 @@
     </div>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════════
-     MACRO: Action Card
-═══════════════════════════════════════════════════════════════ -->
-{% macro _action_card(a) %}
-<div class="action-card {% if a.overdue %}overdue{% endif %}">
-    <div class="action-title">{{ a.Action }}</div>
-
-    <div class="action-meta">
-        <i class="fa-solid fa-user"></i>
-        <span>{{ a.Responsable or '—' }}</span>
-    </div>
-    {% if a['Échéance'] %}
-    <div class="action-meta" style="{% if a.overdue %}color:var(--danger);{% endif %}">
-        <i class="fa-solid fa-calendar-day"></i>
-        <span>{{ a['Échéance'] }}</span>
-        {% if a.overdue %}<span class="badge badge-danger" style="padding:2px 6px; font-size:9px;">RETARD</span>{% endif %}
-    </div>
-    {% endif %}
-    {% if a['Réunion_Ref'] %}
-    <div class="action-meta">
-        <i class="fa-solid fa-link"></i>
-        <span style="font-size:10px;">{{ a['Réunion_Ref'] }}</span>
-    </div>
-    {% endif %}
-    {% if a.Notes %}
-    <div style="font-size:11px; color:var(--text-sec); margin-top:8px; padding-top:8px; border-top:1px solid var(--border); line-height:1.5;">{{ a.Notes }}</div>
-    {% endif %}
-
-    <div class="action-actions">
-        <!-- Move to next status -->
-        {% set next_map = {'Backlog': 'En cours', 'En cours': 'Terminée', 'Bloquée': 'En cours'} %}
-        {% if next_map.get(a.Statut) %}
-        <form method="POST" action="{{ url_for('manager_plan_update_action', action_id=a.ID) }}" style="display:inline;">
-            <input type="hidden" name="statut" value="{{ next_map[a.Statut] }}">
-            <button type="submit" class="btn btn-glass btn-xs" title="Avancer">
-                <i class="fa-solid fa-arrow-right"></i>
-            </button>
-        </form>
-        {% endif %}
-        {% if a.Statut != 'Bloquée' %}
-        <form method="POST" action="{{ url_for('manager_plan_update_action', action_id=a.ID) }}" style="display:inline;">
-            <input type="hidden" name="statut" value="Bloquée">
-            <button type="submit" class="btn btn-glass btn-xs" title="Marquer bloquée" style="color:var(--danger);">
-                <i class="fa-solid fa-ban"></i>
-            </button>
-        </form>
-        {% endif %}
-        <form method="POST" action="{{ url_for('manager_plan_delete_action', action_id=a.ID) }}"
-              onsubmit="return confirm('Supprimer cette action ?');" style="display:inline;">
-            <button type="submit" class="btn btn-glass btn-xs" title="Supprimer" style="color:var(--danger);">
-                <i class="fa-solid fa-trash"></i>
-            </button>
-        </form>
-    </div>
-</div>
-{% endmacro %}
 
 <!-- ═══════════════════════════════════════════════════════════
      MODAL: Add Meeting

@@ -182,7 +182,7 @@
 }
 .section-title i { color: var(--primary, #2E008B); }
 
-@media (max-width: 1024px) {
+@media (max-width: 1280px) {
     .ebm-analytics-grid {
         grid-template-columns: 1fr !important;
     }
@@ -381,11 +381,11 @@
                     <canvas id="gaugeChart"></canvas>
                     <div class="efficiency-label">
                         {% if kpis.total_items > 0 %}
-                        <div class="efficiency-pct">{{ "{:.0f}".format(kpis.validated_count / kpis.total_items * 100) }}%</div>
+                        <div class="efficiency-pct">{{ "{:.0f}".format((kpis.validated_count + kpis.delivered_count) / kpis.total_items * 100) }}%</div>
                         {% else %}
                         <div class="efficiency-pct">0%</div>
                         {% endif %}
-                        <div class="efficiency-sub">Validé</div>
+                        <div class="efficiency-sub">Validé &amp; Livré</div>
                     </div>
                 </div>
 
@@ -395,12 +395,12 @@
                         <div class="kpi-mini-lbl">Validés</div>
                     </div>
                     <div class="kpi-mini">
-                        <div class="kpi-mini-val" style="color:#D97706;">{{ kpis.pending_count }}</div>
-                        <div class="kpi-mini-lbl">En cours</div>
+                        <div class="kpi-mini-val" style="color:#2563EB;">{{ kpis.delivered_count }}</div>
+                        <div class="kpi-mini-lbl">Livrés</div>
                     </div>
                     <div class="kpi-mini">
-                        <div class="kpi-mini-val" style="color:#DC2626;">{{ kpis.rejected_count }}</div>
-                        <div class="kpi-mini-lbl">Refusés</div>
+                        <div class="kpi-mini-val" style="color:#D97706;">{{ kpis.pending_count }}</div>
+                        <div class="kpi-mini-lbl">En cours</div>
                     </div>
                 </div>
             </div>
@@ -408,16 +408,16 @@
             <!-- Consommation Validée Bar -->
             <div>
                 <div style="display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:4px;">
-                    <span style="color:var(--text-sec);font-weight:600;">Part budgétaire validée</span>
+                    <span style="color:var(--text-sec);font-weight:600;">Part budgétaire engagée</span>
                     {% if kpis.total_budget > 0 %}
                     <span style="color:#7C3AED;font-weight:700;">
-                        {{ "{:.1f}".format(kpis.validated_amount / kpis.total_budget * 100) }}%
+                        {{ "{:.1f}".format((kpis.committed_amount or kpis.validated_amount) / kpis.total_budget * 100) }}%
                     </span>
                     {% endif %}
                 </div>
                 <div class="prog-track" style="height:8px;">
                     {% if kpis.total_budget > 0 %}
-                    <div class="prog-fill" style="width:{{ (kpis.validated_amount / kpis.total_budget * 100) | round(0) | int }}%; background:linear-gradient(90deg,#7C3AED,#2563EB);"></div>
+                    <div class="prog-fill" style="width:{{ ((kpis.committed_amount or kpis.validated_amount) / kpis.total_budget * 100) | round(0) | int }}%; background:linear-gradient(90deg,#7C3AED,#2563EB);"></div>
                     {% endif %}
                 </div>
             </div>
@@ -436,11 +436,11 @@
 
             <div style="background:linear-gradient(135deg,#F0FDF4,#DCFCE7);border:1px solid #BBF7D0;border-radius:14px;padding:16px 18px;">
                 <div class="stat-label" style="color:#065F46;">Montant Engagé &amp; Validé</div>
-                <div class="stat-number" style="color:#059669;">{{ "{:,.0f}".format(kpis.validated_amount) }} <small style="font-size:15px;color:#059669;">€</small></div>
+                <div class="stat-number" style="color:#059669;">{{ "{:,.0f}".format(kpis.committed_amount or kpis.validated_amount) }} <small style="font-size:15px;color:#059669;">€</small></div>
                 <div style="font-size:11px;color:#059669;font-weight:600;margin-top:4px;">
                     <i class="fa-solid fa-circle-check"></i>
                     {% if kpis.total_budget > 0 %}
-                    {{ "{:.1f}".format(kpis.validated_amount / kpis.total_budget * 100) }}% du budget total
+                    {{ "{:.1f}".format((kpis.committed_amount or kpis.validated_amount) / kpis.total_budget * 100) }}% du budget total
                     {% else %}
                     0% du budget
                     {% endif %}
@@ -733,7 +733,7 @@ const COLORS = {
     const ctx = document.getElementById('gaugeChart');
     if (ctx) {
         const total = KPI.validated + KPI.pending + KPI.delivered + KPI.rejected;
-        const validPct = total > 0 ? KPI.validated / total : 0;
+        const validPct = total > 0 ? (KPI.validated + KPI.delivered) / total : 0;
         new Chart(ctx, {
             type: 'doughnut',
             data: {

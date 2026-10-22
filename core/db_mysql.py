@@ -116,6 +116,14 @@ def adapt_sql_dialect(sql: str) -> str:
     Translates common SQLite statements into MySQL equivalents.
     """
     cleaned = sql.strip()
+    # 0. SQLite transaction control -> MySQL START TRANSACTION / COMMIT / ROLLBACK
+    if re.match(r"(?i)^BEGIN(\s+(EXCLUSIVE|IMMEDIATE|DEFERRED))?(\s+TRANSACTION)?\s*;?$", cleaned):
+        return "START TRANSACTION"
+    if re.match(r"(?i)^COMMIT(\s+TRANSACTION)?\s*;?$", cleaned):
+        return "COMMIT"
+    if re.match(r"(?i)^ROLLBACK(\s+TRANSACTION)?\s*;?$", cleaned):
+        return "ROLLBACK"
+
     # 1. PRAGMA table_info(x) -> SHOW COLUMNS FROM x
     m = re.match(r"(?i)^PRAGMA\s+table_info\s*\(\s*\[?([a-zA-Z0-9_]+)\]?\s*\)", cleaned)
     if m:
@@ -139,8 +147,9 @@ def adapt_sql_dialect(sql: str) -> str:
     # 6. datetime('now') -> NOW()
     cleaned = re.sub(r"(?i)datetime\s*\(\s*'now'\s*\)", "NOW()", cleaned)
 
-    # 7. INSERT OR REPLACE INTO -> REPLACE INTO
+    # 7. INSERT OR REPLACE INTO -> REPLACE INTO / INSERT OR IGNORE -> INSERT IGNORE
     cleaned = re.sub(r"(?i)\bINSERT\s+OR\s+REPLACE\s+INTO\b", "REPLACE INTO", cleaned)
+    cleaned = re.sub(r"(?i)\bINSERT\s+OR\s+IGNORE\s+INTO\b", "INSERT IGNORE INTO", cleaned)
 
     # 8. ON CONFLICT(...) DO UPDATE SET -> ON DUPLICATE KEY UPDATE
     cleaned = re.sub(r"(?i)ON\s+CONFLICT\s*\([^)]*\)\s*DO\s+UPDATE\s+SET", "ON DUPLICATE KEY UPDATE", cleaned)
@@ -279,6 +288,19 @@ class MySQLConnectionWrapper:
         return MySQLCursorWrapper(raw_cur)
 
     def execute(self, sql: str, params: Optional[Union[Tuple, List, Dict]] = None):
+        cleaned = sql.strip()
+        if re.match(r"(?i)^BEGIN(\s+(EXCLUSIVE|IMMEDIATE|DEFERRED))?(\s+TRANSACTION)?\s*;?$", cleaned):
+            try:
+                self._raw.start_transaction()
+                return self.cursor()
+            except Exception:
+                pass
+        elif re.match(r"(?i)^COMMIT(\s+TRANSACTION)?\s*;?$", cleaned):
+            self.commit()
+            return self.cursor()
+        elif re.match(r"(?i)^ROLLBACK(\s+TRANSACTION)?\s*;?$", cleaned):
+            self.rollback()
+            return self.cursor()
         cur = self.cursor()
         cur.execute(sql, params)
         return cur

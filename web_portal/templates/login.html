@@ -42,21 +42,22 @@
         /* ─────────────────────────────────────────────
            PAGE CANVAS
         ───────────────────────────────────────────── */
-        html, body {
-            height: 100%;
-            font-family: var(--font-body);
-            background: var(--gray-100);
-            color: var(--gray-900);
-            overflow-x: hidden;
+        html {
+            min-height: 100%;
         }
 
         body {
+            font-family: var(--font-body);
+            background: var(--gray-100);
+            color: var(--gray-900);
+            min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
-            min-height: 100vh;
             padding: 24px;
             position: relative;
+            overflow-x: hidden;
+            overflow-y: auto;
         }
 
         /* Subtle canvas texture */
@@ -758,6 +759,16 @@
             .features { display: none; }
             .brand-name { font-size: 40px; }
             .login-panel { padding: 36px 32px 32px; }
+        }
+
+        @media (max-height: 740px) {
+            body { padding: 12px; }
+            .card { min-height: auto; }
+            .brand { padding: 26px 30px; }
+            .features { margin: 16px 0; gap: 6px; }
+            .feature { padding: 8px 12px; }
+            .login-panel { padding: 24px 30px; }
+            .brand-name { font-size: 38px; }
         }
 
         @media (max-width: 460px) {

@@ -399,7 +399,14 @@ class IMADatabase:
             # slip in between the SELECT (generate_code) and the INSERT.
             conn = self._conn()
             try:
-                conn.execute("BEGIN EXCLUSIVE")
+                try:
+                    conn.execute("BEGIN EXCLUSIVE")
+                except Exception:
+                    try:
+                        conn.execute("START TRANSACTION")
+                    except Exception:
+                        pass
+
                 code = data.get("code") or self._generate_code_in_conn(conn, prefix)
                 conn.execute("""
                     INSERT INTO interventions
@@ -431,13 +438,22 @@ class IMADatabase:
                     "checklist_results": json.dumps(data.get("checklist_results", [])),
                     "created_at":        now,
                 })
-                conn.execute("COMMIT")
+                try:
+                    conn.execute("COMMIT")
+                except Exception:
+                    try:
+                        conn.commit()
+                    except Exception:
+                        pass
                 return code
             except Exception:
                 try:
                     conn.execute("ROLLBACK")
                 except Exception:
-                    pass
+                    try:
+                        conn.rollback()
+                    except Exception:
+                        pass
                 raise
             finally:
                 conn.close()
