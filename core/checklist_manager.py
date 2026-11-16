@@ -693,6 +693,44 @@ class ChecklistManager:
                 rows.append(d)
             return rows
 
+    def delete_execution(self, exec_id: int) -> bool:
+        """Permanently deletes a checklist execution record by its ID. Returns True on success."""
+        with self._get_conn() as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT filled_excel_path FROM checklist_executions WHERE id = ?", (exec_id,))
+            row = cur.fetchone()
+            filled_path = dict(row).get("filled_excel_path", "") if row else ""
+            cur.execute("DELETE FROM checklist_executions WHERE id = ?", (exec_id,))
+            conn.commit()
+            if filled_path and os.path.isfile(filled_path):
+                try:
+                    os.remove(filled_path)
+                except Exception:
+                    pass
+            return cur.rowcount > 0
+
+    def delete_executions_bulk(self, exec_ids: List[int]) -> int:
+        """Deletes multiple checklist execution records. Returns count deleted."""
+        if not exec_ids:
+            return 0
+        deleted = 0
+        with self._get_conn() as conn:
+            cur = conn.cursor()
+            for eid in exec_ids:
+                cur.execute("SELECT filled_excel_path FROM checklist_executions WHERE id = ?", (eid,))
+                row = cur.fetchone()
+                filled_path = dict(row).get("filled_excel_path", "") if row else ""
+                cur.execute("DELETE FROM checklist_executions WHERE id = ?", (eid,))
+                if cur.rowcount > 0:
+                    deleted += 1
+                    if filled_path and os.path.isfile(filled_path):
+                        try:
+                            os.remove(filled_path)
+                        except Exception:
+                            pass
+            conn.commit()
+        return deleted
+
     def get_execution_by_id(self, exec_id: int) -> Optional[Dict[str, Any]]:
         """Returns a single execution record by its primary key ID."""
         with self._get_conn() as conn:

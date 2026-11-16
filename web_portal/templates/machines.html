@@ -14,31 +14,46 @@
 
 {% block extra_css %}
 <style>
-.machines-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.machines-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
 @media(max-width:1280px) { .machines-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media(max-width:680px)  { .machines-grid { grid-template-columns: 1fr; } }
 
 .machine-card {
     background: #FFFFFF;
     border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 18px;
-    display: flex; flex-direction: column; gap: 12px;
-    transition: var(--transition);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    display: flex; flex-direction: column; gap: 14px;
+    transition: all 0.22s cubic-bezier(0.4,0,0.2,1);
     box-shadow: var(--shadow-sm);
+    position: relative;
+    overflow: hidden;
+}
+.machine-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--primary), #5B21B6);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
 }
 .machine-card:hover {
-    border-color: var(--border-h);
-    box-shadow: var(--shadow);
+    border-color: var(--primary-border);
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-3px);
 }
+.machine-card:hover::before { transform: scaleX(1); }
 .machine-card-top { display: flex; align-items: flex-start; justify-content: space-between; }
-.machine-id { font-family: monospace; font-size: 13px; font-weight: 800; color: var(--primary); }
+.machine-id { font-family: var(--font-mono); font-size: 13px; font-weight: 800; color: var(--primary); }
 .machine-name { font-size: 15px; font-weight: 700; color: var(--text); margin-top: 2px; }
-.machine-desc { font-size: 12px; color: var(--text-sec); line-height: 1.5; flex:1; }
-.machine-stats { display: flex; gap: 12px; background: var(--bg-page); padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); }
-.machine-stat { text-align: center; flex:1; }
-.machine-stat-val { font-size: 16px; font-weight: 800; color: var(--text); }
-.machine-stat-lbl { font-size: 10px; color: var(--text-sec); text-transform: uppercase; letter-spacing: 0.6px; font-weight: 600; }
+.machine-desc { font-size: 12px; color: var(--text-sec); line-height: 1.6; flex:1; }
+.machine-stats { display: flex; gap: 0; background: var(--bg-page); border-radius: var(--radius-sm); border: 1px solid var(--border); overflow: hidden; }
+.machine-stat { text-align: center; flex:1; padding: 10px 14px; }
+.machine-stat + .machine-stat { border-left: 1px solid var(--border); }
+.machine-stat-val { font-size: 18px; font-weight: 800; color: var(--text); font-family: var(--font-display); }
+.machine-stat-lbl { font-size: 10px; color: var(--text-sec); text-transform: uppercase; letter-spacing: 0.6px; font-weight: 600; margin-top: 2px; }
 .machine-actions { display: flex; gap: 8px; }
 </style>
 {% endblock %}

@@ -28,9 +28,11 @@
     </div>
 
     <!-- Feed / Table of Passations -->
-    <div class="card" style="padding:0; overflow:hidden;">
-        <div style="padding:16px 20px; border-bottom:1px solid var(--border); background:#FAFAFA; font-weight:700; font-size:14px;">
-            <i class="fa-solid fa-clock-rotate-left" style="color:var(--primary); margin-right:6px;"></i> Historique Récent des Passations
+    <div class="table-card animate-up" style="animation-delay:0.08s;">
+        <div class="table-header">
+            <div class="table-title">
+                <i class="fa-solid fa-clock-rotate-left" style="color:var(--primary); margin-right:6px;"></i> Historique Récent des Passations
+            </div>
         </div>
         <div style="overflow-x:auto;">
             <table class="data-table">
@@ -82,7 +84,7 @@
                         </td>
                     </tr>
                     {% else %}
-                    <tr><td colspan="8" style="text-align:center; color:var(--text-sec); padding:30px;">Aucune passation enregistrée. Cliquez sur "Nouvelle Passation de Shift".</td></tr>
+                    <tr><td colspan="8"><div class="empty-state"><i class="fa-solid fa-handshake empty-icon"></i><div class="empty-title">Aucune passation enregistrée</div><div class="empty-desc">Cliquez sur "Nouvelle Passation de Shift" pour commencer.</div></div></td></tr>
                     {% endfor %}
                 </tbody>
             </table>

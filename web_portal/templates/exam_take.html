@@ -88,7 +88,7 @@
     max-width: 980px;
     margin: 0 auto 16px auto;
     border-radius: 12px;
-    overflow: visible;
+    overflow: visible;              /* CRITICAL: never clip boxes */
     box-shadow: 0 4px 20px rgba(0,0,0,0.07);
     background: #FFFFFF;
     border: 1.5px solid #E2E8F0;
@@ -98,8 +98,10 @@
 .labeling-canvas-inner {
     position: relative;
     width: 100%;
-    overflow: hidden;
+    overflow: visible;              /* CRITICAL: allow boxes to be visible at edges */
     border-radius: 11px;
+    /* This padding ensures boxes near top/bottom don't get cut */
+    padding: 2px;
 }
 
 .labeling-canvas-inner img {
@@ -108,13 +110,14 @@
     display: block;
     user-select: none;
     -webkit-user-drag: none;
+    border-radius: 9px;
 }
 
 .image-label-box {
     position: absolute;
-    background: rgba(255, 255, 255, 0.94);
-    border: 2px dashed #2563EB;
-    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.92);
+    border: 2.5px solid #2563EB;
+    border-radius: 5px;
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -122,30 +125,33 @@
     padding: 2px 4px;
     box-sizing: border-box;
     transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
-    z-index: 10;
+    z-index: 20;                    /* Always above image */
+    min-width: 48px;
+    min-height: 22px;
 }
 .image-label-box:hover {
     border-color: #1D4ED8;
-    background: #EFF6FF;
-    transform: scale(1.03);
+    background: rgba(239, 246, 255, 0.97);
+    transform: scale(1.04);
     box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
-    z-index: 25;
+    z-index: 35;
 }
 .image-label-box.ready-to-fill {
     border-color: #059669;
-    border-style: dashed;
+    border-style: solid;
     background: rgba(209, 250, 229, 0.92);
     animation: boxPulse 1.2s infinite alternate;
+    z-index: 30;
 }
 @keyframes boxPulse {
     from { box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.4); }
-    to { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0.7); }
+    to { box-shadow: 0 0 0 7px rgba(16, 185, 129, 0.6); }
 }
 
 .image-label-box.filled {
-    border: 2px solid #2563EB;
+    border: 2.5px solid #1D4ED8;
     background: #FFFFFF;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14);
 }
 .image-label-box.filled:hover {
     box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3);
@@ -155,12 +161,13 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 4px;
+    gap: 3px;
     font-size: 11px;
     font-weight: 800;
     color: #2563EB;
     pointer-events: none;
     text-align: center;
+    line-height: 1.1;
 }
 .box-inner-filled {
     display: none;
@@ -177,11 +184,29 @@
     pointer-events: none;
     padding: 0 2px;
 }
+/* Inline text input mode */
+.box-text-input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: none;
+    outline: none;
+    background: transparent;
+    font-size: 10px;
+    font-weight: 700;
+    color: #0F172A;
+    text-align: center;
+    padding: 1px 3px;
+    cursor: text;
+    z-index: 5;
+}
+
 .box-remove-btn {
     display: none;
     position: absolute;
-    top: -8px;
-    right: -8px;
+    top: -9px;
+    right: -9px;
     width: 20px;
     height: 20px;
     border-radius: 50%;
@@ -194,8 +219,9 @@
     align-items: center;
     justify-content: center;
     box-shadow: 0 2px 5px rgba(0,0,0,0.25);
-    z-index: 30;
+    z-index: 40;
     transition: transform 0.15s ease, background 0.15s ease;
+    line-height: 1;
 }
 .box-remove-btn:hover {
     background: #DC2626;
@@ -252,8 +278,8 @@
     border-radius: 10px;
     box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
     z-index: 1000;
-    width: 280px;
-    max-height: 260px;
+    width: 290px;
+    max-height: 280px;
     overflow-y: auto;
     padding: 6px;
     display: none;
@@ -345,12 +371,24 @@
                         <!-- ═══════════════════════════════════════════════════════════════ -->
                         <div class="image-labeling-zone" id="labeling-zone-{{ q.id }}" style="margin-top:12px;">
                             
-                            <!-- Helpful instruction banner -->
-                            <div style="background:#EFF6FF; border:1px solid #BFDBFE; border-radius:8px; padding:10px 14px; font-size:12.5px; color:#1E40AF; display:flex; align-items:center; gap:10px; margin-bottom:14px;">
-                                <i class="fa-solid fa-hand-pointer" style="font-size:16px; color:#2563EB;"></i>
-                                <span>
-                                    <strong>Comment remplir l'image :</strong> Cliquez directement sur un <strong>cadre vide (#1 à #11)</strong> dans l'image pour choisir sa réponse, ou sélectionnez une <strong>étiquette ci-dessous</strong> puis cliquez sur le cadre correspondant.
-                                </span>
+                            <!-- Mode Toggle + instruction banner -->
+                            <div style="background:#EFF6FF; border:1px solid #BFDBFE; border-radius:8px; padding:10px 14px; font-size:12.5px; color:#1E40AF; display:flex; align-items:flex-start; gap:10px; margin-bottom:10px; flex-wrap:wrap;">
+                                <i class="fa-solid fa-hand-pointer" style="font-size:16px; color:#2563EB; margin-top:1px;"></i>
+                                <div style="flex:1; min-width:200px;">
+                                    <strong>Mode A — Chips :</strong> Cliquez une étiquette ci-dessous, puis cliquez le cadre correspondant.<br>
+                                    <strong>Mode B — Texte direct :</strong> Cliquez directement un cadre vide et tapez votre réponse.
+                                </div>
+                                <div style="display:flex; align-items:center; gap:8px; white-space:nowrap;">
+                                    <span style="font-size:11px; font-weight:700;">Mode :</span>
+                                    <button type="button" id="mode-btn-chip-{{ q.id }}" onclick="setLabelingMode({{ q.id }}, 'chip')"
+                                        style="font-size:11px; font-weight:700; padding:3px 10px; border-radius:12px; border:1.5px solid #2563EB; background:#2563EB; color:#fff; cursor:pointer;">
+                                        🏷️ Chips
+                                    </button>
+                                    <button type="button" id="mode-btn-text-{{ q.id }}" onclick="setLabelingMode({{ q.id }}, 'text')"
+                                        style="font-size:11px; font-weight:700; padding:3px 10px; border-radius:12px; border:1.5px solid #CBD5E1; background:#fff; color:#475569; cursor:pointer;">
+                                        ✏️ Texte libre
+                                    </button>
+                                </div>
                             </div>
 
                             <!-- Interactive Image with Overlay Boxes -->
@@ -359,7 +397,12 @@
                                     <img src="/static/exam_images/{{ q.image }}"
                                          id="labeling-img-{{ q.id }}"
                                          alt="Illustration interactive — Question {{ q.question_number }}"
-                                         onerror="this.parentElement.style.display='none'">
+                                         onerror="this.style.display='none'; document.getElementById('img-missing-{{ q.id }}').style.display='block';"
+                                         onload="recalcBoxPositions({{ q.id }})">
+                                    <div id="img-missing-{{ q.id }}" style="display:none; padding:20px; text-align:center; color:#94A3B8; font-size:12px;">
+                                        <i class="fa-solid fa-image" style="font-size:32px; margin-bottom:8px; display:block;"></i>
+                                        Image non disponible
+                                    </div>
                                     
                                     <!-- Dynamic Interactive Boxes Overlaid on Image -->
                                     {% if q.labeling_boxes %}
@@ -370,11 +413,15 @@
                                              data-boxid="{{ box.id }}"
                                              data-num="{{ box.num }}"
                                              data-target="{{ box.target }}"
+                                             data-left="{{ box.left }}"
+                                             data-top="{{ box.top }}"
+                                             data-width="{{ box.width }}"
+                                             data-height="{{ box.height }}"
                                              title="{{ box.hint or ('Cadre #' ~ box.num) }}"
                                              onclick="handleImageLabelBoxClick(event, {{ q.id }}, {{ box.id }})"
                                              style="left:{{ box.left }}%; top:{{ box.top }}%; width:{{ box.width }}%; height:{{ box.height }}%;">
                                             <div class="box-inner-unfilled">
-                                                <i class="fa-solid fa-pen-to-square" style="font-size:10px;"></i>
+                                                <i class="fa-solid fa-pen-to-square" style="font-size:9px;"></i>
                                                 <span>#{{ box.num }}</span>
                                             </div>
                                             <div class="box-inner-filled">
@@ -386,6 +433,12 @@
                                                     title="Effacer ce cadre">✕</button>
                                         </div>
                                         {% endfor %}
+                                    {% else %}
+                                        <!-- No boxes configured — show fallback text input fields below the image -->
+                                        <div id="no-boxes-msg-{{ q.id }}" style="position:absolute; bottom:8px; left:50%; transform:translateX(-50%); background:rgba(254,243,199,0.95); border:1px solid #FCD34D; border-radius:8px; padding:8px 16px; font-size:12px; color:#92400E; font-weight:600; z-index:25; text-align:center; white-space:nowrap;">
+                                            <i class="fa-solid fa-triangle-exclamation"></i>
+                                            Les cadres de réponse n'ont pas encore été configurés par l'administrateur.
+                                        </div>
                                     {% endif %}
                                 </div>
 
@@ -397,12 +450,13 @@
 
                             <!-- Below Image: Available Labels Cloud -->
                             <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; padding:16px;">
+                                {% if q.labeling_boxes %}
                                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
                                     <div style="font-size:12px; font-weight:800; color:#334155; text-transform:uppercase; letter-spacing:0.5px; display:flex; align-items:center; gap:8px;">
                                         <i class="fa-solid fa-tags" style="color:var(--primary);"></i>
                                         <span>Éléments disponibles à identifier</span>
                                         <span id="counter-{{ q.id }}" style="background:#E0E7FF; color:#4338CA; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:700;">
-                                            0 / {{ q.labeling_boxes|length if q.labeling_boxes else (q.available_labels|length) }} complétés
+                                            0 / {{ q.labeling_boxes|length }} complétés
                                         </span>
                                     </div>
                                     <button type="button" 
@@ -414,7 +468,7 @@
                                 </div>
 
                                 <div class="active-label-prompt" id="active-prompt-{{ q.id }}" style="display:none; background:#FEF3C7; border:1px solid #FCD34D; color:#92400E; font-size:12px; font-weight:700; padding:6px 12px; border-radius:6px; margin-bottom:10px;">
-                                    <i class="fa-solid fa-arrow-up"></i> Cliquez maintenant sur un cadre vide (#1 à #11) dans l'image pour y placer cette étiquette.
+                                    <i class="fa-solid fa-arrow-up"></i> Cliquez maintenant sur un cadre vide dans l'image pour y placer cette étiquette.
                                 </div>
 
                                 <div class="labels-cloud" id="labels-cloud-{{ q.id }}" style="display:flex; flex-wrap:wrap; gap:8px;">
@@ -431,6 +485,31 @@
                                     </button>
                                     {% endfor %}
                                 </div>
+                                {% else %}
+                                <!-- Fallback: no boxes configured — show simple numbered text inputs -->
+                                <div style="font-size:12px; font-weight:800; color:#334155; text-transform:uppercase; letter-spacing:0.5px; display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+                                    <i class="fa-solid fa-keyboard" style="color:var(--primary);"></i>
+                                    <span>Répondez pour chaque élément</span>
+                                    <span style="background:#FEF3C7; color:#92400E; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:700;">
+                                        ⚠ Cadres non configurés — réponse en mode texte
+                                    </span>
+                                </div>
+                                <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:10px;" id="fallback-inputs-{{ q.id }}">
+                                    {% for lbl in q.available_labels %}
+                                    <div style="display:flex; align-items:center; gap:8px; background:#FFFFFF; border:1px solid #E2E8F0; border-radius:8px; padding:8px 12px;">
+                                        <span style="font-size:12px; font-weight:800; color:var(--primary); min-width:28px;">{{ lbl }}.</span>
+                                        <input type="text" 
+                                               name="fallback_label_{{ q.id }}_{{ loop.index0 }}" 
+                                               data-qid="{{ q.id }}" 
+                                               data-label="{{ lbl }}"
+                                               class="form-control" 
+                                               placeholder="Votre réponse..." 
+                                               style="font-size:12px; padding:4px 8px; height:32px;"
+                                               oninput="updateFallbackLabeling({{ q.id }})">
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
 
                                 <!-- Hidden Serialized Value for Form Submit -->
                                 <input type="hidden" name="labeling_answers_{{ q.id }}" id="labeling-val-{{ q.id }}" value="">
@@ -652,7 +731,9 @@ function markTextAnswered(questionId) {
         const val = ta.value.trim();
         if (val.length > 0) dot.classList.add('answered');
         else dot.classList.remove('answered');
-        saveAnswerAJAX(questionId, null, val);
+        // Debounced save — 700ms after last keystroke
+        if (ta._saveTimer) clearTimeout(ta._saveTimer);
+        ta._saveTimer = setTimeout(() => saveAnswerAJAX(questionId, null, val), 700);
     }
 }
 
@@ -662,7 +743,9 @@ function autoSubmit() {
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// IMAGE LABELING INTERACTIVE ENGINE (CLICK CHIP -> CLICK BOX OR CLICK BOX DIRECTLY)
+// IMAGE LABELING INTERACTIVE ENGINE v2
+// Two modes: 'chip' (select label then click box) | 'text' (click box then type)
+// Responsive: boxes reposition on image resize via ResizeObserver
 // ═════════════════════════════════════════════════════════════════════════════
 const LabelingState = {};
 
@@ -670,19 +753,108 @@ function initLabelingQuestion(questionId) {
     if (!LabelingState[questionId]) {
         LabelingState[questionId] = {
             activeLabel: null,
-            assignments: {} // boxId -> labelText
+            assignments: {},     // boxId -> labelText
+            mode: 'chip'         // 'chip' | 'text'
         };
     }
 }
 
-// User clicks on a label chip below the picture
+// ── Fallback text input for questions without configured boxes ───────────────
+function updateFallbackLabeling(questionId) {
+    var container = document.getElementById('fallback-inputs-' + questionId);
+    if (!container) return;
+    var inputs = container.querySelectorAll('input[data-qid="' + questionId + '"]');
+    var answers = {};
+    inputs.forEach(function(inp) {
+        var label = inp.getAttribute('data-label');
+        if (inp.value.trim()) {
+            answers[label] = inp.value.trim();
+        }
+    });
+    var hiddenField = document.getElementById('labeling-val-' + questionId);
+    if (hiddenField) {
+        hiddenField.value = JSON.stringify(answers);
+    }
+    // Mark nav dot as answered if at least one answer given
+    var navDot = document.querySelector('.nav-dot[data-qid="' + questionId + '"]');
+    if (navDot) {
+        if (Object.keys(answers).length > 0) {
+            navDot.classList.add('answered');
+        } else {
+            navDot.classList.remove('answered');
+        }
+    }
+}
+
+// ── Mode switching ──────────────────────────────────────────────────────────
+function setLabelingMode(questionId, mode) {
+    initLabelingQuestion(questionId);
+    LabelingState[questionId].mode = mode;
+
+    const chipBtn = document.getElementById(`mode-btn-chip-${questionId}`);
+    const textBtn = document.getElementById(`mode-btn-text-${questionId}`);
+    const cloudEl = document.getElementById(`labels-cloud-${questionId}`);
+    const promptEl = document.getElementById(`active-prompt-${questionId}`);
+
+    if (chipBtn && textBtn) {
+        if (mode === 'chip') {
+            chipBtn.style.background = '#2563EB';
+            chipBtn.style.color = '#fff';
+            chipBtn.style.borderColor = '#2563EB';
+            textBtn.style.background = '#fff';
+            textBtn.style.color = '#475569';
+            textBtn.style.borderColor = '#CBD5E1';
+            if (cloudEl) cloudEl.style.display = 'flex';
+        } else {
+            textBtn.style.background = '#7C3AED';
+            textBtn.style.color = '#fff';
+            textBtn.style.borderColor = '#7C3AED';
+            chipBtn.style.background = '#fff';
+            chipBtn.style.color = '#475569';
+            chipBtn.style.borderColor = '#CBD5E1';
+            if (cloudEl) cloudEl.style.display = 'none';
+        }
+    }
+
+    // Clear any active chip selection when switching modes
+    LabelingState[questionId].activeLabel = null;
+    if (promptEl) promptEl.style.display = 'none';
+    const card = document.getElementById(`q-card-${questionId}`);
+    if (card) card.querySelectorAll('.label-chip').forEach(c => c.classList.remove('active-selected'));
+    unhighlightBoxes(questionId);
+    closeAllDropdowns();
+}
+
+// ── Responsive box positioning via ResizeObserver ───────────────────────────
+const _labelingResizeObservers = {};
+
+function recalcBoxPositions(questionId) {
+    // Boxes already use % positions relative to canvas-inner — just ensure
+    // the canvas-inner matches the natural image height so % top values are correct.
+    const img = document.getElementById(`labeling-img-${questionId}`);
+    const inner = document.getElementById(`canvas-inner-${questionId}`);
+    if (!img || !inner) return;
+    // Nothing to do — CSS handles % positions automatically as long as
+    // the parent (canvas-inner) has correct height. Confirm it's tall enough:
+    inner.style.minHeight = img.offsetHeight + 'px';
+}
+
+function setupResizeObserver(questionId) {
+    if (_labelingResizeObservers[questionId]) return;
+    const inner = document.getElementById(`canvas-inner-${questionId}`);
+    if (!inner || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => recalcBoxPositions(questionId));
+    ro.observe(inner);
+    _labelingResizeObservers[questionId] = ro;
+}
+
+// ── Chip click handler ──────────────────────────────────────────────────────
 function handleLabelChipClick(chipEl, questionId) {
     initLabelingQuestion(questionId);
     const state = LabelingState[questionId];
     const label = chipEl.getAttribute('data-label');
     const prompt = document.getElementById(`active-prompt-${questionId}`);
 
-    // If already active, toggle off
     if (state.activeLabel === label) {
         state.activeLabel = null;
         chipEl.classList.remove('active-selected');
@@ -691,45 +863,45 @@ function handleLabelChipClick(chipEl, questionId) {
         return;
     }
 
-    // Set as active
     state.activeLabel = label;
     const card = document.getElementById(`q-card-${questionId}`);
     card.querySelectorAll('.label-chip').forEach(c => c.classList.remove('active-selected'));
     chipEl.classList.add('active-selected');
 
     if (prompt) {
-        prompt.innerHTML = `<i class="fa-solid fa-arrow-up"></i> <strong>Étiquette sélectionnée :</strong> "${label}". Cliquez sur un cadre (#1 à #11) sur l'image pour la placer.`;
+        prompt.innerHTML = `<i class="fa-solid fa-arrow-up"></i> <strong>Étiquette sélectionnée :</strong> "${label}". Cliquez sur un cadre dans l'image pour la placer.`;
         prompt.style.display = 'block';
     }
-
     highlightAvailableBoxes(questionId);
 }
 
 function highlightAvailableBoxes(questionId) {
     const card = document.getElementById(`q-card-${questionId}`);
-    card.querySelectorAll('.image-label-box').forEach(b => {
-        b.classList.add('ready-to-fill');
-    });
+    if (!card) return;
+    card.querySelectorAll('.image-label-box').forEach(b => b.classList.add('ready-to-fill'));
 }
 
 function unhighlightBoxes(questionId) {
     const card = document.getElementById(`q-card-${questionId}`);
-    card.querySelectorAll('.image-label-box').forEach(b => {
-        b.classList.remove('ready-to-fill');
-    });
+    if (!card) return;
+    card.querySelectorAll('.image-label-box').forEach(b => b.classList.remove('ready-to-fill'));
 }
 
-// User clicks directly on a box in the picture!
+// ── Box click handler ───────────────────────────────────────────────────────
 function handleImageLabelBoxClick(event, questionId, boxId) {
     event.stopPropagation();
     initLabelingQuestion(questionId);
     const state = LabelingState[questionId];
 
-    // Mode 1: An active label was chosen from below -> place it immediately!
+    // TEXT MODE: open an inline input inside the box
+    if (state.mode === 'text') {
+        openInlineTextInput(event, questionId, boxId);
+        return;
+    }
+
+    // CHIP MODE with active label → place it immediately
     if (state.activeLabel) {
         assignLabelToBox(questionId, boxId, state.activeLabel);
-        
-        // Clear active selection
         state.activeLabel = null;
         const card = document.getElementById(`q-card-${questionId}`);
         card.querySelectorAll('.label-chip').forEach(c => c.classList.remove('active-selected'));
@@ -740,11 +912,83 @@ function handleImageLabelBoxClick(event, questionId, boxId) {
         return;
     }
 
-    // Mode 2: No active label -> show contextual dropdown at this box!
+    // CHIP MODE with no active label → show dropdown
     showBoxDropdown(event, questionId, boxId);
 }
 
-// Show dropdown menu at clicked box
+// ── Inline text input (text mode) ──────────────────────────────────────────
+function openInlineTextInput(event, questionId, boxId) {
+    event.stopPropagation();
+    closeAllDropdowns();
+
+    const boxEl = document.getElementById(`box-${questionId}-${boxId}`);
+    if (!boxEl) return;
+
+    // If already has an input open, focus it
+    let existingInput = boxEl.querySelector('.box-text-input');
+    if (existingInput) {
+        existingInput.focus();
+        existingInput.select();
+        return;
+    }
+
+    initLabelingQuestion(questionId);
+    const state = LabelingState[questionId];
+    const currentVal = state.assignments[boxId] || '';
+
+    // Create the inline input
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.className = 'box-text-input';
+    inp.value = currentVal;
+    inp.placeholder = `#${boxEl.getAttribute('data-num')}`;
+    inp.setAttribute('autocomplete', 'off');
+
+    // Hide the unfilled/filled divs while editing
+    const unfilled = boxEl.querySelector('.box-inner-unfilled');
+    const filled = boxEl.querySelector('.box-inner-filled');
+    if (unfilled) unfilled.style.display = 'none';
+    if (filled) filled.style.display = 'none';
+
+    // Show remove button
+    const removeBtn = boxEl.querySelector('.box-remove-btn');
+    if (removeBtn) removeBtn.style.display = 'flex';
+
+    boxEl.appendChild(inp);
+    boxEl.style.cursor = 'text';
+    inp.focus();
+    inp.select();
+
+    function commitInput() {
+        const val = inp.value.trim();
+        boxEl.removeChild(inp);
+        boxEl.style.cursor = 'pointer';
+        if (val) {
+            assignLabelToBox(questionId, boxId, val);
+        } else {
+            // Clear assignment if empty
+            delete state.assignments[boxId];
+            clearBoxUI(questionId, boxId);
+            syncLabelingState(questionId);
+        }
+    }
+
+    inp.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === 'Tab') {
+            e.preventDefault();
+            commitInput();
+        } else if (e.key === 'Escape') {
+            boxEl.removeChild(inp);
+            boxEl.style.cursor = 'pointer';
+            // Restore UI without changing assignment
+            updateBoxUI(questionId, boxId, state.assignments[boxId] || null);
+        }
+    });
+    inp.addEventListener('blur', commitInput);
+    inp.addEventListener('click', e => e.stopPropagation());
+}
+
+// ── Dropdown (chip mode, no active label) ──────────────────────────────────
 function showBoxDropdown(event, questionId, boxId) {
     closeAllDropdowns();
     initLabelingQuestion(questionId);
@@ -753,13 +997,12 @@ function showBoxDropdown(event, questionId, boxId) {
     const boxEl = document.getElementById(`box-${questionId}-${boxId}`);
     if (!dropdown || !boxEl) return;
 
-    // Get all available labels
     const card = document.getElementById(`q-card-${questionId}`);
     const chips = card.querySelectorAll('.label-chip');
     const usedLabels = new Set(Object.values(state.assignments));
     const currentBoxLabel = state.assignments[boxId];
 
-    let html = `<div style="font-size:11px; font-weight:800; color:#64748B; padding:4px 8px; text-transform:uppercase; letter-spacing:0.5px; border-bottom:1px solid #E2E8F0; margin-bottom:4px;">Choisir pour le cadre #${boxEl.getAttribute('data-num')}</div>`;
+    let html = `<div style="font-size:11px; font-weight:800; color:#64748B; padding:4px 8px; text-transform:uppercase; letter-spacing:0.5px; border-bottom:1px solid #E2E8F0; margin-bottom:4px;">Cadre #${boxEl.getAttribute('data-num')}</div>`;
 
     let count = 0;
     chips.forEach(chip => {
@@ -770,13 +1013,12 @@ function showBoxDropdown(event, questionId, boxId) {
         if (!isAssignedElse) {
             count++;
             const activeStyle = isAssignedHere ? 'background:#EEF2FF; color:#4338CA; font-weight:700;' : '';
-            const checkIcon = isAssignedHere ? '<i class="fa-solid fa-check" style="color:#4338CA;"></i>' : '<i class="fa-regular fa-circle" style="color:#94A3B8; font-size:10px;"></i>';
-            html += `
-                <div class="box-context-item" style="${activeStyle}" onclick="selectFromDropdown(${questionId}, ${boxId}, '${lbl.replace(/'/g, "\\'")}')">
-                    ${checkIcon}
-                    <span style="flex:1;">${lbl}</span>
-                </div>
-            `;
+            const checkIcon = isAssignedHere
+                ? '<i class="fa-solid fa-check" style="color:#4338CA;"></i>'
+                : '<i class="fa-regular fa-circle" style="color:#94A3B8; font-size:10px;"></i>';
+            const safeLbl = lbl.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+            html += `<div class="box-context-item" style="${activeStyle}" onclick="selectFromDropdown(${questionId}, ${boxId}, '${safeLbl}')">
+                ${checkIcon}<span style="flex:1;">${lbl}</span></div>`;
         }
     });
 
@@ -785,31 +1027,22 @@ function showBoxDropdown(event, questionId, boxId) {
     }
 
     if (currentBoxLabel) {
-        html += `
-            <div class="box-context-item clear-item" onclick="removeBoxAssignment(event, ${questionId}, ${boxId})">
-                <i class="fa-solid fa-trash-can"></i>
-                <span>Effacer ce cadre</span>
-            </div>
-        `;
+        html += `<div class="box-context-item clear-item" onclick="removeBoxAssignment(event, ${questionId}, ${boxId})">
+            <i class="fa-solid fa-trash-can"></i><span>Effacer ce cadre</span></div>`;
     }
 
     dropdown.innerHTML = html;
 
-    // Position dropdown near the box
+    // Smart positioning: appear near the box, never overflow the wrapper
     const boxRect = boxEl.getBoundingClientRect();
-    const canvasRect = boxEl.parentElement.getBoundingClientRect();
+    const wrapRect = boxEl.closest('.labeling-canvas-wrapper').getBoundingClientRect();
 
-    let left = boxRect.left - canvasRect.left;
-    let top = boxRect.bottom - canvasRect.top + 4;
+    let left = boxRect.left - wrapRect.left;
+    let top = boxRect.bottom - wrapRect.top + 4;
 
-    // Prevent overflow right
-    if (left + 280 > canvasRect.width) {
-        left = Math.max(8, canvasRect.width - 288);
-    }
-    // Prevent overflow bottom
-    if (top + 200 > canvasRect.height) {
-        top = Math.max(8, (boxRect.top - canvasRect.top) - 210);
-    }
+    if (left + 290 > wrapRect.width) left = Math.max(4, wrapRect.width - 294);
+    if (top + 240 > wrapRect.height + 20) top = (boxRect.top - wrapRect.top) - 244;
+    if (top < 0) top = boxRect.bottom - wrapRect.top + 4;
 
     dropdown.style.left = `${left}px`;
     dropdown.style.top = `${top}px`;
@@ -822,25 +1055,23 @@ function selectFromDropdown(questionId, boxId, label) {
 }
 
 function closeAllDropdowns() {
-    document.querySelectorAll('.box-context-dropdown').forEach(d => {
-        d.style.display = 'none';
-    });
+    document.querySelectorAll('.box-context-dropdown').forEach(d => { d.style.display = 'none'; });
 }
 
-document.addEventListener('click', () => {
-    closeAllDropdowns();
-});
+document.addEventListener('click', () => closeAllDropdowns());
 
-// Assign a label into a specific box
+// ── Core assignment logic ───────────────────────────────────────────────────
 function assignLabelToBox(questionId, boxId, label) {
     initLabelingQuestion(questionId);
     const state = LabelingState[questionId];
 
-    // If another box has this label, clear it from that box first
-    for (const [otherBoxId, otherLbl] of Object.entries(state.assignments)) {
-        if (otherLbl === label && parseInt(otherBoxId) !== boxId) {
-            clearBoxUI(questionId, parseInt(otherBoxId));
-            delete state.assignments[otherBoxId];
+    // If another box has this label (chip mode), clear it from there
+    if (state.mode === 'chip') {
+        for (const [otherBoxId, otherLbl] of Object.entries(state.assignments)) {
+            if (otherLbl === label && parseInt(otherBoxId) !== boxId) {
+                clearBoxUI(questionId, parseInt(otherBoxId));
+                delete state.assignments[otherBoxId];
+            }
         }
     }
 
@@ -853,8 +1084,15 @@ function updateBoxUI(questionId, boxId, label) {
     const boxEl = document.getElementById(`box-${questionId}-${boxId}`);
     if (!boxEl) return;
 
+    if (!label) { clearBoxUI(questionId, boxId); return; }
+
+    // Remove any inline text input if present
+    const inp = boxEl.querySelector('.box-text-input');
+    if (inp) boxEl.removeChild(inp);
+
     boxEl.classList.add('filled');
     boxEl.classList.remove('ready-to-fill');
+    boxEl.style.cursor = 'pointer';
 
     const unfilled = boxEl.querySelector('.box-inner-unfilled');
     const filled = boxEl.querySelector('.box-inner-filled');
@@ -871,7 +1109,12 @@ function clearBoxUI(questionId, boxId) {
     const boxEl = document.getElementById(`box-${questionId}-${boxId}`);
     if (!boxEl) return;
 
+    // Remove any inline input
+    const inp = boxEl.querySelector('.box-text-input');
+    if (inp) boxEl.removeChild(inp);
+
     boxEl.classList.remove('filled', 'ready-to-fill');
+    boxEl.style.cursor = 'pointer';
 
     const unfilled = boxEl.querySelector('.box-inner-unfilled');
     const filled = boxEl.querySelector('.box-inner-filled');
@@ -888,7 +1131,6 @@ function removeBoxAssignment(event, questionId, boxId) {
     if (event) event.stopPropagation();
     initLabelingQuestion(questionId);
     const state = LabelingState[questionId];
-
     delete state.assignments[boxId];
     clearBoxUI(questionId, boxId);
     syncLabelingState(questionId);
@@ -896,10 +1138,9 @@ function removeBoxAssignment(event, questionId, boxId) {
 }
 
 function resetAllImageBoxes(questionId) {
-    if (!confirm("Voulez-vous réinitialiser tous les cadres de cette question ?")) return;
+    if (!confirm('Voulez-vous réinitialiser tous les cadres de cette question ?')) return;
     initLabelingQuestion(questionId);
     const state = LabelingState[questionId];
-
     for (const boxId of Object.keys(state.assignments)) {
         clearBoxUI(questionId, parseInt(boxId));
     }
@@ -907,87 +1148,91 @@ function resetAllImageBoxes(questionId) {
     syncLabelingState(questionId);
 }
 
-// Sync UI and persist to hidden input and server
+// ── State sync: serialize to hidden input + AJAX save ───────────────────────
 function syncLabelingState(questionId) {
     const state = LabelingState[questionId];
     const assignments = state.assignments;
     const usedLabels = new Set(Object.values(assignments));
 
-    // Update chips styling below
+    // Update chip styling
     const card = document.getElementById(`q-card-${questionId}`);
-    card.querySelectorAll('.label-chip').forEach(chip => {
-        const lbl = chip.getAttribute('data-label');
-        const icon = chip.querySelector('i');
+    if (card) {
+        card.querySelectorAll('.label-chip').forEach(chip => {
+            const lbl = chip.getAttribute('data-label');
+            const icon = chip.querySelector('i');
+            if (usedLabels.has(lbl)) {
+                chip.classList.add('used');
+                chip.classList.remove('active-selected');
+                if (icon) icon.className = 'fa-solid fa-circle-check';
+                icon && (icon.style.color = '#059669');
+            } else {
+                chip.classList.remove('used');
+                if (icon) { icon.className = 'fa-regular fa-square'; icon.style.color = ''; }
+            }
+        });
+    }
 
-        if (usedLabels.has(lbl)) {
-            chip.classList.add('used');
-            chip.classList.remove('active-selected');
-            if (icon) icon.className = 'fa-solid fa-circle-check text-success';
-        } else {
-            chip.classList.remove('used');
-            if (icon) icon.className = 'fa-regular fa-square';
-        }
-    });
-
-    // Update Counter
+    // Update counter
     const count = Object.keys(assignments).length;
-    const totalBoxes = card.querySelectorAll('.image-label-box').length;
+    const totalBoxes = card ? card.querySelectorAll('.image-label-box').length : 0;
     const counter = document.getElementById(`counter-${questionId}`);
     if (counter) {
         counter.innerText = `${count} / ${totalBoxes} complétés`;
-        if (count === totalBoxes && totalBoxes > 0) {
-            counter.style.background = '#D1FAE5';
-            counter.style.color = '#065F46';
-        } else {
-            counter.style.background = '#E0E7FF';
-            counter.style.color = '#4338CA';
-        }
+        counter.style.background = (count === totalBoxes && totalBoxes > 0) ? '#D1FAE5' : '#E0E7FF';
+        counter.style.color = (count === totalBoxes && totalBoxes > 0) ? '#065F46' : '#4338CA';
     }
 
-    // Update Hidden Input Value
+    // Serialize to hidden input
     const serialized = JSON.stringify(assignments);
     const hiddenInp = document.getElementById(`labeling-val-${questionId}`);
     if (hiddenInp) hiddenInp.value = (count > 0) ? serialized : '';
 
-    // Update Navigation Indicator Dot
+    // Update nav dot
     const dot = document.getElementById(`nav-dot-${questionId}`);
     if (dot) {
         if (count > 0) dot.classList.add('answered');
         else dot.classList.remove('answered');
     }
 
-    // Auto-save via AJAX to server
+    // Auto-save via AJAX
     saveAnswerAJAX(questionId, null, serialized);
 }
 
-// Restore any saved answers on page load
+// ── Restore saved answers on page load ─────────────────────────────────────
 function restoreLabelingAnswers() {
     for (const [qidStr, rawVal] of Object.entries(savedTextAnswers)) {
         const qid = parseInt(qidStr);
         const card = document.getElementById(`q-card-${qid}`);
         if (!card || !rawVal) continue;
-
         try {
             const data = (typeof rawVal === 'string') ? JSON.parse(rawVal) : rawVal;
             if (typeof data === 'object' && data !== null) {
                 initLabelingQuestion(qid);
                 for (const [boxIdStr, labelText] of Object.entries(data)) {
                     const boxId = parseInt(boxIdStr);
-                    if (boxId && labelText) {
-                        assignLabelToBox(qid, boxId, labelText);
-                    }
+                    if (boxId && labelText) assignLabelToBox(qid, boxId, labelText);
                 }
             }
-        } catch (e) {
+        } catch(e) {
             console.warn('Could not restore labeling answer for Q' + qid, e);
         }
     }
 }
 
-// Initialize on page load
+// ── Init on page load ───────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
     startTimer();
     restoreLabelingAnswers();
+
+    // Setup ResizeObserver for every labeling question on page
+    document.querySelectorAll('.labeling-canvas-inner').forEach(el => {
+        const qid = el.id.replace('canvas-inner-', '');
+        if (qid) {
+            setupResizeObserver(qid);
+            const img = document.getElementById(`labeling-img-${qid}`);
+            if (img && img.complete) recalcBoxPositions(qid);
+        }
+    });
 });
 </script>
 {% endblock %}

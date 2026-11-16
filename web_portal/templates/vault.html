@@ -10,29 +10,31 @@
 }
 .vault-sidebar {
     width: 260px;
-    background: var(--bg-card);
+    background: #FFFFFF;
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     padding: 20px; flex-shrink: 0;
+    box-shadow: var(--shadow-sm);
 }
 .folder-item {
     display: flex; align-items: center; gap: 10px;
-    padding: 10px 12px; border-radius: var(--radius-sm);
+    padding: 10px 12px; border-radius: 10px;
     color: var(--text-sec); font-size: 13px; font-weight: 500;
     cursor: pointer; transition: var(--transition-s);
-    margin-bottom: 4px;
+    margin-bottom: 4px; border: 1px solid transparent;
 }
-.folder-item:hover { background: rgba(255,255,255,0.04); color: var(--text); }
-.folder-item.active { background: rgba(37,99,235,0.15); color: var(--primary); }
+.folder-item:hover { background: var(--bg-page); color: var(--text); border-color: var(--border); }
+.folder-item.active { background: var(--primary-light); color: var(--primary); border-color: var(--primary-border); font-weight: 600; }
 .folder-item i { font-size: 16px; color: #EAB308; }
 .folder-item.active i { color: var(--primary); }
 
 .vault-main {
     flex: 1; min-width: 0;
-    background: var(--bg-card);
+    background: #FFFFFF;
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     margin-bottom: 24px;
+    box-shadow: var(--shadow-sm);
 }
 .vault-header {
     padding: 20px 24px; border-bottom: 1px solid var(--border);
@@ -44,17 +46,17 @@
 .file-item {
     display: flex; align-items: center; gap: 16px;
     padding: 12px 16px; border-radius: var(--radius-sm);
-    background: rgba(255,255,255,0.02); border: 1px solid var(--border);
+    background: #FFFFFF; border: 1px solid var(--border);
     transition: var(--transition-s);
 }
-.file-item:hover { background: rgba(255,255,255,0.05); border-color: var(--border-h); }
+.file-item:hover { background: #F8FAFF; border-color: var(--primary-border); transform: translateX(3px); }
 .file-icon {
-    width: 40px; height: 40px; border-radius: 10px;
+    width: 42px; height: 42px; border-radius: 10px;
     display: flex; align-items: center; justify-content: center;
     font-size: 18px; flex-shrink: 0;
 }
-.icon-pdf { background: rgba(239,68,68,0.15); color: var(--danger); }
-.icon-excel { background: rgba(16,185,129,0.15); color: var(--success); }
+.icon-pdf { background: var(--danger-bg); color: var(--danger); }
+.icon-excel { background: var(--success-bg); color: var(--success); }
 .file-info { flex: 1; min-width: 0; }
 .file-name { font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .file-meta { font-size: 11px; color: var(--text-sec); margin-top: 3px; display: flex; gap: 12px; }

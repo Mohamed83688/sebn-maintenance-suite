@@ -25,6 +25,7 @@ from core.document_manager import DocumentManager
 from ima.config import IMAConfig
 from ima.database import IMADatabase
 from core.checklist_manager import ChecklistManager
+from core.attendance_manager import AttendanceManager
 from web_portal.utils.export_helper import export_interventions_to_excel
 from web_portal.utils.email_service import send_simple_alert
 from web_portal.utils.pdf_helper import export_dashboard_pdf
@@ -84,6 +85,9 @@ checklist_mgr = ChecklistManager(
     db_path=IMA_DB_PATH,
     storage_dir=pma_config.dirs.get('ppe', os.path.join(pma_config.active_base, 'PPE_Templates'))
 )
+
+# Attendance, Leaves & Missing Badge Manager (SQLite)
+attendance_mgr = AttendanceManager(db_path=IMA_DB_PATH, data_dir=pma_config.active_base)
 
 # Manager Action Plan workbook path
 MANAGER_PLAN_PATH = os.path.join(pma_config.active_base, "manager_plan_performance.xlsx")
@@ -1330,8 +1334,13 @@ def exam_result_view(attempt_id: int):
         return redirect(url_for('training'))
 
     exam = exam_mgr.get_exam_by_id(attempt['exam_id'])
-    
-    return render_template('exam_result.html', attempt=attempt, exam=exam, tech=u)
+    # Load per-question review for detailed feedback
+    try:
+        review = exam_mgr.get_attempt_review(attempt_id)
+    except Exception:
+        review = []
+
+    return render_template('exam_result.html', attempt=attempt, exam=exam, tech=u, review=review)
 
 
 # ── ADMIN EXAM MANAGEMENT ROUTES ─────────────────────────────────────────────
@@ -1483,6 +1492,37 @@ def admin_question_set_labels(question_id: int):
     return jsonify({'error': 'Erreur lors de la sauvegarde des étiquettes'}), 400
 
 
+@app.route('/admin/exam/question/<int:question_id>/set-boxes', methods=['POST'])
+@admin_required
+def admin_question_set_boxes(question_id: int):
+    """
+    Save the interactive box definitions (positions + targets) for an image_labeling question.
+    Expects JSON: { boxes: [ {id, num, target, left, top, width, height, hint?}, ... ] }
+    """
+    data = request.get_json(silent=True) or {}
+    boxes = data.get('boxes', [])
+    # Validate required fields
+    for b in boxes:
+        for field in ('id', 'num', 'target', 'left', 'top', 'width', 'height'):
+            if field not in b:
+                return jsonify({'error': f'Champ manquant dans la définition de la boîte: {field}'}), 400
+    ok = exam_mgr.set_boxes_json(question_id, boxes)
+    if ok:
+        # Also sync available_labels from box targets
+        targets = [str(b.get('target', '')).strip() for b in boxes if b.get('target')]
+        exam_mgr.set_available_labels(question_id, targets)
+        return jsonify({'success': True, 'box_count': len(boxes)})
+    return jsonify({'error': 'Erreur lors de la sauvegarde des boîtes'}), 400
+
+
+@app.route('/admin/exam/question/<int:question_id>/get-boxes', methods=['GET'])
+@admin_required
+def admin_question_get_boxes(question_id: int):
+    """Return current boxes_json for a question."""
+    boxes = exam_mgr.get_boxes_json(question_id)
+    return jsonify({'success': True, 'boxes': boxes})
+
+
 @app.route('/admin/exam/<int:exam_id>/fix-types', methods=['POST'])
 @admin_required
 def admin_exam_fix_types(exam_id: int):
@@ -1621,6 +1661,39 @@ def admin_exam_import_docx():
 
     return redirect(url_for('admin') + '#exams')
 
+
+
+@app.route('/admin/exam/question/<int:question_id>/add-answer', methods=['POST'])
+@admin_required
+def admin_question_add_answer(question_id: int):
+    """Add a new answer choice to a QCM question."""
+    data = request.get_json(silent=True) or {}
+    answer_text = (data.get('answer_text') or '').strip()
+    is_correct = int(data.get('is_correct', 0))
+    if not answer_text:
+        return jsonify({'error': 'Texte de la réponse requis'}), 400
+    answer_id = exam_mgr.add_answer_to_question(question_id, answer_text, is_correct)
+    return jsonify({'success': True, 'answer_id': answer_id})
+
+
+@app.route('/admin/exam/answer/<int:answer_id>/delete', methods=['POST'])
+@admin_required
+def admin_answer_delete(answer_id: int):
+    """Delete a specific answer choice."""
+    exam_mgr.delete_answer(answer_id)
+    return jsonify({'success': True})
+
+
+@app.route('/admin/exam/answer/<int:answer_id>/update', methods=['POST'])
+@admin_required
+def admin_answer_update(answer_id: int):
+    """Update the text of a specific answer choice."""
+    data = request.get_json(silent=True) or {}
+    text = (data.get('answer_text') or '').strip()
+    if not text:
+        return jsonify({'error': 'Texte requis'}), 400
+    exam_mgr.update_answer_text(answer_id, text)
+    return jsonify({'success': True})
 
 
 @app.route('/admin/tech-level-override/<int:user_id>', methods=['POST'])
@@ -2072,20 +2145,42 @@ def admin():
     all_exams_admin = exam_mgr.get_all_exams(role='ADMIN')
     technicians_for_override = exam_mgr.get_all_technicians_for_override()
 
+    # Build technicians list for the Techniciens panel (name, matricule, shift)
+    technicians = tech_db.get_dashboard_summary()
+
+    # Attendance, Leaves & Missing Badges Data for admin panel
+    now_dt = datetime.datetime.now()
+    cur_year = now_dt.year
+    cur_month = now_dt.month
+    attendance_techs = attendance_mgr.get_all_technicians()
+    attendance_stats = attendance_mgr.get_statistics(year=cur_year, month=cur_month)
+    attendance_records = attendance_mgr.get_attendance_records(year=cur_year, month=cur_month, limit=150)
+    leave_records = attendance_mgr.get_leaves(year=cur_year, limit=100)
+    badge_records = attendance_mgr.get_missing_badges(year=cur_year, limit=100)
+
     return render_template(
         'admin.html',
         excel_path=excel_path,
         schedule_files=schedule_files,
         asp_codes=asp_codes,
         all_techs=all_techs,
+        technicians=technicians,
         ppe_templates=ppe_templates,
         checklists=checklists,
         checklist_history=chk_history,
+        exec_history=checklist_mgr.get_execution_history(limit=200),
         shift_config=shift_config,
         email_config=email_config,
         signatures=signatures,
         all_exams_admin=all_exams_admin,
-        technicians_for_override=technicians_for_override
+        technicians_for_override=technicians_for_override,
+        attendance_stats=attendance_stats,
+        attendance_records=attendance_records,
+        leave_records=leave_records,
+        badge_records=badge_records,
+        attendance_techs=attendance_techs,
+        cur_year=cur_year,
+        cur_month=cur_month
     )
 
 @app.route('/admin/credentials', methods=['POST'])
@@ -2217,6 +2312,283 @@ def admin_tech_delete(matricule):
         flash("Technicien introuvable.", "danger")
     return redirect(url_for('admin'))
 
+
+# =============================================================
+# TECHNICIAN ATTENDANCE, LEAVES & MISSING BADGE ROUTES
+# =============================================================
+
+@app.route('/admin/attendance/record', methods=['POST'])
+@admin_required
+def admin_attendance_record():
+    """Records or updates daily attendance (weekday or weekend)."""
+    data = request.get_json(silent=True) or request.form
+    try:
+        tech_id = int(data.get('technician_id', 0))
+        date_str = str(data.get('date', '')).strip()
+        if not tech_id or not date_str:
+            if request.is_json:
+                return jsonify({'error': 'Technicien et date requis'}), 400
+            flash("Technicien et date requis.", "danger")
+            return redirect(url_for('admin') + '#attendance')
+
+        status = data.get('status', 'PRESENT').strip().upper()
+        arr = data.get('arrival_time', '06:00').strip()
+        dep = data.get('departure_time', '14:00').strip()
+        hw_raw = data.get('hours_worked')
+        hw = float(hw_raw) if hw_raw not in (None, '') else None
+        notes = data.get('notes', '').strip()
+        user_name = session.get('user', 'Admin')
+
+        res = attendance_mgr.record_attendance(
+            technician_id=tech_id,
+            date=date_str,
+            status=status,
+            arrival_time=arr,
+            departure_time=dep,
+            hours_worked=hw,
+            notes=notes,
+            created_by=user_name
+        )
+
+        if request.is_json:
+            return jsonify({'success': True, 'record': res})
+
+        flash(f"Pointage enregistré avec succès pour {res['technician']} le {date_str}.", "success")
+    except Exception as e:
+        logger.error(f"[Attendance] Error saving record: {e}")
+        if request.is_json:
+            return jsonify({'error': str(e)}), 400
+        flash(f"Erreur lors de l'enregistrement: {e}", "danger")
+
+    return redirect(url_for('admin') + '#attendance')
+
+
+@app.route('/admin/attendance/delete/<int:record_id>', methods=['POST'])
+@admin_required
+def admin_attendance_delete(record_id: int):
+    """Deletes an attendance record."""
+    ok = attendance_mgr.delete_attendance(record_id)
+    if request.is_json:
+        return jsonify({'success': ok})
+    if ok:
+        flash("Pointage supprimé.", "success")
+    else:
+        flash("Pointage introuvable.", "warning")
+    return redirect(url_for('admin') + '#attendance')
+
+
+@app.route('/admin/attendance/leave/record', methods=['POST'])
+@admin_required
+def admin_attendance_leave_record():
+    """Registers a leave (Congé) or authorized permission/absence."""
+    data = request.get_json(silent=True) or request.form
+    try:
+        tech_id = int(data.get('technician_id', 0))
+        leave_type = data.get('leave_type', 'CONGE').strip().upper()
+        start_date = data.get('start_date', '').strip()
+        end_date = data.get('end_date', start_date).strip() or start_date
+        duration = float(data.get('duration_days', 1.0) or 1.0)
+        start_time = data.get('start_time', '').strip() or None
+        end_time = data.get('end_time', '').strip() or None
+        reason = data.get('reason', '').strip()
+        notes = data.get('notes', '').strip()
+        approved_by = session.get('user', 'Admin')
+
+        if not tech_id or not start_date or not reason:
+            if request.is_json:
+                return jsonify({'error': 'Technicien, date début et motif obligatoires'}), 400
+            flash("Technicien, date de début et motif requis.", "danger")
+            return redirect(url_for('admin') + '#attendance')
+
+        res = attendance_mgr.record_leave(
+            technician_id=tech_id,
+            leave_type=leave_type,
+            start_date=start_date,
+            end_date=end_date,
+            duration_days=duration,
+            reason=reason,
+            start_time=start_time,
+            end_time=end_time,
+            approved_by=approved_by,
+            notes=notes
+        )
+
+        if request.is_json:
+            return jsonify({'success': True, 'leave': res})
+
+        label = "Congé" if leave_type == "CONGE" else ("Permission" if leave_type == "PERMISSION" else leave_type)
+        flash(f"{label} enregistré avec succès ({duration} jour(s)) pour {res['technician']}.", "success")
+    except Exception as e:
+        logger.error(f"[Attendance] Error saving leave: {e}")
+        if request.is_json:
+            return jsonify({'error': str(e)}), 400
+        flash(f"Erreur enregistrement congé/permission: {e}", "danger")
+
+    return redirect(url_for('admin') + '#attendance')
+
+
+@app.route('/admin/attendance/leave/delete/<int:leave_id>', methods=['POST'])
+@admin_required
+def admin_attendance_leave_delete(leave_id: int):
+    """Deletes a leave or permission record."""
+    ok = attendance_mgr.delete_leave(leave_id)
+    if request.is_json:
+        return jsonify({'success': ok})
+    if ok:
+        flash("Enregistrement de congé/permission supprimé.", "success")
+    else:
+        flash("Enregistrement introuvable.", "warning")
+    return redirect(url_for('admin') + '#attendance')
+
+
+@app.route('/admin/attendance/badge/record', methods=['POST'])
+@admin_required
+def admin_attendance_badge_record():
+    """Records a missing badge incident (forgot to badge entry/exit)."""
+    data = request.get_json(silent=True) or request.form
+    try:
+        tech_id = int(data.get('technician_id', 0))
+        date_str = str(data.get('date', '')).strip()
+        badge_type = data.get('badge_type', 'ENTREE').strip().upper()
+        real_time = data.get('real_time', '').strip()
+        shift = data.get('shift', '').strip() or None
+        reason = data.get('reason', '').strip()
+        notes = data.get('notes', '').strip()
+
+        if not tech_id or not date_str or not reason:
+            if request.is_json:
+                return jsonify({'error': 'Technicien, date et motif requis'}), 400
+            flash("Technicien, date et motif requis.", "danger")
+            return redirect(url_for('admin') + '#attendance')
+
+        res = attendance_mgr.record_missing_badge(
+            technician_id=tech_id,
+            date=date_str,
+            badge_type=badge_type,
+            real_time=real_time,
+            shift=shift,
+            reason=reason,
+            notes=notes
+        )
+
+        if request.is_json:
+            return jsonify({'success': True, 'badge': res})
+
+        flash(f"Incident de manque de badgage enregistré pour {res['technician']}.", "success")
+    except Exception as e:
+        logger.error(f"[Attendance] Error saving missing badge: {e}")
+        if request.is_json:
+            return jsonify({'error': str(e)}), 400
+        flash(f"Erreur enregistrement manque de badgage: {e}", "danger")
+
+    return redirect(url_for('admin') + '#attendance')
+
+
+@app.route('/admin/attendance/badge/regularize/<int:badge_id>', methods=['POST'])
+@admin_required
+def admin_attendance_badge_regularize(badge_id: int):
+    """Marks a missing badge incident as regularized/corrected."""
+    data = request.get_json(silent=True) or request.form
+    notes = data.get('notes', '').strip()
+    user_name = session.get('user', 'Admin')
+    ok = attendance_mgr.regularize_missing_badge(badge_id, regularized_by=user_name, notes=notes)
+    if request.is_json:
+        return jsonify({'success': ok})
+    if ok:
+        flash("Oubli de badgage régularisé avec succès.", "success")
+    else:
+        flash("Enregistrement introuvable.", "warning")
+    return redirect(url_for('admin') + '#attendance')
+
+
+@app.route('/admin/attendance/badge/delete/<int:badge_id>', methods=['POST'])
+@admin_required
+def admin_attendance_badge_delete(badge_id: int):
+    """Deletes a missing badge record."""
+    ok = attendance_mgr.delete_missing_badge(badge_id)
+    if request.is_json:
+        return jsonify({'success': ok})
+    if ok:
+        flash("Enregistrement de manque de badgage supprimé.", "success")
+    else:
+        flash("Enregistrement introuvable.", "warning")
+    return redirect(url_for('admin') + '#attendance')
+
+
+@app.route('/api/admin/attendance/stats')
+@admin_required
+def api_admin_attendance_stats():
+    """Returns live JSON statistics for filters (year, month, technician_id)."""
+    year = request.args.get('year', type=int)
+    month = request.args.get('month', type=int)
+    tech_id = request.args.get('technician_id', type=int)
+    stats = attendance_mgr.get_statistics(technician_id=tech_id, month=month, year=year)
+    return jsonify(stats)
+
+
+@app.route('/api/admin/attendance/records')
+@admin_required
+def api_admin_attendance_records():
+    """Returns filtered JSON attendance records."""
+    year = request.args.get('year', type=int)
+    month = request.args.get('month', type=int)
+    tech_id = request.args.get('technician_id', type=int)
+    status = request.args.get('status')
+    wk_only = request.args.get('weekend_only') in ('1', 'true', 'True')
+    recs = attendance_mgr.get_attendance_records(
+        technician_id=tech_id,
+        month=month,
+        year=year,
+        status=status,
+        weekend_only=wk_only,
+        limit=500
+    )
+    return jsonify({'records': recs})
+
+
+@app.route('/api/admin/attendance/leaves')
+@admin_required
+def api_admin_attendance_leaves():
+    """Returns filtered JSON leaves."""
+    year = request.args.get('year', type=int)
+    month = request.args.get('month', type=int)
+    tech_id = request.args.get('technician_id', type=int)
+    ltype = request.args.get('leave_type')
+    leaves = attendance_mgr.get_leaves(technician_id=tech_id, leave_type=ltype, year=year, month=month)
+    return jsonify({'leaves': leaves})
+
+
+@app.route('/api/admin/attendance/badges')
+@admin_required
+def api_admin_attendance_badges():
+    """Returns filtered JSON missing badges."""
+    year = request.args.get('year', type=int)
+    month = request.args.get('month', type=int)
+    tech_id = request.args.get('technician_id', type=int)
+    is_reg = request.args.get('is_regularized', type=int)
+    badges = attendance_mgr.get_missing_badges(technician_id=tech_id, is_regularized=is_reg, year=year, month=month)
+    return jsonify({'badges': badges})
+
+
+@app.route('/admin/attendance/export')
+@admin_required
+def admin_attendance_export():
+    """Exports complete attendance dossier as a styled multi-sheet Excel file."""
+    year = request.args.get('year', type=int) or datetime.date.today().year
+    month = request.args.get('month', type=int)
+    tech_id = request.args.get('technician_id', type=int)
+
+    output = attendance_mgr.export_to_excel(year=year, month=month, technician_id=tech_id)
+    period_tag = f"{year}_{month:02d}" if month else f"{year}"
+    filename = f"SEBN_TN_Suivi_Presence_{period_tag}.xlsx"
+
+    return send_file(
+        output,
+        as_attachment=True,
+        download_name=filename,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
 # =============================================================
 # IMA — INTERVENTION ROUTES
 # =============================================================
@@ -2304,6 +2676,13 @@ def intervention_form():
         if end_time:
             dt = calc_downtime(data['start_time'], end_time)
             ima_db.close_intervention(code, end_time, dt, data.get('remarks', ''))
+
+        # ── Notification Email immédiate au Team Leader (Asynchrone) ───────────────
+        try:
+            from web_portal.utils.email_service import notify_intervention_started_async
+            notify_intervention_started_async(data, code, pma_config.active_base, request.host_url)
+        except Exception as _mail_err:
+            logger.warning(f"Failed to dispatch intervention email: {_mail_err}")
 
         flash(f"Intervention {code} créée avec succès.", "success")
         return redirect(url_for('intervention_detail', code=code))
@@ -2637,16 +3016,95 @@ def admin_change_password():
 @admin_required
 def admin_update_email():
     email_path = os.path.join(pma_config.active_base, "email_config.json")
+    
+    sender_mail = request.form.get("sender_email", "").strip()
+    tl_emails_raw = request.form.get("team_leader_emails", "").strip()
+    
+    from web_portal.utils.email_service import parse_recipients
+    recip_list = parse_recipients(tl_emails_raw)
+    tl_emails_clean = ", ".join(recip_list)
+
+    # Checkbox values
+    notify_intervention = (request.form.get("notify_intervention_start") == "1")
+    send_pma = (request.form.get("send_pma_excel") == "1")
+
+    port_raw = request.form.get("smtp_port", "587").strip()
+    try:
+        port = int(port_raw)
+    except ValueError:
+        port = 587
+
     data = {
-        "smtp_server": request.form.get("smtp_server", "smtp.gmail.com").strip(),
-        "smtp_port": int(request.form.get("smtp_port", 587)),
-        "sender": request.form.get("sender_email", "").strip(),
-        "password": request.form.get("sender_password", "").strip(),
-        "recipient": request.form.get("sender_email", "").strip()
+        "smtp_server":               request.form.get("smtp_server", "smtp.gmail.com").strip(),
+        "smtp_port":                 port,
+        "security":                  request.form.get("security", "STARTTLS").strip(),
+        "sender":                    sender_mail,
+        "sender_email":              sender_mail,
+        "password":                  request.form.get("sender_password", "").strip(),
+        "team_leader_emails":        tl_emails_clean,
+        "recipient":                 tl_emails_clean or sender_mail,
+        "recipients":                recip_list,
+        "notify_intervention_start": notify_intervention,
+        "send_pma_excel":            send_pma
     }
     pma_config.save_json(email_path, data)
-    flash("Paramètres de messagerie mis à jour.", "success")
-    return redirect(url_for('admin'))
+    flash(f"Paramètres email enregistrés avec succès ({len(recip_list)} destinataire(s)).", "success")
+    return redirect(url_for('admin') + '#email')
+
+
+@app.route('/admin/email/test', methods=['POST'])
+@admin_required
+def admin_test_email():
+    """Diagnostic SMTP test connection and send test email."""
+    data = request.get_json() or {}
+    email_path = os.path.join(pma_config.active_base, "email_config.json")
+    saved_cfg = pma_config.load_json(email_path, {})
+    
+    smtp_server = data.get("smtp_server") or saved_cfg.get("smtp_server", "smtp.gmail.com")
+    smtp_port   = data.get("smtp_port") or saved_cfg.get("smtp_port", 587)
+    security    = data.get("security") or saved_cfg.get("security", "STARTTLS")
+    sender      = data.get("sender_email") or saved_cfg.get("sender") or saved_cfg.get("sender_email", "")
+    password    = data.get("sender_password") or saved_cfg.get("password", "")
+    recipient   = data.get("recipient") or data.get("team_leader_emails") or saved_cfg.get("team_leader_emails") or saved_cfg.get("recipient") or sender
+
+    from web_portal.utils.email_service import test_email_connection
+    success, log_details = test_email_connection(
+        sender_email=sender,
+        app_password=password,
+        recipient_email=recipient,
+        smtp_server=smtp_server,
+        smtp_port=smtp_port,
+        security=security
+    )
+    return jsonify({
+        "status": "success" if success else "error",
+        "message": "Connexion et envoi de test réussis !" if success else "Échec du test SMTP.",
+        "details": log_details
+    })
+
+
+@app.route('/admin/email/send-pma-excel', methods=['POST'])
+@admin_required
+def admin_send_pma_excel():
+    """Manual trigger from Admin: sends preventive schedule Excel to Team Leader."""
+    from web_portal.utils.email_service import send_preventive_schedule_email
+    note = (request.form.get("note") or (request.get_json() or {}).get("note", "")).strip()
+    success, msg = send_preventive_schedule_email(pma_config.active_base, custom_note=note)
+    if request.is_json:
+        return jsonify({"status": "success" if success else "error", "message": msg})
+    flash(msg, "success" if success else "danger")
+    return redirect(url_for('admin') + '#email')
+
+
+@app.route('/pma/send-to-team-leader', methods=['POST'])
+@login_required
+def pma_send_to_team_leader():
+    """Trigger from Planning PMA view: sends current preventive schedule Excel to Team Leader."""
+    from web_portal.utils.email_service import send_preventive_schedule_email
+    data = request.get_json() or {}
+    note = data.get("note", f"Envoyé par {session.get('name', 'Technicien')} depuis le planning PMA.")
+    success, msg = send_preventive_schedule_email(pma_config.active_base, custom_note=note)
+    return jsonify({"status": "success" if success else "error", "message": msg})
 
 @app.route('/admin/upload-ppe', methods=['POST'])
 @admin_required
@@ -2936,12 +3394,15 @@ def pma_dashboard():
     current_iso_w = datetime.datetime.now().isocalendar()[1]
     current_iso_w_label = f"S{current_iso_w}"
 
+    email_cfg = pma_config.load_json(os.path.join(pma_config.active_base, "email_config.json"))
+
     return render_template('pma_dashboard.html',
                            tasks=tasks, stats=stats,
                            months=months, sheets=sheets, weeks=weeks,
                            current_month=month, current_sheet=sheet,
                            current_week=week, current_search=search,
-                           current_iso_w_label=current_iso_w_label)
+                           current_iso_w_label=current_iso_w_label,
+                           email_config=email_cfg)
 
 @app.route('/pma/upload', methods=['POST'])
 @admin_required
@@ -3255,6 +3716,43 @@ def checklist_download(exec_id: int):
         as_attachment=True,
         download_name=os.path.basename(out_path)
     )
+
+
+# =============================================================
+# PMA CHECKLIST EXECUTION DELETE (ADMIN)
+# =============================================================
+
+@app.route('/pma/checklist/delete/<int:exec_id>', methods=['POST'])
+@admin_required
+def checklist_delete(exec_id):
+    """Admin: permanently delete a single checklist execution record."""
+    try:
+        ok = checklist_mgr.delete_execution(exec_id)
+        if ok:
+            return jsonify({"status": "success", "message": "Exécution supprimée."})
+        else:
+            return jsonify({"status": "error", "message": "Enregistrement introuvable."}), 404
+    except Exception as e:
+        logger.error(f"checklist_delete error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/pma/checklist/delete-bulk', methods=['POST'])
+@admin_required
+def checklist_delete_bulk():
+    """Admin: permanently delete multiple checklist execution records."""
+    data = request.get_json() or {}
+    ids = data.get('ids', [])
+    if not ids:
+        return jsonify({"status": "error", "message": "Aucun identifiant fourni."}), 400
+    try:
+        ids = [int(i) for i in ids]
+        count = checklist_mgr.delete_executions_bulk(ids)
+        return jsonify({"status": "success", "deleted": count,
+                        "message": f"{count} exécution(s) supprimée(s)."})
+    except Exception as e:
+        logger.error(f"checklist_delete_bulk error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 
 # =============================================================

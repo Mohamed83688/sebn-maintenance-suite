@@ -4,6 +4,11 @@
 {% block page_subtitle %}Gestion et suivi des tâches de maintenance programmée{% endblock %}
 
 {% block topbar_actions %}
+{% if email_config and email_config.get('send_pma_excel', True) %}
+<button class="btn btn-sm" onclick="sendPmaExcelToTeamLeader(this)" title="Envoyer le planning préventif Excel au Team Leader par email" style="background:#FFFFFF; border:1px solid var(--primary-border); color:var(--primary); font-weight:600; display:inline-flex; align-items:center; gap:6px;">
+    <i class="fa-solid fa-paper-plane" style="color:var(--primary);"></i> Envoyer Excel au Team Leader
+</button>
+{% endif %}
 {% if role == 'admin' %}
 <button class="btn btn-primary btn-sm" onclick="document.getElementById('upload-modal').classList.add('open')">
     <i class="fa-solid fa-file-arrow-up"></i> Charger Excel
@@ -15,23 +20,34 @@
 <style>
 /* ── HERO SECTION ── */
 .pma-hero {
-    background: #FFFFFF;
-    border: 1px solid var(--border);
+    background: linear-gradient(135deg, #FFFFFF 0%, #F8F5FF 100%);
+    border: 1px solid var(--primary-border);
     border-radius: var(--radius-lg);
-    padding: 24px 30px;
+    padding: 28px 32px;
     margin-bottom: 24px;
     display: flex;
     align-items: center;
     gap: 36px;
     flex-wrap: wrap;
     position: relative;
-    box-shadow: var(--shadow-sm);
+    box-shadow: 0 4px 20px rgba(46,0,139,0.08);
+    overflow: hidden;
+}
+.pma-hero::before {
+    content: '';
+    position: absolute;
+    top: -60px; right: -60px;
+    width: 200px; height: 200px;
+    border-radius: 50%;
+    background: rgba(46,0,139,0.04);
+    pointer-events: none;
 }
 
 /* Progress Ring */
 .progress-ring-wrap {
     position: relative;
     flex-shrink: 0;
+    filter: drop-shadow(0 4px 12px rgba(46,0,139,0.18));
 }
 .progress-ring-wrap svg { display: block; transform: rotate(-90deg); }
 .progress-ring-bg { fill: none; stroke: #E2E8F0; stroke-width: 9; }
@@ -67,14 +83,15 @@
 
 .hero-counters { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; }
 .hero-counter {
-    background: var(--bg-page);
+    background: #FFFFFF;
     border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    padding: 12px 14px;
+    border-radius: var(--radius);
+    padding: 14px 16px;
     text-align: center;
     transition: var(--transition);
+    box-shadow: var(--shadow-xs);
 }
-.hero-counter:hover { border-color: var(--border-h); background: #F1F5F9; }
+.hero-counter:hover { border-color: var(--primary-border); background: var(--primary-light); transform: translateY(-2px); box-shadow: var(--shadow-sm); }
 .hero-counter-val { font-size: 1.5rem; font-weight: 800; line-height: 1; margin-bottom: 4px; }
 .hero-counter-lbl { font-size: 10px; color: var(--text-sec); font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; }
 
@@ -365,6 +382,134 @@ async function completeTask(btn, sheet, rawIndex, taskType) {
     } catch {
         btn.disabled = false;
         btn.innerHTML = originalHTML;
+    }
+}
+</script>
+{% endblock %}
+        });
+        const data = await res.json();
+        if (res.ok && data.status === 'success') {
+            if (row) {
+                row.style.transition = 'opacity 0.4s, transform 0.4s';
+                row.style.opacity = '0';
+                row.style.transform = 'translateX(20px)';
+                setTimeout(() => row.remove(), 420);
+            }
+            updateHistoryCount(-1);
+        } else {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-trash"></i>';
+            alert(data.message || 'Erreur lors de la suppression.');
+        }
+    } catch (e) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-trash"></i>';
+        alert('Erreur réseau : ' + e);
+    }
+}
+
+function toggleAllCheckboxes(masterCb) {
+    document.querySelectorAll('.exec-cb').forEach(cb => cb.checked = masterCb.checked);
+    updateDeleteBtn();
+}
+
+function toggleSelectAll() {
+    const cbs = document.querySelectorAll('.exec-cb');
+    const anyUnchecked = Array.from(cbs).some(cb => !cb.checked);
+    cbs.forEach(cb => cb.checked = anyUnchecked);
+    const masterCb = document.getElementById('cb-all');
+    if (masterCb) masterCb.checked = !anyUnchecked;
+    updateDeleteBtn();
+}
+
+function updateDeleteBtn() {
+    const selected = document.querySelectorAll('.exec-cb:checked').length;
+    const btn = document.getElementById('delete-selected-btn');
+    if (btn) {
+        btn.style.display = selected > 0 ? 'inline-flex' : 'none';
+        btn.innerHTML = '<i class="fa-solid fa-trash"></i> Supprimer (' + selected + ')';
+    }
+}
+
+async function deleteSelected() {
+    const checked = Array.from(document.querySelectorAll('.exec-cb:checked'));
+    if (!checked.length) return;
+    const ids = checked.map(cb => parseInt(cb.value));
+    if (!confirm('Supprimer définitivement ' + ids.length + ' enregistrement(s) de checklist ?\nCette action est irréversible.')) return;
+
+    const btn = document.getElementById('delete-selected-btn');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Suppression...'; }
+
+    try {
+        const res = await fetch('/pma/checklist/delete-bulk', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ids})
+        });
+        const data = await res.json();
+        if (res.ok && data.status === 'success') {
+            ids.forEach(id => {
+                const row = document.getElementById('exec-row-' + id);
+                if (row) {
+                    row.style.transition = 'opacity 0.3s';
+                    row.style.opacity = '0';
+                    setTimeout(() => row.remove(), 320);
+                }
+            });
+            updateHistoryCount(-ids.length);
+            if (btn) { btn.disabled = false; btn.style.display = 'none'; }
+            const masterCb = document.getElementById('cb-all');
+            if (masterCb) masterCb.checked = false;
+        } else {
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-trash"></i> Supprimer la sélection'; }
+            alert(data.message || 'Erreur lors de la suppression.');
+        }
+    } catch (e) {
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-trash"></i> Supprimer la sélection'; }
+        alert('Erreur réseau : ' + e);
+    }
+}
+
+function updateHistoryCount(delta) {
+    const card = document.getElementById('exec-history-card');
+    if (!card) return;
+    const subtitle = card.querySelector('.filter-row div div:last-child');
+    const rows = document.querySelectorAll('.exec-history-row').length + delta;
+    if (subtitle) subtitle.textContent = rows + ' enregistrement(s) — Administration uniquement';
+}
+
+async function sendPmaExcelToTeamLeader(btn) {
+    if (!confirm("Envoyer le fichier Excel du planning préventif au Team Leader par email ?")) return;
+    const origHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Envoi en cours...';
+    try {
+        const res = await fetch('/pma/send-to-team-leader', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({})
+        });
+        const data = await res.json();
+        if (res.ok && data.status === 'success') {
+            btn.innerHTML = '<i class="fa-solid fa-check"></i> Envoyé !';
+            btn.style.borderColor = 'var(--success)';
+            btn.style.color = 'var(--success)';
+            setTimeout(() => {
+                btn.disabled = false;
+                btn.innerHTML = origHtml;
+                btn.style.borderColor = '';
+                btn.style.color = '';
+            }, 3000);
+            alert("✅ " + data.message);
+        } else {
+            btn.disabled = false;
+            btn.innerHTML = origHtml;
+            alert("❌ Erreur : " + (data.message || "Impossible d'envoyer l'email"));
+        }
+    } catch (e) {
+        btn.disabled = false;
+        btn.innerHTML = origHtml;
+        alert("❌ Erreur réseau : " + e);
     }
 }
 </script>

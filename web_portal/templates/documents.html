@@ -213,9 +213,10 @@
 
             {% if doc.file_exists %}
             <div class="doc-actions">
-                <a href="{{ url_for('document_view', doc_id=doc.id) }}"
+                <a href="{{ url_for('document_view', doc_id=doc.id, inline=1) }}"
                    class="doc-btn-view"
-                   title="Ouvrir le document">
+                   target="_blank"
+                   title="Ouvrir le document directement">
                     <i class="fa-solid fa-eye"></i> Ouvrir
                 </a>
                 <a href="{{ url_for('document_download', doc_id=doc.id) }}"

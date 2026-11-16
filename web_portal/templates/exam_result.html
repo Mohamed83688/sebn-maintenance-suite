@@ -82,6 +82,148 @@
     color: var(--text-sec);
     margin-top: 4px;
 }
+
+/* Review Section */
+.review-section {
+    max-width: 820px;
+    margin: 0 auto 40px;
+}
+.review-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+.review-card {
+    background: #FFFFFF;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 14px;
+    transition: box-shadow 0.2s ease;
+}
+.review-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+}
+.review-card.correct {
+    border-left: 4px solid #10B981;
+}
+.review-card.incorrect {
+    border-left: 4px solid #EF4444;
+}
+.review-card.unanswered {
+    border-left: 4px solid #94A3B8;
+}
+.review-card.manual {
+    border-left: 4px solid #F59E0B;
+}
+
+.review-q-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.review-q-num {
+    font-weight: 800;
+    font-size: 12px;
+    color: var(--text-sec);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.review-badge {
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 800;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+.review-badge.correct { background: #D1FAE5; color: #065F46; }
+.review-badge.incorrect { background: #FEE2E2; color: #991B1B; }
+.review-badge.unanswered { background: #F1F5F9; color: #64748B; }
+.review-badge.manual { background: #FEF3C7; color: #92400E; }
+
+.review-q-text {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1.5;
+    white-space: pre-line;
+    margin-bottom: 12px;
+}
+.answer-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    margin-bottom: 6px;
+}
+.answer-row.user-answer {
+    background: #EEF2FF;
+    border: 1px solid #C7D2FE;
+}
+.answer-row.correct-answer {
+    background: #F0FDF4;
+    border: 1px solid #BBF7D0;
+}
+.answer-row.user-wrong {
+    background: #FEF2F2;
+    border: 1px solid #FECACA;
+}
+.answer-icon {
+    font-size: 14px;
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+/* Labeling review boxes */
+.box-review-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    margin-bottom: 4px;
+    font-size: 12.5px;
+}
+.box-review-row.box-correct {
+    background: #F0FDF4;
+    border: 1px solid #BBF7D0;
+}
+.box-review-row.box-wrong {
+    background: #FEF2F2;
+    border: 1px solid #FECACA;
+}
+.box-review-row.box-empty {
+    background: #F8FAFC;
+    border: 1px solid #E2E8F0;
+    color: #94A3B8;
+}
+
+.review-filter-btn {
+    padding: 5px 14px;
+    border-radius: 20px;
+    border: 1.5px solid var(--border);
+    background: #FFFFFF;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-sec);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.review-filter-btn.active {
+    border-color: var(--primary);
+    background: #EEF2FF;
+    color: var(--primary);
+}
 </style>
 {% endblock %}
 
@@ -158,7 +300,240 @@
                 Retour à l'Espace Formation
             </a>
             {% endif %}
+            {% if review %}
+            <button class="btn btn-glass" onclick="document.getElementById('review-section').scrollIntoView({behavior:'smooth'})" style="color:var(--primary); border-color:var(--primary-light);">
+                <i class="fa-solid fa-list-check"></i> Voir la correction détaillée
+            </button>
+            {% endif %}
         </div>
     </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- DETAILED PER-QUESTION REVIEW                                     -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    {% if review %}
+    <div class="review-section" id="review-section">
+        <div class="review-header">
+            <div>
+                <h3 style="font-weight:800; font-size:18px; color:var(--text); margin:0 0 4px 0;">
+                    <i class="fa-solid fa-list-check" style="color:var(--primary);"></i> Correction Détaillée
+                </h3>
+                <p style="font-size:13px; color:var(--text-sec); margin:0;">Revoyez vos réponses question par question.</p>
+            </div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <button class="review-filter-btn active" onclick="filterReview('all', this)">Toutes ({{ review|length }})</button>
+                <button class="review-filter-btn" onclick="filterReview('correct', this)">
+                    <i class="fa-solid fa-check" style="color:#10B981;"></i>
+                    Correctes ({{ review | selectattr('is_correct', 'equalto', true) | list | length }})
+                </button>
+                <button class="review-filter-btn" onclick="filterReview('incorrect', this)">
+                    <i class="fa-solid fa-xmark" style="color:#EF4444;"></i>
+                    Incorrectes ({{ review | selectattr('is_correct', 'equalto', false) | list | length }})
+                </button>
+                <button class="review-filter-btn" onclick="filterReview('unanswered', this)">
+                    <i class="fa-solid fa-circle-minus" style="color:#94A3B8;"></i>
+                    Sans réponse ({{ review | rejectattr('answered') | list | length }})
+                </button>            </div>
+        </div>
+
+        {% set alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' %}
+        {% for item in review %}
+        {% if item.is_correct == true %}
+            {% set card_class = 'correct' %}
+            {% set badge_class = 'correct' %}
+            {% set badge_icon = 'fa-circle-check' %}
+            {% set badge_text = 'Correcte' %}
+        {% elif item.is_correct is none %}
+            {% set card_class = 'manual' %}
+            {% set badge_class = 'manual' %}
+            {% set badge_icon = 'fa-pen-to-square' %}
+            {% set badge_text = 'Révision formateur' %}
+        {% elif not item.answered %}
+            {% set card_class = 'unanswered' %}
+            {% set badge_class = 'unanswered' %}
+            {% set badge_icon = 'fa-circle-minus' %}
+            {% set badge_text = 'Sans réponse' %}
+        {% else %}
+            {% set card_class = 'incorrect' %}
+            {% set badge_class = 'incorrect' %}
+            {% set badge_icon = 'fa-circle-xmark' %}
+            {% set badge_text = 'Incorrecte' %}
+        {% endif %}
+
+        <div class="review-card {{ card_class }}"
+             data-status="{{ card_class }}"
+             id="review-q-{{ item.question_id }}">
+            <div class="review-q-header">
+                <div class="review-q-num">
+                    Question {{ item.question_number }} sur {{ review|length }}
+                    <span style="margin-left:8px; opacity:0.6; font-size:10px;">
+                        [{{ item.question_type | replace('_', ' ') | upper }}]
+                    </span>
+                </div>
+                <span class="review-badge {{ badge_class }}">
+                    <i class="fa-solid {{ badge_icon }}"></i>
+                    {{ badge_text }}
+                </span>
+            </div>
+
+            <!-- Question text -->
+            <div class="review-q-text">{{ item.question_text }}</div>
+
+            <!-- Question image if any -->
+            {% if item.image %}
+            <div style="margin-bottom:14px; text-align:center;">
+                <img src="/static/exam_images/{{ item.image }}"
+                     alt="Illustration Q{{ item.question_number }}"
+                     style="max-width:100%; max-height:280px; border-radius:8px; border:1px solid var(--border); object-fit:contain;"
+                     onerror="this.parentElement.style.display='none'">
+            </div>
+            {% endif %}
+
+            <!-- Type-specific answer display -->
+            {% if item.question_type == 'image_labeling' %}
+                <!-- Image Labeling: show box-by-box comparison -->
+                {% if item.labeling_boxes %}
+                <div style="margin-top:8px;">
+                    <div style="font-size:11px; font-weight:800; color:var(--text-sec); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px;">
+                        <i class="fa-solid fa-tags"></i> Comparaison cadre par cadre
+                    </div>
+                    {% for box in item.labeling_boxes %}
+                    {% set user_val = item.user_boxes.get(box.id|string, '') %}
+                    {% set target_val = box.target %}
+                    {% if user_val %}
+                        {% set box_ok = (user_val.lower() == target_val.lower()) or (user_val.lower() in target_val.lower()) or (target_val.lower() in user_val.lower()) %}
+                    {% else %}
+                        {% set box_ok = false %}
+                    {% endif %}
+                    <div class="box-review-row {% if not user_val %}box-empty{% elif box_ok %}box-correct{% else %}box-wrong{% endif %}">
+                        <span style="font-weight:800; min-width:28px; text-align:center; font-size:11px; color:var(--primary);">#{{ box.num }}</span>
+                        <span style="flex:1;">
+                            <strong>Votre réponse :</strong>
+                            {% if user_val %}
+                                "{{ user_val }}"
+                            {% else %}
+                                <em style="color:#94A3B8;">Non rempli</em>
+                            {% endif %}
+                        </span>
+                        <span style="color:var(--text-sec); font-size:11px;">
+                            ✓ {{ target_val }}
+                        </span>
+                        {% if not user_val %}
+                        <i class="fa-solid fa-minus" style="color:#94A3B8;"></i>
+                        {% elif box_ok %}
+                        <i class="fa-solid fa-check" style="color:#10B981;"></i>
+                        {% else %}
+                        <i class="fa-solid fa-xmark" style="color:#EF4444;"></i>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% elif not item.answered %}
+                <div style="font-size:13px; color:#94A3B8; font-style:italic; padding:8px 0;">
+                    <i class="fa-solid fa-circle-minus"></i> Aucune réponse fournie pour cette question.
+                </div>
+                {% endif %}
+
+            {% elif item.question_type == 'text_input' %}
+                <!-- Text input: show what was written -->
+                {% if item.user_text %}
+                <div class="answer-row user-answer">
+                    <i class="fa-solid fa-pen-line answer-icon" style="color:#4F46E5;"></i>
+                    <div>
+                        <div style="font-size:11px; font-weight:700; color:#4338CA; margin-bottom:3px;">VOTRE RÉPONSE</div>
+                        <div style="font-size:13px;">{{ item.user_text }}</div>
+                    </div>
+                </div>
+                <div style="font-size:11px; color:#92400E; background:#FEF3C7; border:1px solid #FDE68A; padding:6px 10px; border-radius:6px; margin-top:8px;">
+                    <i class="fa-solid fa-circle-info"></i> Question à réponse libre — évaluation par le formateur.
+                </div>
+                {% else %}
+                <div style="font-size:13px; color:#94A3B8; font-style:italic; padding:8px 0;">
+                    <i class="fa-solid fa-circle-minus"></i> Aucune réponse fournie pour cette question.
+                </div>
+                {% endif %}
+
+            {% else %}
+                <!-- QCM / True-False: show all options with user answer vs correct -->
+                {% for ans in item.answers %}
+                {% set is_user_ans = (item.user_answer and item.user_answer.id == ans.id) %}
+                {% set is_correct_ans = (ans.is_correct == 1) %}
+
+                {% if is_user_ans and is_correct_ans %}
+                    <div class="answer-row correct-answer">
+                        <i class="fa-solid fa-circle-check answer-icon" style="color:#10B981;"></i>
+                        <div style="flex:1;">
+                            <span style="font-weight:700; color:#374151; margin-right:8px;">{{ alphabet[loop.index0] }}.</span>
+                            {{ ans.answer_text }}
+                        </div>
+                        <span style="font-size:11px; font-weight:700; color:#065F46; white-space:nowrap;">✓ Votre réponse — CORRECTE</span>
+                    </div>
+                {% elif is_user_ans and not is_correct_ans %}
+                    <div class="answer-row user-wrong">
+                        <i class="fa-solid fa-circle-xmark answer-icon" style="color:#EF4444;"></i>
+                        <div style="flex:1;">
+                            <span style="font-weight:700; color:#374151; margin-right:8px;">{{ alphabet[loop.index0] }}.</span>
+                            {{ ans.answer_text }}
+                        </div>
+                        <span style="font-size:11px; font-weight:700; color:#991B1B; white-space:nowrap;">✗ Votre réponse — INCORRECTE</span>
+                    </div>
+                {% elif not is_user_ans and is_correct_ans %}
+                    <div class="answer-row correct-answer">
+                        <i class="fa-solid fa-lightbulb answer-icon" style="color:#10B981;"></i>
+                        <div style="flex:1;">
+                            <span style="font-weight:700; color:#374151; margin-right:8px;">{{ alphabet[loop.index0] }}.</span>
+                            {{ ans.answer_text }}
+                        </div>
+                        <span style="font-size:11px; font-weight:700; color:#065F46; white-space:nowrap;">← Bonne réponse</span>
+                    </div>
+                {% else %}
+                    <div class="answer-row" style="background:#F8FAFC; border:1px solid #E2E8F0;">
+                        <i class="fa-regular fa-circle answer-icon" style="color:#CBD5E1;"></i>
+                        <div style="flex:1; color:var(--text-sec);">
+                            <span style="font-weight:700; margin-right:8px;">{{ alphabet[loop.index0] }}.</span>
+                            {{ ans.answer_text }}
+                        </div>
+                    </div>
+                {% endif %}
+                {% endfor %}
+
+                {% if not item.answered %}
+                <div style="font-size:13px; color:#94A3B8; font-style:italic; padding:8px 0; margin-top:4px;">
+                    <i class="fa-solid fa-circle-minus"></i> Aucune réponse sélectionnée.
+                    {% if item.correct_answer %}
+                    La bonne réponse était : <strong style="color:#065F46;">{{ item.correct_answer.answer_text }}</strong>
+                    {% endif %}
+                </div>
+                {% endif %}
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function filterReview(status, btn) {
+    // Update active button
+    document.querySelectorAll('.review-filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    // Filter cards
+    document.querySelectorAll('.review-card').forEach(card => {
+        const cardStatus = card.dataset.status;
+        if (status === 'all') {
+            card.style.display = '';
+        } else if (status === 'correct') {
+            card.style.display = cardStatus === 'correct' ? '' : 'none';
+        } else if (status === 'incorrect') {
+            card.style.display = cardStatus === 'incorrect' ? '' : 'none';
+        } else if (status === 'unanswered') {
+            card.style.display = cardStatus === 'unanswered' ? '' : 'none';
+        }
+    });
+}
+</script>
 {% endblock %}

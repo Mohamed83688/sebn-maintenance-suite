@@ -45,17 +45,31 @@
 
 /* Quick Exam Card */
 .quick-exam-card {
-    background: #FFFFFF;
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 18px 24px;
+    background: linear-gradient(135deg, #F8F5FF 0%, #FFFFFF 100%);
+    border: 1px solid var(--primary-border);
+    border-radius: var(--radius-lg);
+    padding: 20px 28px;
     margin-bottom: 24px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     flex-wrap: wrap;
     gap: 16px;
-    box-shadow: 0 4px 12px rgba(46,0,139,0.04);
+    box-shadow: 0 4px 16px rgba(46,0,139,0.08);
+    position: relative;
+    overflow: hidden;
+}
+.quick-exam-card::after {
+    content: '\f19d';
+    font-family: 'Font Awesome 6 Free';
+    font-weight: 900;
+    position: absolute;
+    right: 28px; top: 50%;
+    transform: translateY(-50%);
+    font-size: 56px;
+    opacity: 0.05;
+    color: var(--primary);
+    pointer-events: none;
 }
 
 /* MVP Banner */

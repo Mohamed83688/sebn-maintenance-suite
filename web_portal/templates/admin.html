@@ -7,20 +7,52 @@
 <style>
 .admin-layout { display: flex; gap: 24px; align-items: flex-start; }
 .admin-sidebar {
-    width: 220px; background: #FFFFFF;
-    border: 1px solid var(--border); border-radius: var(--radius);
-    padding: 8px; flex-shrink: 0; position: sticky; top: 80px;
+    width: 240px; background: #FFFFFF;
+    border: 1px solid var(--border); border-radius: var(--radius-lg);
+    padding: 10px; flex-shrink: 0; position: sticky; top: 80px;
     box-shadow: var(--shadow-sm);
+    overflow: hidden;
 }
+.admin-sidebar-header {
+    padding: 12px 14px 14px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 8px;
+    background: linear-gradient(135deg, var(--primary-light) 0%, #FFFFFF 100%);
+    border-radius: 8px;
+    margin: -2px -2px 10px;
+}
+.admin-sidebar-header h3 {
+    font-size: 10px; font-weight: 800; color: var(--primary);
+    text-transform: uppercase; letter-spacing: 1.2px;
+    display: flex; align-items: center; gap: 7px;
+}
+.admin-sidebar-header h3 i { font-size: 12px; }
 .admin-tab {
-    display: flex; align-items: center; gap: 10px;
-    padding: 9px 12px; border-radius: var(--radius-sm);
-    color: var(--text-sec); font-size: 13px; font-weight: 600;
-    cursor: pointer; transition: var(--transition-s); margin-bottom: 2px;
+    display: flex; align-items: center; gap: 11px;
+    padding: 10px 13px; border-radius: 10px;
+    color: var(--text-sec); font-size: 13px; font-weight: 500;
+    cursor: pointer; transition: all 0.18s ease; margin-bottom: 2px;
+    border: 1px solid transparent;
 }
-.admin-tab:hover { background: var(--bg-page); color: var(--text); }
-.admin-tab.active { background: var(--primary-light); color: var(--primary); }
-.admin-tab i { width: 16px; text-align: center; }
+.admin-tab:hover {
+    background: var(--bg-page); color: var(--text);
+    border-color: var(--border);
+}
+.admin-tab.active {
+    background: linear-gradient(135deg, var(--primary-light) 0%, #EDE9FF 100%);
+    color: var(--primary);
+    border-color: var(--primary-border);
+    box-shadow: 0 2px 8px rgba(46,0,139,0.12);
+    font-weight: 600;
+}
+.admin-tab i {
+    width: 20px; height: 20px; text-align: center; font-size: 12px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 6px;
+    background: var(--bg-page);
+    transition: all 0.18s;
+}
+.admin-tab.active i { background: rgba(46,0,139,0.14); color: var(--primary); }
 
 .admin-main { flex: 1; min-width: 0; }
 .admin-panel { display: none; animation: fadeIn 0.25s ease; }
@@ -28,15 +60,18 @@
 
 .settings-card {
     background: #FFFFFF; border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 24px;
+    border-radius: var(--radius-lg); padding: 26px 28px;
     margin-bottom: 20px; box-shadow: var(--shadow-sm);
+    transition: box-shadow 0.2s ease;
 }
+.settings-card:hover { box-shadow: var(--shadow); }
 .settings-header {
-    border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 20px;
+    border-bottom: 1px solid var(--border); padding-bottom: 14px; margin-bottom: 22px;
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 10px;
 }
-.settings-title { font-size: 15px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 9px; }
-.settings-title i { color: var(--primary); }
-.settings-desc { font-size: 12px; color: var(--text-sec); margin-top: 3px; }
+.settings-title { font-size: 15px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 10px; }
+.settings-title i { color: var(--primary); font-size: 14px; }
+.settings-desc { font-size: 12px; color: var(--text-sec); margin-top: 4px; line-height: 1.5; }
 
 .danger-zone { border: 1px solid var(--danger-border); background: var(--danger-bg); }
 .danger-zone .settings-title i { color: var(--danger); }
@@ -75,6 +110,7 @@ input:checked + .slider:before { transform: translateX(20px); }
 @media(max-width: 960px) {
     .admin-layout { flex-direction: column; gap: 16px; }
     .admin-sidebar { width: 100%; display: flex; flex-wrap: wrap; gap: 6px; padding: 10px; position: relative; top: 0; }
+    .admin-sidebar-header { display: none; }
     .admin-tab { flex: 0 0 auto; margin-bottom: 0; }
 }
 </style>
@@ -84,6 +120,9 @@ input:checked + .slider:before { transform: translateX(20px); }
 <div class="admin-layout">
     <!-- Sidebar tabs -->
     <div class="admin-sidebar animate-up">
+        <div class="admin-sidebar-header">
+            <h3><i class="fa-solid fa-sliders" style="margin-right:6px;color:var(--primary);"></i>Administration</h3>
+        </div>
         <div class="admin-tab active" onclick="switchAdminTab('general')">
             <i class="fa-solid fa-sliders"></i> Général
         </div>
@@ -102,11 +141,17 @@ input:checked + .slider:before { transform: translateX(20px); }
         <div class="admin-tab" onclick="switchAdminTab('technicians')">
             <i class="fa-solid fa-users"></i> Techniciens
         </div>
+        <div class="admin-tab" onclick="switchAdminTab('attendance')" id="tab-attendance">
+            <i class="fa-solid fa-calendar-check"></i> Suivi de Présence
+        </div>
         <div class="admin-tab" onclick="switchAdminTab('asp')">
             <i class="fa-solid fa-tags"></i> Codes ASP
         </div>
         <div class="admin-tab" onclick="switchAdminTab('pma')">
             <i class="fa-solid fa-calendar-check"></i> Planning PMA
+        </div>
+        <div class="admin-tab" onclick="switchAdminTab('checklist-history')">
+            <i class="fa-solid fa-clipboard-list"></i> Historique PPE
         </div>
         <div class="admin-tab" onclick="switchAdminTab('signatures')">
             <i class="fa-solid fa-file-signature"></i> Signatures &amp; Validations
@@ -207,34 +252,159 @@ input:checked + .slider:before { transform: translateX(20px); }
         <div id="panel-email" class="admin-panel">
             <div class="settings-card">
                 <div class="settings-header">
-                    <div class="settings-title"><i class="fa-solid fa-envelope"></i> Notifications Email / SMTP</div>
-                    <div class="settings-desc">Configuration des envois d'alertes automatiques en cas d'anomalie.</div>
+                    <div>
+                        <div class="settings-title"><i class="fa-solid fa-envelope"></i> Passerelle Email &amp; Notifications Team Leader</div>
+                        <div class="settings-desc">Configurez le serveur SMTP de l'usine, les alertes au démarrage d'intervention et l'envoi du planning préventif Excel.</div>
+                    </div>
+                    <div>
+                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="sendPmaExcelNow(this)" style="font-weight:600; background:#FFFFFF; border:1px solid var(--border); color:var(--text);">
+                            <i class="fa-solid fa-paper-plane" style="color:var(--primary);"></i> Envoyer l'Excel Préventif
+                        </button>
+                    </div>
                 </div>
-                <form method="POST" action="{{ url_for('admin_update_email') }}">
+
+                <form method="POST" action="{{ url_for('admin_update_email') }}" id="smtp-config-form">
+                    <!-- SECTION 1: SERVEUR SMTP -->
+                    <div style="font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:0.8px; color:var(--primary); margin-bottom:12px; display:flex; align-items:center; gap:6px;">
+                        <i class="fa-solid fa-server"></i> Paramètres du Serveur SMTP
+                    </div>
+
                     <div class="grid-2">
                         <div class="form-group">
-                            <label class="form-label">Serveur SMTP</label>
-                            <input type="text" name="smtp_server" class="form-control" value="{{ config.get('smtp_server', 'smtp.gmail.com') }}">
+                            <label class="form-label">Serveur SMTP (Hôte ou IP)</label>
+                            <input type="text" name="smtp_server" id="smtp_server" class="form-control" 
+                                   value="{{ email_config.get('smtp_server', 'smtp.gmail.com') }}" 
+                                   placeholder="ex: smtp.sebn.com ou 10.x.x.x">
                         </div>
                         <div class="form-group">
                             <label class="form-label">Port SMTP</label>
-                            <input type="number" name="smtp_port" class="form-control" value="{{ config.get('smtp_port', 587) }}">
+                            <input type="number" name="smtp_port" id="smtp_port" class="form-control" 
+                                   value="{{ email_config.get('smtp_port', 587) }}" 
+                                   placeholder="587, 465, ou 25">
                         </div>
                     </div>
+
                     <div class="grid-2">
                         <div class="form-group">
-                            <label class="form-label">Email Expéditeur</label>
-                            <input type="email" name="sender_email" class="form-control" value="{{ config.get('sender_email', '') }}">
+                            <label class="form-label">Protocole de Sécurité / Chiffrement</label>
+                            <select name="security" id="smtp_security" class="form-control">
+                                <option value="STARTTLS" {% if email_config.get('security') == 'STARTTLS' or not email_config.get('security') %}selected{% endif %}>STARTTLS (Recommandé - Port 587 ou 25)</option>
+                                <option value="SSL" {% if email_config.get('security') == 'SSL' %}selected{% endif %}>SSL / TLS Direct (Port 465)</option>
+                                <option value="NONE" {% if email_config.get('security') == 'NONE' %}selected{% endif %}>Aucun Chiffrement (Relais interne usine - Port 25)</option>
+                            </select>
                         </div>
                         <div class="form-group">
-                            <label class="form-label">Mot de Passe d'application</label>
-                            <input type="password" name="sender_password" class="form-control" value="{{ config.get('sender_password', '') }}">
+                            <label class="form-label">Email Expéditeur (FROM)</label>
+                            <input type="email" name="sender_email" id="sender_email" class="form-control" 
+                                   value="{{ email_config.get('sender', email_config.get('sender_email', '')) }}" 
+                                   placeholder="maintenance@sebn.com">
                         </div>
                     </div>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fa-solid fa-paper-plane"></i> Enregistrer Paramètres SMTP
-                    </button>
+
+                    <div class="form-group">
+                        <label class="form-label">Mot de Passe ou Clé d'Application</label>
+                        <input type="password" name="sender_password" id="sender_password" class="form-control" 
+                               value="{{ email_config.get('password', email_config.get('sender_password', '')) }}" 
+                               placeholder="••••••••••••••••">
+                        <div style="font-size:11px; color:var(--text-sec); margin-top:4px;">
+                            <i class="fa-solid fa-circle-info"></i> Laissez vide si le serveur SMTP de l'usine est un relais interne sans authentification.
+                        </div>
+                    </div>
+
+                    <!-- SECTION 2: DESTINATAIRES TEAM LEADER & MULTI-EMAILS -->
+                    <div style="font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:0.8px; color:var(--primary); margin:24px 0 12px; display:flex; align-items:center; justify-content:space-between;">
+                        <div style="display:flex; align-items:center; gap:6px;">
+                            <i class="fa-solid fa-users-gear"></i> Destinataires des Notifications &amp; Team Leaders
+                        </div>
+                        <span class="badge badge-info" id="email-count-badge" style="font-size:11px; font-weight:700;">
+                            0 email(s)
+                        </span>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom:14px;">
+                        <label class="form-label">Ajouter un email destinataire (Team Leader, Superviseur, Chef d'équipe...)</label>
+                        <div style="display:flex; gap:10px; align-items:center;">
+                            <div style="position:relative; flex:1;">
+                                <i class="fa-solid fa-at" style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--text-sec); font-size:13px;"></i>
+                                <input type="email" id="new_email_input" class="form-control" placeholder="ex: teamleader.shiftA@sebn.com" style="padding-left:36px;" onkeydown="if(event.key==='Enter'){event.preventDefault(); addEmailChip();}">
+                            </div>
+                            <button type="button" class="btn btn-primary" onclick="addEmailChip()" style="flex-shrink:0;">
+                                <i class="fa-solid fa-plus"></i> Ajouter l'email
+                            </button>
+                        </div>
+                        <div style="font-size:11px; color:var(--text-sec); margin-top:4px;">
+                            Tapez une adresse email et cliquez sur <strong>Ajouter</strong> (ou appuyez sur <strong>Entrée</strong>). Vous pouvez en ajouter autant que nécessaire !
+                        </div>
+                    </div>
+
+                    <!-- Container pour les badges d'emails actifs -->
+                    <div style="background:#FFFFFF; border:1px solid var(--border); border-radius:var(--radius); padding:14px; min-height:76px; margin-bottom:18px;">
+                        <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.6px; color:var(--text-sec); margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
+                            <span>Emails configurés pour recevoir les alertes &amp; plannings</span>
+                            <button type="button" onclick="clearAllEmails()" style="background:none; border:none; color:var(--danger); font-size:11px; cursor:pointer; font-weight:600; text-decoration:underline;">
+                                Tout effacer
+                            </button>
+                        </div>
+                        <div id="email-chips-container" style="display:flex; flex-wrap:wrap; gap:8px;">
+                            <!-- Badges d'emails générés dynamiquement -->
+                        </div>
+                        <div id="no-emails-msg" style="color:var(--text-dim); font-size:12px; font-style:italic; padding:12px 0; text-align:center; display:none;">
+                            <i class="fa-solid fa-inbox" style="font-size:18px; margin-bottom:4px; display:block; opacity:0.4;"></i>
+                            Aucun email destinataire pour le moment. Ajoutez des adresses ci-dessus.
+                        </div>
+                    </div>
+
+                    <!-- Champ caché qui transmet la liste complète d'emails avec le formulaire -->
+                    <input type="hidden" name="team_leader_emails" id="team_leader_emails" value="{{ email_config.get('team_leader_emails', email_config.get('recipient', '')) }}">
+
+                    <!-- TOGGLES -->
+                    <div style="background:#F8FAFC; border:1px solid var(--border); border-radius:var(--radius); padding:16px 18px; margin:16px 0 24px; display:flex; flex-direction:column; gap:14px;">
+                        <label style="display:flex; align-items:flex-start; gap:12px; cursor:pointer; margin:0;">
+                            <input type="checkbox" name="notify_intervention_start" value="1" 
+                                   {% if email_config.get('notify_intervention_start', True) %}checked{% endif %}
+                                   style="margin-top:3px; width:17px; height:17px; accent-color:var(--primary); cursor:pointer;">
+                            <div>
+                                <div style="font-size:13px; font-weight:700; color:var(--text);">
+                                    <i class="fa-solid fa-bell" style="color:var(--primary); margin-right:4px;"></i>
+                                    Alerter le Team Leader dès le démarrage d'une intervention
+                                </div>
+                                <div style="font-size:11px; color:var(--text-sec); margin-top:2px;">
+                                    Envoie immédiatement un email au Team Leader avec la machine concernée, la panne constatée, l'équipe et le technicien déclarant lorsqu'une nouvelle intervention curative est créée.
+                                </div>
+                            </div>
+                        </label>
+
+                        <div style="height:1px; background:var(--border);"></div>
+
+                        <label style="display:flex; align-items:flex-start; gap:12px; cursor:pointer; margin:0;">
+                            <input type="checkbox" name="send_pma_excel" value="1" 
+                                   {% if email_config.get('send_pma_excel', True) %}checked{% endif %}
+                                   style="margin-top:3px; width:17px; height:17px; accent-color:var(--primary); cursor:pointer;">
+                            <div>
+                                <div style="font-size:13px; font-weight:700; color:var(--text);">
+                                    <i class="fa-solid fa-file-excel" style="color:#10B981; margin-right:4px;"></i>
+                                    Activer l'option d'envoi du planning préventif Excel
+                                </div>
+                                <div style="font-size:11px; color:var(--text-sec); margin-top:2px;">
+                                    Affiche les boutons d'expédition rapide permettant d'envoyer la dernière version du fichier Excel PMA au Team Leader par email depuis le portail.
+                                </div>
+                            </div>
+                        </label>
+                    </div>
+
+                    <!-- ACTION BUTTONS -->
+                    <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fa-solid fa-floppy-disk"></i> Enregistrer Paramètres Email
+                        </button>
+                        <button type="button" class="btn btn-outline-primary" id="btn-test-email" onclick="testSmtpConnection()">
+                            <i class="fa-solid fa-bolt"></i> Tester la Connexion &amp; Envoyer Email Test
+                        </button>
+                    </div>
                 </form>
+
+                <!-- Test Diagnostic Result Box -->
+                <div id="smtp-test-result" style="display:none; margin-top:20px; border-radius:var(--radius); padding:16px; font-size:12px; font-family:monospace; line-height:1.6; white-space:pre-wrap;"></div>
             </div>
         </div>
 
@@ -384,8 +554,11 @@ input:checked + .slider:before { transform: translateX(20px); }
             <div class="settings-card">
                 <div class="settings-header">
                     <div class="settings-title"><i class="fa-solid fa-users"></i> Personnel &amp; Techniciens</div>
-                    <div class="settings-desc">Liste des techniciens habilités sur la plateforme.</div>
+                    <div class="settings-desc">Liste des techniciens habilités sur la plateforme.
+                        <span class="badge badge-info" style="margin-left:8px; font-size:11px;">{{ technicians|length }} technicien{{ 's' if technicians|length != 1 else '' }}</span>
+                    </div>
                 </div>
+                {% if technicians %}
                 <div class="table-card" style="box-shadow:none;">
                     <table class="data-table tech-table-mini">
                         <thead>
@@ -401,15 +574,538 @@ input:checked + .slider:before { transform: translateX(20px); }
                             <tr>
                                 <td class="td-mono">{{ tech.matricule }}</td>
                                 <td style="font-weight:600;">{{ tech.name }}</td>
-                                <td><span class="badge badge-info">Équipe {{ tech.shift }}</span></td>
+                                <td>{% if tech.shift %}<span class="badge badge-info">Équipe {{ tech.shift }}</span>{% else %}<span style="color:var(--text-dim);">—</span>{% endif %}</td>
                                 <td><span class="badge badge-success">Technicien</span></td>
                             </tr>
-                            {% else %}
-                            <tr><td colspan="4" style="text-align:center; color:var(--text-sec);">Aucun technicien enregistré.</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
+                {% else %}
+                <div style="text-align:center; padding:40px 20px; color:var(--text-sec);">
+                    <i class="fa-solid fa-users" style="font-size:36px; opacity:0.3; display:block; margin-bottom:12px;"></i>
+                    <div style="font-weight:600; margin-bottom:4px;">Aucun technicien enregistré</div>
+                    <div style="font-size:12px;">Importez un fichier Excel depuis la section Planning PMA pour ajouter des techniciens.</div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+
+        <!-- ── ATTENDANCE & LEAVES (SUIVI DE PRÉSENCE) ────────────────────── -->
+        <div id="panel-attendance" class="admin-panel">
+            <div class="settings-card">
+                <!-- Header -->
+                <div class="settings-header" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:16px;">
+                    <div>
+                        <div class="settings-title">
+                            <i class="fa-solid fa-calendar-check" style="color:var(--primary);"></i> Suivi de Présence, Congés &amp; Badgages
+                        </div>
+                        <div class="settings-desc">
+                            Gestion unifiée des présences hebdomadaires &amp; permanences du week-end (samedi/dimanche), congés, permissions et régularisation des manques de badgage.
+                        </div>
+                    </div>
+                    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="exportAttendanceExcel()" style="background:#FFFFFF; border:1.5px solid #CBD5E1; font-weight:700; color:var(--text); display:flex; align-items:center; gap:6px;">
+                            <i class="fa-solid fa-file-excel" style="color:#10B981; font-size:14px;"></i> Exporter Excel (.xlsx)
+                        </button>
+                        <button type="button" class="btn btn-primary btn-sm" onclick="openModal('record-attendance-modal')" style="font-weight:700; display:flex; align-items:center; gap:6px;">
+                            <i class="fa-solid fa-plus"></i> Nouveau Pointage
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Global Filter Bar -->
+                <div style="background:#F8FAFC; border:1px solid var(--border); border-radius:10px; padding:14px 18px; margin-bottom:20px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+                    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                        <span style="font-size:12px; font-weight:800; text-transform:uppercase; color:var(--text-sec); letter-spacing:0.5px;">
+                            <i class="fa-solid fa-filter"></i> Filtres :
+                        </span>
+                        
+                        <!-- Technician filter -->
+                        <select id="att-filter-tech" class="form-control" style="font-size:12px; height:34px; width:auto; min-width:180px; padding:4px 10px;" onchange="refreshAttendanceViews()">
+                            <option value="">Tous les techniciens</option>
+                            {% for t in attendance_techs %}
+                            <option value="{{ t.id }}">{{ t.name }} ({{ t.matricule }}) — Équipe {{ t.shift or 'B' }}</option>
+                            {% endfor %}
+                        </select>
+
+                        <!-- Month filter -->
+                        <select id="att-filter-month" class="form-control" style="font-size:12px; height:34px; width:auto; padding:4px 10px;" onchange="refreshAttendanceViews()">
+                            <option value="">Toute l'année</option>
+                            <option value="1" {% if cur_month == 1 %}selected{% endif %}>Janvier</option>
+                            <option value="2" {% if cur_month == 2 %}selected{% endif %}>Février</option>
+                            <option value="3" {% if cur_month == 3 %}selected{% endif %}>Mars</option>
+                            <option value="4" {% if cur_month == 4 %}selected{% endif %}>Avril</option>
+                            <option value="5" {% if cur_month == 5 %}selected{% endif %}>Mai</option>
+                            <option value="6" {% if cur_month == 6 %}selected{% endif %}>Juin</option>
+                            <option value="7" {% if cur_month == 7 %}selected{% endif %}>Juillet</option>
+                            <option value="8" {% if cur_month == 8 %}selected{% endif %}>Août</option>
+                            <option value="9" {% if cur_month == 9 %}selected{% endif %}>Septembre</option>
+                            <option value="10" {% if cur_month == 10 %}selected{% endif %}>Octobre</option>
+                            <option value="11" {% if cur_month == 11 %}selected{% endif %}>Novembre</option>
+                            <option value="12" {% if cur_month == 12 %}selected{% endif %}>Décembre</option>
+                        </select>
+
+                        <!-- Year filter -->
+                        <select id="att-filter-year" class="form-control" style="font-size:12px; height:34px; width:auto; padding:4px 10px;" onchange="refreshAttendanceViews()">
+                            <option value="2026" selected>2026</option>
+                            <option value="2025">2025</option>
+                            <option value="2024">2024</option>
+                        </select>
+                    </div>
+
+                    <div style="display:flex; gap:8px;">
+                        <button type="button" class="btn btn-sm" style="background:#EFF6FF; border:1px solid #BFDBFE; color:var(--primary); font-size:12px; font-weight:700;" onclick="resetAttendanceFilters()">
+                            <i class="fa-solid fa-rotate-left"></i> Réinitialiser
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Sub-Tabs Navigation Pills -->
+                <div style="display:flex; gap:8px; border-bottom:2px solid var(--border); padding-bottom:12px; margin-bottom:20px; overflow-x:auto;">
+                    <button type="button" class="att-sub-tab active" id="btn-att-tab-dashboard" onclick="switchAttSubTab('dashboard')"
+                        style="padding:8px 16px; border-radius:20px; border:none; font-size:13px; font-weight:700; cursor:pointer; background:var(--primary); color:#FFFFFF; display:flex; align-items:center; gap:8px; transition:all 0.2s;">
+                        <i class="fa-solid fa-chart-pie"></i> Tableau de Bord &amp; Stats
+                    </button>
+                    <button type="button" class="att-sub-tab" id="btn-att-tab-records" onclick="switchAttSubTab('records')"
+                        style="padding:8px 16px; border-radius:20px; border:1px solid var(--border); font-size:13px; font-weight:600; cursor:pointer; background:#FFFFFF; color:var(--text); display:flex; align-items:center; gap:8px; transition:all 0.2s;">
+                        <i class="fa-solid fa-calendar-day"></i> Pointages &amp; Week-ends
+                        <span id="badge-count-records" style="background:#E2E8F0; color:#334155; font-size:11px; padding:2px 7px; border-radius:10px; font-weight:700;">{{ attendance_records|length }}</span>
+                    </button>
+                    <button type="button" class="att-sub-tab" id="btn-att-tab-leaves" onclick="switchAttSubTab('leaves')"
+                        style="padding:8px 16px; border-radius:20px; border:1px solid var(--border); font-size:13px; font-weight:600; cursor:pointer; background:#FFFFFF; color:var(--text); display:flex; align-items:center; gap:8px; transition:all 0.2s;">
+                        <i class="fa-solid fa-umbrella-beach" style="color:#6366F1;"></i> Congés &amp; Permissions
+                        <span id="badge-count-leaves" style="background:#E0E7FF; color:#4338CA; font-size:11px; padding:2px 7px; border-radius:10px; font-weight:700;">{{ leave_records|length }}</span>
+                    </button>
+                    <button type="button" class="att-sub-tab" id="btn-att-tab-badges" onclick="switchAttSubTab('badges')"
+                        style="padding:8px 16px; border-radius:20px; border:1px solid var(--border); font-size:13px; font-weight:600; cursor:pointer; background:#FFFFFF; color:var(--text); display:flex; align-items:center; gap:8px; transition:all 0.2s;">
+                        <i class="fa-solid fa-id-card-clip" style="color:#EF4444;"></i> Manques de Badgage
+                        <span id="badge-count-badges" style="background:#FEE2E2; color:#DC2626; font-size:11px; padding:2px 7px; border-radius:10px; font-weight:800;">{{ attendance_stats.unregularized_badges }} en attente</span>
+                    </button>
+                </div>
+
+                <!-- ═══════════════════════════════════════════════════════════ -->
+                <!-- SUB-PANEL 1: DASHBOARD & STATS                              -->
+                <!-- ═══════════════════════════════════════════════════════════ -->
+                <div id="att-sub-dashboard" class="att-sub-panel">
+                    <!-- KPI Cards Grid (6 cards) -->
+                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:14px; margin-bottom:20px;">
+                        
+                        <!-- Card 1: Jours Présents -->
+                        <div style="background:#FFFFFF; border:1px solid var(--border); border-radius:10px; padding:16px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+                            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px;">
+                                <div style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-sec); letter-spacing:0.5px;">Jours Présents</div>
+                                <div style="width:32px; height:32px; border-radius:8px; background:#DCFCE7; color:#166534; display:flex; align-items:center; justify-content:center; font-size:14px;">
+                                    <i class="fa-solid fa-user-check"></i>
+                                </div>
+                            </div>
+                            <div style="font-size:24px; font-weight:800; color:#166534;" id="stat-total-present">{{ attendance_stats.total_present_days }}</div>
+                            <div style="font-size:11px; color:var(--text-sec); margin-top:4px;">Semaine + Week-end</div>
+                        </div>
+
+                        <!-- Card 2: Permanences Week-end -->
+                        <div style="background:#FFFFFF; border:1px solid #FDE68A; border-radius:10px; padding:16px; box-shadow:0 1px 3px rgba(0,0,0,0.05); background:#FFFDF5;">
+                            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px;">
+                                <div style="font-size:11px; font-weight:700; text-transform:uppercase; color:#92400E; letter-spacing:0.5px;">Jours Week-end</div>
+                                <div style="width:32px; height:32px; border-radius:8px; background:#FEF3C7; color:#B45309; display:flex; align-items:center; justify-content:center; font-size:14px;">
+                                    <i class="fa-solid fa-calendar-week"></i>
+                                </div>
+                            </div>
+                            <div style="font-size:24px; font-weight:800; color:#B45309;" id="stat-total-weekend">{{ attendance_stats.total_weekend_days }}</div>
+                            <div style="font-size:11px; color:#92400E; margin-top:4px;">Samedi &amp; Dimanche</div>
+                        </div>
+
+                        <!-- Card 3: Heures Travaillées -->
+                        <div style="background:#FFFFFF; border:1px solid var(--border); border-radius:10px; padding:16px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+                            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px;">
+                                <div style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-sec); letter-spacing:0.5px;">Total Heures</div>
+                                <div style="width:32px; height:32px; border-radius:8px; background:#DBEAFE; color:#1D4ED8; display:flex; align-items:center; justify-content:center; font-size:14px;">
+                                    <i class="fa-solid fa-clock"></i>
+                                </div>
+                            </div>
+                            <div style="font-size:24px; font-weight:800; color:#1D4ED8;" id="stat-total-hours">{{ attendance_stats.total_hours }}h</div>
+                            <div style="font-size:11px; color:var(--text-sec); margin-top:4px;">Heures cumulées</div>
+                        </div>
+
+                        <!-- Card 4: Congés (Jours) -->
+                        <div style="background:#FFFFFF; border:1px solid var(--border); border-radius:10px; padding:16px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+                            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px;">
+                                <div style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-sec); letter-spacing:0.5px;">Congés Validés</div>
+                                <div style="width:32px; height:32px; border-radius:8px; background:#E0E7FF; color:#4338CA; display:flex; align-items:center; justify-content:center; font-size:14px;">
+                                    <i class="fa-solid fa-umbrella-beach"></i>
+                                </div>
+                            </div>
+                            <div style="font-size:24px; font-weight:800; color:#4338CA;" id="stat-total-conge">{{ attendance_stats.total_conge_days }}j</div>
+                            <div style="font-size:11px; color:var(--text-sec); margin-top:4px;">Annuel, Maladie, etc.</div>
+                        </div>
+
+                        <!-- Card 5: Permissions -->
+                        <div style="background:#FFFFFF; border:1px solid var(--border); border-radius:10px; padding:16px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+                            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px;">
+                                <div style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-sec); letter-spacing:0.5px;">Permissions</div>
+                                <div style="width:32px; height:32px; border-radius:8px; background:#F3E8FF; color:#7E22CE; display:flex; align-items:center; justify-content:center; font-size:14px;">
+                                    <i class="fa-solid fa-door-open"></i>
+                                </div>
+                            </div>
+                            <div style="font-size:24px; font-weight:800; color:#7E22CE;" id="stat-total-perm">{{ attendance_stats.total_permissions }}</div>
+                            <div style="font-size:11px; color:var(--text-sec); margin-top:4px;">Autorisations d'absence</div>
+                        </div>
+
+                        <!-- Card 6: Manques de Badgage -->
+                        <div style="background:#FFFFFF; border:1px solid #FECACA; border-radius:10px; padding:16px; box-shadow:0 1px 3px rgba(0,0,0,0.05); background:#FFF8F8;">
+                            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px;">
+                                <div style="font-size:11px; font-weight:700; text-transform:uppercase; color:#991B1B; letter-spacing:0.5px;">Oublis Badgage</div>
+                                <div style="width:32px; height:32px; border-radius:8px; background:#FEE2E2; color:#DC2626; display:flex; align-items:center; justify-content:center; font-size:14px;">
+                                    <i class="fa-solid fa-id-card-clip"></i>
+                                </div>
+                            </div>
+                            <div style="font-size:24px; font-weight:800; color:#DC2626;" id="stat-total-badges">{{ attendance_stats.total_missing_badges }}</div>
+                            <div style="font-size:11px; color:#DC2626; font-weight:700; margin-top:4px;" id="stat-unreg-badges">{{ attendance_stats.unregularized_badges }} non régularisé(s)</div>
+                        </div>
+
+                    </div>
+
+                    <!-- Attendance Rate Progress Card -->
+                    <div style="background:#FFFFFF; border:1px solid var(--border); border-radius:10px; padding:18px; margin-bottom:24px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
+                            <div>
+                                <span style="font-size:13px; font-weight:800; color:var(--text); text-transform:uppercase; letter-spacing:0.5px;">Taux de Présence Global</span>
+                                <span style="font-size:12px; color:var(--text-sec); margin-left:8px;" id="stat-period-label">({{ attendance_stats.month_name }} {{ attendance_stats.year }})</span>
+                            </div>
+                            <div style="font-size:20px; font-weight:900; color:var(--primary);" id="stat-global-rate">{{ attendance_stats.global_attendance_rate }}%</div>
+                        </div>
+                        <div style="height:10px; background:#E2E8F0; border-radius:5px; overflow:hidden;">
+                            <div id="stat-rate-bar" style="height:100%; width:{{ attendance_stats.global_attendance_rate }}%; background:var(--primary); transition:width 0.5s ease;"></div>
+                        </div>
+                    </div>
+
+                    <!-- Per-Technician Performance Summary Table -->
+                    <div style="margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
+                        <h4 style="font-size:14px; font-weight:800; color:var(--text); margin:0;">
+                            <i class="fa-solid fa-users" style="color:var(--primary); margin-right:6px;"></i> Synthèse par Technicien
+                        </h4>
+                    </div>
+                    <div class="table-card" style="box-shadow:none; border:1px solid var(--border); border-radius:10px; overflow-x:auto;">
+                        <table class="data-table" id="att-tech-summary-table">
+                            <thead>
+                                <tr>
+                                    <th>Technicien</th>
+                                    <th>Matricule</th>
+                                    <th>Équipe</th>
+                                    <th>Niveau</th>
+                                    <th>Jours Présents</th>
+                                    <th>Week-ends</th>
+                                    <th>Congés (j)</th>
+                                    <th>Permissions</th>
+                                    <th>Oublis Badge</th>
+                                    <th>Heures</th>
+                                    <th>Taux Présence</th>
+                                    <th style="text-align:right;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="att-tech-summary-tbody">
+                                {% for ts in attendance_stats.technicians_summary %}
+                                <tr>
+                                    <td style="font-weight:700; color:var(--text);">{{ ts.name }}</td>
+                                    <td class="td-mono">{{ ts.matricule }}</td>
+                                    <td><span class="badge badge-info">Équipe {{ ts.shift }}</span></td>
+                                    <td><span class="badge badge-primary" style="font-size:11px;">{{ ts.level }}</span></td>
+                                    <td style="text-align:center; font-weight:700; color:#166534;">{{ ts.present_days }}</td>
+                                    <td style="text-align:center;">
+                                        {% if ts.weekend_days > 0 %}
+                                        <span class="badge" style="background:#FEF3C7; color:#B45309; font-weight:700;">{{ ts.weekend_days }}j</span>
+                                        {% else %}
+                                        <span style="color:#94A3B8;">0</span>
+                                        {% endif %}
+                                    </td>
+                                    <td style="text-align:center;">{{ ts.conge_days }}</td>
+                                    <td style="text-align:center;">{{ ts.permission_count }}</td>
+                                    <td style="text-align:center;">
+                                        {% if ts.missing_badges > 0 %}
+                                        <span class="badge" style="background:#FEE2E2; color:#DC2626; font-weight:700;">{{ ts.missing_badges }}</span>
+                                        {% else %}
+                                        <span style="color:#94A3B8;">0</span>
+                                        {% endif %}
+                                    </td>
+                                    <td style="text-align:center; font-weight:600;">{{ ts.total_hours }}h</td>
+                                    <td>
+                                        <div style="display:flex; align-items:center; gap:8px;">
+                                            <div style="width:60px; height:6px; background:#E2E8F0; border-radius:3px; overflow:hidden;">
+                                                <div style="height:100%; width:{{ ts.attendance_rate }}%; background:{% if ts.attendance_rate >= 90 %}#10B981{% elif ts.attendance_rate >= 75 %}#F59E0B{% else %}#EF4444{% endif %};"></div>
+                                            </div>
+                                            <span style="font-weight:700; font-size:12px;">{{ ts.attendance_rate }}%</span>
+                                        </div>
+                                    </td>
+                                    <td style="text-align:right; white-space:nowrap;">
+                                        <button type="button" class="btn btn-sm" style="background:#EEF2FF; color:var(--primary); border:1px solid #C7D2FE; font-weight:700; padding:3px 8px;" onclick="openPointageForTech({{ ts.id }}, '{{ ts.name|escape }}')">
+                                            <i class="fa-solid fa-plus"></i> Pointer
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- ═══════════════════════════════════════════════════════════ -->
+                <!-- SUB-PANEL 2: ATTENDANCE RECORDS (WEEKDAY & WEEKEND)        -->
+                <!-- ═══════════════════════════════════════════════════════════ -->
+                <div id="att-sub-records" class="att-sub-panel" style="display:none;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
+                        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                            <button type="button" class="btn btn-sm att-rec-filter active" id="btn-rf-all" onclick="filterRecTable('all')" style="border-radius:15px; font-weight:700; background:#1E293B; color:#fff;">Tous</button>
+                            <button type="button" class="btn btn-sm att-rec-filter" id="btn-rf-weekend" onclick="filterRecTable('weekend')" style="border-radius:15px; font-weight:700; background:#FEF3C7; color:#92400E; border:1px solid #FCD34D;">⭐ Week-ends uniquement</button>
+                            <button type="button" class="btn btn-sm att-rec-filter" id="btn-rf-present" onclick="filterRecTable('PRESENT')" style="border-radius:15px; font-weight:700; background:#DCFCE7; color:#166534; border:1px solid #86EFAC;">Présents</button>
+                            <button type="button" class="btn btn-sm att-rec-filter" id="btn-rf-retard" onclick="filterRecTable('RETARD')" style="border-radius:15px; font-weight:700; background:#FEF9C3; color:#A16207; border:1px solid #FDE047;">Retards</button>
+                            <button type="button" class="btn btn-sm att-rec-filter" id="btn-rf-absent" onclick="filterRecTable('ABSENT')" style="border-radius:15px; font-weight:700; background:#FEE2E2; color:#991B1B; border:1px solid #FCA5A5;">Absents</button>
+                        </div>
+                        <button type="button" class="btn btn-primary btn-sm" onclick="openModal('record-attendance-modal')">
+                            <i class="fa-solid fa-plus"></i> Ajouter un Pointage
+                        </button>
+                    </div>
+
+                    <div class="table-card" style="box-shadow:none; border:1px solid var(--border); border-radius:10px; overflow-x:auto;">
+                        <table class="data-table" id="att-records-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Jour</th>
+                                    <th>Technicien</th>
+                                    <th>Matricule</th>
+                                    <th>Équipe</th>
+                                    <th>Statut</th>
+                                    <th>Arrivée</th>
+                                    <th>Départ</th>
+                                    <th>Heures</th>
+                                    <th>Remarques</th>
+                                    <th style="text-align:right;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="att-records-tbody">
+                                {% for r in attendance_records %}
+                                <tr class="att-row-item {% if r.is_weekend %}is-weekend-row{% endif %}" data-status="{{ r.status }}" data-weekend="{{ r.is_weekend }}">
+                                    <td class="td-mono" style="font-weight:700;">{{ r.date }}</td>
+                                    <td>
+                                        {% if r.is_weekend %}
+                                        <span class="badge" style="background:#FEF3C7; color:#92400E; font-weight:800; border:1px solid #FCD34D;">
+                                            <i class="fa-solid fa-calendar-week"></i> {{ r.day_of_week }} (Week-end)
+                                        </span>
+                                        {% else %}
+                                        <span style="font-weight:600; color:var(--text);">{{ r.day_of_week }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td style="font-weight:700; color:var(--text);">{{ r.technician_name }}</td>
+                                    <td class="td-mono">{{ r.matricule }}</td>
+                                    <td><span class="badge badge-info">Équipe {{ r.shift }}</span></td>
+                                    <td>
+                                        {% if r.status == 'PRESENT' %}
+                                        <span class="badge badge-success"><i class="fa-solid fa-check"></i> Présent</span>
+                                        {% elif r.status == 'RETARD' %}
+                                        <span class="badge" style="background:#FEF3C7; color:#B45309; font-weight:700;"><i class="fa-solid fa-clock"></i> Retard</span>
+                                        {% elif r.status == 'ABSENT' %}
+                                        <span class="badge badge-danger"><i class="fa-solid fa-xmark"></i> Absent</span>
+                                        {% elif r.status == 'CONGE' %}
+                                        <span class="badge" style="background:#E0E7FF; color:#4338CA; font-weight:700;"><i class="fa-solid fa-umbrella-beach"></i> Congé</span>
+                                        {% elif r.status == 'PERMISSION' %}
+                                        <span class="badge" style="background:#F3E8FF; color:#7E22CE; font-weight:700;"><i class="fa-solid fa-door-open"></i> Permission</span>
+                                        {% else %}
+                                        <span class="badge badge-secondary">{{ r.status }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="td-mono" style="text-align:center;">{{ r.arrival_time or '—' }}</td>
+                                    <td class="td-mono" style="text-align:center;">{{ r.departure_time or '—' }}</td>
+                                    <td style="text-align:center; font-weight:700;">{{ r.hours_worked }}h</td>
+                                    <td style="font-size:12px; color:var(--text-sec); max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ r.notes or '—' }}</td>
+                                    <td style="text-align:right; white-space:nowrap;">
+                                        <button type="button" class="btn btn-sm" style="background:none; border:none; color:var(--danger); cursor:pointer;" onclick="deleteAttendanceRecord({{ r.id }})" title="Supprimer ce pointage">
+                                            <i class="fa-solid fa-trash-can"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="11" style="text-align:center; padding:30px; color:var(--text-sec);">
+                                        <i class="fa-solid fa-calendar-xmark" style="font-size:24px; opacity:0.3; display:block; margin-bottom:8px;"></i>
+                                        Aucun pointage pour les filtres sélectionnés. Cliquez sur <strong>Nouveau Pointage</strong> pour commencer.
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- ═══════════════════════════════════════════════════════════ -->
+                <!-- SUB-PANEL 3: LEAVES & PERMISSIONS                           -->
+                <!-- ═══════════════════════════════════════════════════════════ -->
+                <div id="att-sub-leaves" class="att-sub-panel" style="display:none;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
+                        <div>
+                            <span style="font-size:13px; font-weight:700; color:var(--text);">Historique des Congés &amp; Permissions</span>
+                            <span style="font-size:12px; color:var(--text-sec); margin-left:6px;">Enregistrez et suivez les absences autorisées.</span>
+                        </div>
+                        <button type="button" class="btn btn-sm" style="background:#4338CA; color:#FFFFFF; font-weight:700;" onclick="openModal('record-leave-modal')">
+                            <i class="fa-solid fa-plus"></i> Déclarer Congé / Permission
+                        </button>
+                    </div>
+
+                    <div class="table-card" style="box-shadow:none; border:1px solid var(--border); border-radius:10px; overflow-x:auto;">
+                        <table class="data-table" id="att-leaves-table">
+                            <thead>
+                                <tr>
+                                    <th>Technicien</th>
+                                    <th>Matricule</th>
+                                    <th>Type</th>
+                                    <th>Date Début</th>
+                                    <th>Date Fin</th>
+                                    <th>Durée</th>
+                                    <th>Horaires (si partiel)</th>
+                                    <th>Motif / Justification</th>
+                                    <th>Statut</th>
+                                    <th>Approuvé Par</th>
+                                    <th style="text-align:right;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="att-leaves-tbody">
+                                {% for l in leave_records %}
+                                <tr>
+                                    <td style="font-weight:700; color:var(--text);">{{ l.technician_name }}</td>
+                                    <td class="td-mono">{{ l.matricule }}</td>
+                                    <td>
+                                        {% if l.leave_type == 'CONGE' %}
+                                        <span class="badge" style="background:#E0E7FF; color:#4338CA; font-weight:700;"><i class="fa-solid fa-umbrella-beach"></i> Congé</span>
+                                        {% elif l.leave_type == 'PERMISSION' %}
+                                        <span class="badge" style="background:#F3E8FF; color:#7E22CE; font-weight:700;"><i class="fa-solid fa-door-open"></i> Permission</span>
+                                        {% elif l.leave_type == 'MALADIE' %}
+                                        <span class="badge" style="background:#FEE2E2; color:#DC2626; font-weight:700;"><i class="fa-solid fa-heart-pulse"></i> Maladie</span>
+                                        {% else %}
+                                        <span class="badge badge-secondary">{{ l.leave_type }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="td-mono" style="font-weight:600;">{{ l.start_date }}</td>
+                                    <td class="td-mono" style="font-weight:600;">{{ l.end_date }}</td>
+                                    <td style="text-align:center; font-weight:800; color:var(--primary);">{{ l.duration_days }} j</td>
+                                    <td class="td-mono" style="text-align:center; font-size:11px;">
+                                        {% if l.start_time %}{{ l.start_time }} → {{ l.end_time }}{% else %}—{% endif %}
+                                    </td>
+                                    <td style="font-size:12px; max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ l.reason }}</td>
+                                    <td>
+                                        <span class="badge badge-success"><i class="fa-solid fa-check"></i> {{ l.status }}</span>
+                                    </td>
+                                    <td style="font-size:12px; color:var(--text-sec);">{{ l.approved_by or 'Admin' }}</td>
+                                    <td style="text-align:right; white-space:nowrap;">
+                                        <button type="button" class="btn btn-sm" style="background:none; border:none; color:var(--danger); cursor:pointer;" onclick="deleteLeaveRecord({{ l.id }})" title="Supprimer ce congé">
+                                            <i class="fa-solid fa-trash-can"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="11" style="text-align:center; padding:30px; color:var(--text-sec);">
+                                        <i class="fa-solid fa-umbrella-beach" style="font-size:24px; opacity:0.3; display:block; margin-bottom:8px;"></i>
+                                        Aucun congé ou permission enregistré.
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- ═══════════════════════════════════════════════════════════ -->
+                <!-- SUB-PANEL 4: MISSING BADGES (MANQUE DE BADGAGE)            -->
+                <!-- ═══════════════════════════════════════════════════════════ -->
+                <div id="att-sub-badges" class="att-sub-panel" style="display:none;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
+                        <div>
+                            <span style="font-size:13px; font-weight:700; color:var(--text);">Registre des Manques de Badgage</span>
+                            <span style="font-size:12px; color:var(--text-sec); margin-left:6px;">Oublis de pointage à l'entrée ou à la sortie.</span>
+                        </div>
+                        <button type="button" class="btn btn-sm" style="background:#DC2626; color:#FFFFFF; font-weight:700;" onclick="openModal('record-badge-modal')">
+                            <i class="fa-solid fa-plus"></i> Déclarer Oubli de Badgage
+                        </button>
+                    </div>
+
+                    {% if attendance_stats.unregularized_badges > 0 %}
+                    <div style="background:#FEF2F2; border:1px solid #FCA5A5; border-radius:8px; padding:12px 16px; margin-bottom:16px; display:flex; align-items:center; gap:12px;">
+                        <i class="fa-solid fa-triangle-exclamation" style="color:#DC2626; font-size:18px;"></i>
+                        <div style="flex:1;">
+                            <span style="font-weight:700; color:#991B1B; font-size:13px;">{{ attendance_stats.unregularized_badges }} incident(s) de manque de badgage en attente de régularisation.</span>
+                            <div style="font-size:11px; color:#B91C1C; margin-top:2px;">Cliquez sur « Régulariser » après vérification avec le chef d'équipe ou les caméras/registre manuel.</div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <div class="table-card" style="box-shadow:none; border:1px solid var(--border); border-radius:10px; overflow-x:auto;">
+                        <table class="data-table" id="att-badges-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Technicien</th>
+                                    <th>Matricule</th>
+                                    <th>Équipe</th>
+                                    <th>Type d'Oubli</th>
+                                    <th>Heure Réelle</th>
+                                    <th>Motif Déclaré</th>
+                                    <th>Statut</th>
+                                    <th>Régularisé Par</th>
+                                    <th style="text-align:right;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="att-badges-tbody">
+                                {% for b in badge_records %}
+                                <tr>
+                                    <td class="td-mono" style="font-weight:700;">{{ b.date }}</td>
+                                    <td style="font-weight:700; color:var(--text);">{{ b.technician_name }}</td>
+                                    <td class="td-mono">{{ b.matricule }}</td>
+                                    <td><span class="badge badge-info">Équipe {{ b.shift }}</span></td>
+                                    <td>
+                                        {% if b.badge_type == 'ENTREE' %}
+                                        <span class="badge" style="background:#FEF3C7; color:#92400E; font-weight:700;">Oubli Entrée</span>
+                                        {% elif b.badge_type == 'SORTIE' %}
+                                        <span class="badge" style="background:#FEF3C7; color:#92400E; font-weight:700;">Oubli Sortie</span>
+                                        {% else %}
+                                        <span class="badge" style="background:#FEE2E2; color:#991B1B; font-weight:700;">Entrée &amp; Sortie</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="td-mono" style="text-align:center;">{{ b.real_time or '—' }}</td>
+                                    <td style="font-size:12px; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ b.reason }}</td>
+                                    <td>
+                                        {% if b.is_regularized %}
+                                        <span class="badge badge-success"><i class="fa-solid fa-check"></i> Régularisé</span>
+                                        {% else %}
+                                        <span class="badge badge-danger"><i class="fa-solid fa-clock"></i> Non régularisé</span>
+                                        {% endif %}
+                                    </td>
+                                    <td style="font-size:12px; color:var(--text-sec);">
+                                        {% if b.is_regularized %}{{ b.regularized_by or 'Admin' }}{% else %}—{% endif %}
+                                    </td>
+                                    <td style="text-align:right; white-space:nowrap;">
+                                        {% if not b.is_regularized %}
+                                        <button type="button" class="btn btn-sm" style="background:#DCFCE7; color:#166534; border:1px solid #86EFAC; font-weight:700; padding:2px 8px; margin-right:4px;" onclick="quickRegularizeBadge({{ b.id }})">
+                                            <i class="fa-solid fa-check"></i> Régulariser
+                                        </button>
+                                        {% endif %}
+                                        <button type="button" class="btn btn-sm" style="background:none; border:none; color:var(--danger); cursor:pointer;" onclick="deleteBadgeRecord({{ b.id }})" title="Supprimer cet incident">
+                                            <i class="fa-solid fa-trash-can"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="10" style="text-align:center; padding:30px; color:var(--text-sec);">
+                                        <i class="fa-solid fa-id-card-clip" style="font-size:24px; opacity:0.3; display:block; margin-bottom:8px;"></i>
+                                        Aucun incident de manque de badgage enregistré.
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
             </div>
         </div>
 
@@ -499,6 +1195,113 @@ input:checked + .slider:before { transform: translateX(20px); }
                         <i class="fa-solid fa-upload"></i> Charger le Planning
                     </button>
                 </form>
+            </div>
+        </div>
+
+        <!-- ── HISTORIQUE PPE / CHECKLISTS ───────────────────────────────────── -->
+        <div id="panel-checklist-history" class="admin-panel">
+            <div class="settings-card">
+                <div class="settings-header">
+                    <div>
+                        <div class="settings-title">
+                            <i class="fa-solid fa-clipboard-list"></i> Historique des Checklists Exécutées
+                        </div>
+                        <div class="settings-desc">
+                            Toutes les checklists PPE complétées par les techniciens.
+                            En tant qu'administrateur, vous pouvez supprimer des enregistrements obsolètes.
+                        </div>
+                    </div>
+                    <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                        <button class="btn btn-sm" id="adm-select-all-btn" onclick="admToggleSelectAll()"
+                                style="background:var(--bg-soft); border:1px solid var(--border); color:var(--text-sec); font-size:12px;">
+                            <i class="fa-regular fa-square-check"></i> Tout sélectionner
+                        </button>
+                        <button class="btn btn-sm" id="adm-delete-selected-btn" onclick="admDeleteSelected()"
+                                style="background:#FEE2E2; border:1px solid #FECACA; color:#DC2626; font-size:12px; display:none;">
+                            <i class="fa-solid fa-trash"></i> Supprimer la sélection
+                        </button>
+                    </div>
+                </div>
+
+                {% if exec_history %}
+                <div style="overflow-x:auto;">
+                    <table class="data-table" id="adm-exec-table">
+                        <thead>
+                            <tr>
+                                <th style="width:36px;">
+                                    <input type="checkbox" id="adm-cb-all" onchange="admToggleAllCb(this)"
+                                           style="cursor:pointer; width:15px; height:15px; accent-color:var(--primary);">
+                                </th>
+                                <th>#</th>
+                                <th>Équipement</th>
+                                <th>Type</th>
+                                <th>Semaine</th>
+                                <th>Mois</th>
+                                <th>Technicien</th>
+                                <th>Date</th>
+                                <th>Statut</th>
+                                <th style="text-align:right; padding-right:16px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for ex in exec_history %}
+                            <tr id="adm-exec-row-{{ ex.id }}" class="adm-exec-row">
+                                <td>
+                                    <input type="checkbox" class="adm-exec-cb" value="{{ ex.id }}"
+                                           onchange="admUpdateDeleteBtn()"
+                                           style="cursor:pointer; width:15px; height:15px; accent-color:var(--primary);">
+                                </td>
+                                <td style="font-size:11px; color:var(--text-sec); font-family:monospace; font-weight:700;">#{{ ex.id }}</td>
+                                <td>
+                                    <div style="font-weight:700; font-size:12px; color:var(--text); font-family:monospace;">{{ ex.equipment }}</div>
+                                    {% if ex.checklist_name %}
+                                    <div style="font-size:10px; color:var(--text-sec);">{{ ex.checklist_name }}</div>
+                                    {% endif %}
+                                </td>
+                                <td><span class="badge badge-info" style="font-size:10px;">{{ ex.task_type }}</span></td>
+                                <td style="font-size:12px; color:var(--text-sec); font-weight:600;">{{ ex.week or '—' }}</td>
+                                <td style="font-size:12px; color:var(--text-sec);">{{ ex.month or '—' }}</td>
+                                <td>
+                                    <div style="font-size:12px; font-weight:600; color:var(--text);">{{ ex.technician_name }}</div>
+                                    {% if ex.technician_matricule %}
+                                    <div style="font-size:10px; color:var(--text-sec);">Mat: {{ ex.technician_matricule }}</div>
+                                    {% endif %}
+                                </td>
+                                <td style="font-size:11px; color:var(--text-sec);">
+                                    {{ ex.executed_at[:16] if ex.executed_at else '—' }}
+                                </td>
+                                <td>
+                                    <span class="badge badge-success" style="font-size:10px;">
+                                        <i class="fa-solid fa-check-circle"></i> {{ ex.status or 'COMPLÉTÉ' }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="action-cell" style="justify-content:flex-end; gap:6px;">
+                                        <a href="{{ url_for('checklist_download', exec_id=ex.id) }}"
+                                           class="btn btn-xs" title="Télécharger Excel"
+                                           style="background:var(--primary-light); color:var(--primary); border:1px solid var(--primary-border);">
+                                            <i class="fa-solid fa-file-excel"></i>
+                                        </a>
+                                        <button class="btn btn-xs"
+                                                onclick="admDeleteExecution({{ ex.id }}, this)"
+                                                title="Supprimer"
+                                                style="background:#FEE2E2; border:1px solid #FECACA; color:#DC2626;">
+                                            <i class="fa-solid fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="empty-state" style="padding:40px 20px;">
+                    <i class="fa-solid fa-clipboard-list empty-icon"></i>
+                    <div class="empty-title">Aucune exécution enregistrée</div>
+                    <div class="empty-desc">Les checklists complétées par les techniciens apparaîtront ici.</div>
+                </div>
+                {% endif %}
             </div>
         </div>
 
@@ -784,6 +1587,251 @@ input:checked + .slider:before { transform: translateX(20px); }
 
     </div><!-- /admin-main -->
 </div><!-- /admin-layout -->
+
+
+<!-- ── MODAL: NOUVEAU POINTAGE ATTENDANCE ───────────────────────────────────── -->
+<div class="modal-overlay" id="record-attendance-modal">
+    <div class="modal-box" style="max-width: 520px;">
+        <div class="modal-close" onclick="closeModal('record-attendance-modal')">
+            <i class="fa-solid fa-xmark"></i>
+        </div>
+        <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+            <div style="width:40px; height:40px; border-radius:10px; background:#DCFCE7; color:#166534; display:flex; align-items:center; justify-content:center; font-size:18px;">
+                <i class="fa-solid fa-calendar-check"></i>
+            </div>
+            <div>
+                <h3 style="font-size:16px; font-weight:800; color:var(--text); margin:0;">Pointage de Présence</h3>
+                <p style="font-size:12px; color:var(--text-sec); margin:0;">Enregistrer ou corriger la présence (semaine &amp; week-end).</p>
+            </div>
+        </div>
+
+        <form method="POST" action="/admin/attendance/record" id="form-attendance-record">
+            <div class="form-group">
+                <label class="form-label">Technicien *</label>
+                <select name="technician_id" id="att-modal-tech-id" class="form-control" required>
+                    <option value="">Sélectionner un technicien...</option>
+                    {% for t in attendance_techs %}
+                    <option value="{{ t.id }}">{{ t.name }} ({{ t.matricule }}) — Équipe {{ t.shift or 'B' }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="grid-2">
+                <div class="form-group">
+                    <label class="form-label">Date *</label>
+                    <input type="date" name="date" id="att-modal-date" class="form-control" required onchange="onAttDateChanged(this.value)">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Statut *</label>
+                    <select name="status" id="att-modal-status" class="form-control" required onchange="onAttStatusChanged(this.value)">
+                        <option value="PRESENT" selected>✅ Présent</option>
+                        <option value="RETARD">⚠️ Retard</option>
+                        <option value="ABSENT">❌ Absent</option>
+                        <option value="CONGE">🏖️ Congé</option>
+                        <option value="PERMISSION">🚪 Permission</option>
+                        <option value="MISSION">🚗 Mission Externe</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Weekend Alert Banner (auto-detected) -->
+            <div id="att-weekend-alert" style="display:none; background:#FEF3C7; border:1px solid #FCD34D; border-radius:8px; padding:10px 14px; margin-bottom:14px; font-size:12px; color:#92400E; align-items:center; gap:8px;">
+                <i class="fa-solid fa-calendar-week" style="font-size:16px;"></i>
+                <div>
+                    <strong>Permanence Week-end détectée !</strong><br>
+                    Cette date est un <span id="att-weekend-dayname" style="font-weight:800;">Samedi</span>. Ce pointage sera comptabilisé dans les heures supplémentaires / permanences week-end.
+                </div>
+            </div>
+
+            <div class="grid-2" id="att-hours-row">
+                <div class="form-group">
+                    <label class="form-label">Heure d'Arrivée</label>
+                    <input type="time" name="arrival_time" id="att-modal-arr" class="form-control" value="06:00">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Heure de Départ</label>
+                    <input type="time" name="departure_time" id="att-modal-dep" class="form-control" value="14:00">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Remarques &amp; Justifications (optionnel)</label>
+                <textarea name="notes" id="att-modal-notes" class="form-control" rows="2" placeholder="ex: Permanence spéciale CT45, remplacement équipe..."></textarea>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('record-attendance-modal')">Annuler</button>
+                <button type="submit" class="btn btn-primary" style="font-weight:700;">
+                    <i class="fa-solid fa-floppy-disk"></i> Enregistrer le Pointage
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ── MODAL: CONGÉ & PERMISSION ────────────────────────────────────────────── -->
+<div class="modal-overlay" id="record-leave-modal">
+    <div class="modal-box" style="max-width: 520px;">
+        <div class="modal-close" onclick="closeModal('record-leave-modal')">
+            <i class="fa-solid fa-xmark"></i>
+        </div>
+        <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+            <div style="width:40px; height:40px; border-radius:10px; background:#E0E7FF; color:#4338CA; display:flex; align-items:center; justify-content:center; font-size:18px;">
+                <i class="fa-solid fa-umbrella-beach"></i>
+            </div>
+            <div>
+                <h3 style="font-size:16px; font-weight:800; color:var(--text); margin:0;">Déclaration Congé / Permission</h3>
+                <p style="font-size:12px; color:var(--text-sec); margin:0;">Enregistrement d'un congé légal ou d'une autorisation d'absence.</p>
+            </div>
+        </div>
+
+        <form method="POST" action="/admin/attendance/leave/record" id="form-leave-record">
+            <div class="form-group">
+                <label class="form-label">Technicien *</label>
+                <select name="technician_id" class="form-control" required>
+                    <option value="">Sélectionner un technicien...</option>
+                    {% for t in attendance_techs %}
+                    <option value="{{ t.id }}">{{ t.name }} ({{ t.matricule }}) — Équipe {{ t.shift or 'B' }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="grid-2">
+                <div class="form-group">
+                    <label class="form-label">Type d'Absence *</label>
+                    <select name="leave_type" class="form-control" required onchange="onLeaveTypeChanged(this.value)">
+                        <option value="CONGE" selected>🏖️ Congé Annuel</option>
+                        <option value="PERMISSION">🚪 Permission / Sortie</option>
+                        <option value="MALADIE">🩺 Maladie / Certificat</option>
+                        <option value="RECUPERATION">🔄 Récupération Week-end</option>
+                        <option value="AUTRE">📋 Autre motif</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Durée en Jours *</label>
+                    <input type="number" step="0.5" name="duration_days" id="leave-modal-duration" class="form-control" value="1.0" min="0.5" required>
+                </div>
+            </div>
+
+            <div class="grid-2">
+                <div class="form-group">
+                    <label class="form-label">Date de Début *</label>
+                    <input type="date" name="start_date" id="leave-modal-start" class="form-control" required onchange="syncLeaveDates()">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Date de Fin *</label>
+                    <input type="date" name="end_date" id="leave-modal-end" class="form-control" required>
+                </div>
+            </div>
+
+            <!-- Optional Time Range for Part-day Permission -->
+            <div class="grid-2" id="leave-time-row" style="display:none;">
+                <div class="form-group">
+                    <label class="form-label">Heure Début (Permission)</label>
+                    <input type="time" name="start_time" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Heure Fin (Permission)</label>
+                    <input type="time" name="end_time" class="form-control">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Motif / Justification *</label>
+                <input type="text" name="reason" class="form-control" placeholder="ex: Rendez-vous administratif, repos..." required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Notes complémentaires</label>
+                <textarea name="notes" class="form-control" rows="2" placeholder="Optionnel..."></textarea>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('record-leave-modal')">Annuler</button>
+                <button type="submit" class="btn btn-primary" style="background:#4338CA; border-color:#4338CA; font-weight:700;">
+                    <i class="fa-solid fa-check"></i> Valider l'Absence
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ── MODAL: MANQUE DE BADGAGE ────────────────────────────────────────────── -->
+<div class="modal-overlay" id="record-badge-modal">
+    <div class="modal-box" style="max-width: 520px;">
+        <div class="modal-close" onclick="closeModal('record-badge-modal')">
+            <i class="fa-solid fa-xmark"></i>
+        </div>
+        <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+            <div style="width:40px; height:40px; border-radius:10px; background:#FEE2E2; color:#DC2626; display:flex; align-items:center; justify-content:center; font-size:18px;">
+                <i class="fa-solid fa-id-card-clip"></i>
+            </div>
+            <div>
+                <h3 style="font-size:16px; font-weight:800; color:var(--text); margin:0;">Déclaration Manque de Badgage</h3>
+                <p style="font-size:12px; color:var(--text-sec); margin:0;">Enregistrer un oubli de pointage d'arrivée ou de sortie.</p>
+            </div>
+        </div>
+
+        <form method="POST" action="/admin/attendance/badge/record" id="form-badge-record">
+            <div class="form-group">
+                <label class="form-label">Technicien concerné *</label>
+                <select name="technician_id" class="form-control" required>
+                    <option value="">Sélectionner un technicien...</option>
+                    {% for t in attendance_techs %}
+                    <option value="{{ t.id }}">{{ t.name }} ({{ t.matricule }}) — Équipe {{ t.shift or 'B' }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="grid-2">
+                <div class="form-group">
+                    <label class="form-label">Date de l'oubli *</label>
+                    <input type="date" name="date" class="form-control" required id="badge-modal-date">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Type d'Oubli *</label>
+                    <select name="badge_type" class="form-control" required>
+                        <option value="ENTREE" selected>Oubli Entrée (Arrivée)</option>
+                        <option value="SORTIE">Oubli Sortie (Départ)</option>
+                        <option value="LES_DEUX">Oubli Entrée &amp; Sortie</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="grid-2">
+                <div class="form-group">
+                    <label class="form-label">Heure Réelle Estimée / Constatée</label>
+                    <input type="time" name="real_time" class="form-control" value="06:00">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Équipe (Shift)</label>
+                    <select name="shift" class="form-control">
+                        <option value="B" selected>Équipe B</option>
+                        <option value="A">Équipe A</option>
+                        <option value="C">Équipe C</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Motif Déclaré / Justification *</label>
+                <input type="text" name="reason" class="form-control" placeholder="ex: Oubli de badge à la maison, lecteur défaillant..." required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Notes &amp; Validation chef d'équipe</label>
+                <textarea name="notes" class="form-control" rows="2" placeholder="ex: Témoin présent, vérifié par Team Leader..."></textarea>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('record-badge-modal')">Annuler</button>
+                <button type="submit" class="btn btn-primary" style="background:#DC2626; border-color:#DC2626; font-weight:700;">
+                    <i class="fa-solid fa-triangle-exclamation"></i> Enregistrer l'Oubli
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
 
 <!-- ── MODAL: UPLOAD / UPDATE CHECKLIST EXCEL ───────────────────────────── -->
 <div class="modal-overlay" id="upload-checklist-modal">
@@ -1102,6 +2150,11 @@ function switchAdminTab(tabId) {
     if (btn) btn.classList.add('active');
 }
 
+function openModal(modalId) {
+    const m = document.getElementById(modalId);
+    if (m) m.classList.add('open');
+}
+
 function closeModal(modalId) {
     const m = document.getElementById(modalId);
     if (m) m.classList.remove('open');
@@ -1382,32 +2435,88 @@ function renderQuestionsEditor(exam) {
 
             <!-- Conditional Section based on question_type -->
             ${qType === 'image_labeling' ? `
-            <div style="background:#F0FDF4; border:1px solid #BBF7D0; border-radius:8px; padding:14px; margin-bottom:12px;">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                    <span style="font-weight:800; font-size:12px; color:#166534; text-transform:uppercase;">
-                        <i class="fa-solid fa-tags"></i> Étiquettes / Éléments disponibles (${labels.length})
-                    </span>
-                </div>
-                <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px;">
-                    ${labels.map((lbl, li) => `
-                        <span style="display:inline-flex; align-items:center; gap:6px; background:#fff; border:1.5px solid #86EFAC; padding:4px 10px; border-radius:15px; font-size:12px; font-weight:600; color:#14532D;">
-                            <span>${escapeHtml(lbl)}</span>
-                            <i class="fa-solid fa-xmark" style="cursor:pointer; color:#DC2626;" onclick="removeLabel(${q.id}, ${li})" title="Supprimer"></i>
+            <!-- INLINE BOX EDITOR -->
+            <div style="background:#F0FDF4; border:1.5px solid #86EFAC; border-radius:10px; padding:14px; margin-bottom:12px;">
+
+                <!-- Header -->
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <span style="font-weight:800; font-size:12px; color:#166534; text-transform:uppercase; letter-spacing:0.5px;">
+                            <i class="fa-solid fa-crosshairs"></i> Boîtes Interactives
                         </span>
-                    `).join('')}
-                    ${labels.length === 0 ? '<span style="font-size:12px; color:var(--text-sec); font-style:italic;">Aucune étiquette définie.</span>' : ''}
+                        <span id="inline-box-count-${q.id}" style="background:#166534; color:#fff; padding:2px 10px; border-radius:12px; font-size:11px; font-weight:700; display:inline-block;">
+                            Chargement...
+                        </span>
+                    </div>
+                    <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                        <button type="button" class="btn btn-sm"
+                            style="background:#1D4ED8; color:#fff; font-size:11px; border:none;"
+                            onclick="inlineBoxLoadDefaults(${q.id})"
+                            title="Charger les 11 boîtes CS WIN par défaut">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> CS WIN défaut
+                        </button>
+                        <button type="button" class="btn btn-sm"
+                            style="background:#166534; color:#fff; font-size:11px; border:none; font-weight:700;"
+                            onclick="inlineBoxSave(${q.id})">
+                            <i class="fa-solid fa-floppy-disk"></i> Sauvegarder
+                        </button>
+                        <button type="button" class="btn btn-sm"
+                            style="background:#DC2626; color:#fff; font-size:11px; border:none;"
+                            onclick="inlineBoxClearAll(${q.id})">
+                            <i class="fa-solid fa-trash"></i> Tout effacer
+                        </button>
+                    </div>
                 </div>
-                <div style="display:flex; gap:8px;">
-                    <input type="text" id="new-label-input-${q.id}" placeholder="Ajouter une étiquette..." class="form-control" style="font-size:12px; height:32px;" onkeydown="if(event.key==='Enter'){event.preventDefault(); addLabel(${q.id});}">
-                    <button type="button" class="btn btn-sm" style="background:#166534; color:#fff; white-space:nowrap;" onclick="addLabel(${q.id})">
-                        <i class="fa-solid fa-plus"></i> Ajouter
-                    </button>
+
+                <!-- How-to -->
+                <div style="background:#ECFDF5; border:1px solid #6EE7B7; border-radius:6px; padding:7px 12px; margin-bottom:10px; font-size:11px; color:#065F46;">
+                    <i class="fa-solid fa-circle-info"></i>
+                    <strong>Dessiner :</strong> Cliquez-glissez sur l'image pour créer un cadre. &nbsp;
+                    <strong>Déplacer :</strong> Glissez un cadre. &nbsp;
+                    <strong>Redimensionner :</strong> Coin bleu bas-droite. &nbsp;
+                    <strong>Réponse :</strong> Remplissez le champ dans la liste ci-dessous.
                 </div>
-                <div style="margin-top:10px; font-size:11px; color:#166534; font-style:italic;">
-                    <i class="fa-solid fa-circle-info"></i> Les techniciens sélectionnent ces étiquettes lors de l'examen. Pas de QCM. Non notée automatiquement.
+
+                ${q.image ? `
+                <!-- CANVAS -->
+                <div id="inline-canvas-wrap-${q.id}"
+                     style="position:relative; display:block; width:100%; cursor:crosshair; border:2px dashed #86EFAC; border-radius:8px; overflow:visible; user-select:none; background:#f0fdf4; margin-bottom:10px;"
+                     onmousedown="inlineCanvasMouseDown(event, ${q.id})"
+                     onmousemove="inlineCanvasMouseMove(event, ${q.id})"
+                     onmouseup="inlineCanvasMouseUp(event, ${q.id})">
+
+                    <img src="/static/exam_images/${q.image}"
+                         id="inline-img-${q.id}"
+                         alt="Image Q${q.question_number}"
+                         style="display:block; width:100%; height:auto; border-radius:6px; pointer-events:none;"
+                         draggable="false"
+                         onload="inlineBoxInit(${q.id})">
+
+                    <!-- Overlay hint when empty -->
+                    <div id="inline-hint-${q.id}"
+                         style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; pointer-events:none; z-index:5;">
+                        <div style="background:rgba(22,101,52,0.80); color:#fff; border-radius:10px; padding:12px 20px; font-size:13px; font-weight:700; text-align:center; box-shadow:0 4px 16px rgba(0,0,0,0.25);">
+                            <i class="fa-solid fa-hand-pointer" style="font-size:20px; display:block; margin-bottom:6px;"></i>
+                            Cliquez-glissez sur l'image<br>pour ajouter un cadre
+                        </div>
+                    </div>
+                    <!-- Boxes injected here by inlineBoxRenderBoxes() -->
                 </div>
-            </div>
-            ` : qType === 'true_false' ? `
+                ` : `
+                <div style="background:#FEF9C3; border:1px dashed #FCD34D; border-radius:8px; padding:20px; text-align:center; color:#92400E; font-size:12px; margin-bottom:10px;">
+                    <i class="fa-solid fa-image" style="font-size:24px; margin-bottom:8px; display:block;"></i>
+                    <strong>Ajoutez d'abord une image</strong> (section ci-dessus), puis les boîtes pourront être dessinées.
+                </div>
+                `}
+
+                <!-- Box list (table of boxes with target inputs) -->
+                <div id="inline-box-list-${q.id}">
+                    <!-- Populated by inlineBoxRenderList() after init -->
+                    <div style="color:#94A3B8; font-size:11px; font-style:italic; text-align:center; padding:8px;">
+                        Chargement des boîtes...
+                    </div>
+                </div>
+            </div>` : qType === 'true_false' ? `
             <div style="font-weight:700; font-size:12px; color:var(--text-sec); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px;">Bonne réponse (Vrai / Faux) :</div>
             <div style="display:flex; gap:12px; margin-bottom:12px;">
                 ${(q.answers || []).map((a, ai) => `
@@ -1423,21 +2532,48 @@ function renderQuestionsEditor(exam) {
                 <i class="fa-solid fa-circle-info"></i> <strong>Question à réponse libre (texte) :</strong> Le technicien saisit sa réponse dans un champ texte. Non notée automatiquement.
             </div>
             ` : `
-            <!-- Choices with correct-answer selector -->
+            <!-- Choices with correct-answer selector + add/delete -->
             <div style="font-weight:700; font-size:12px; color:var(--text-sec); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px;">Réponses — sélectionnez la correcte :</div>
             ${(q.answers || []).map((a, ai) => `
-            <label style="display:flex; align-items:center; gap:10px; padding:8px 12px; border-radius:6px; border:1px solid ${a.is_correct ? '#10B981' : 'var(--border)'}; background:${a.is_correct ? '#F0FDF4' : '#fff'}; margin-bottom:6px; cursor:pointer;" id="ans-label-${a.id}">
-                <input type="radio" name="correct_${q.id}" value="${a.id}" ${a.is_correct ? 'checked' : ''} onchange="markCorrect(${q.id}, ${a.id})">
-                <span style="font-weight:700; color:var(--text-sec);">${alphabet[ai]}.</span>
-                <span style="font-size:13px;">${a.answer_text}</span>
-                ${a.is_correct ? '<span style="margin-left:auto; font-size:11px; color:#10B981; font-weight:700;"><i class="fa-solid fa-check"></i> Correcte</span>' : ''}
-            </label>
+            <div style="display:flex; align-items:center; gap:6px; margin-bottom:6px;">
+                <label style="flex:1; display:flex; align-items:center; gap:10px; padding:8px 12px; border-radius:6px; border:1px solid ${a.is_correct ? '#10B981' : 'var(--border)'}; background:${a.is_correct ? '#F0FDF4' : '#fff'}; cursor:pointer;" id="ans-label-${a.id}">
+                    <input type="radio" name="correct_${q.id}" value="${a.id}" ${a.is_correct ? 'checked' : ''} onchange="markCorrect(${q.id}, ${a.id})">
+                    <span style="font-weight:700; color:var(--text-sec);">${alphabet[ai]}.</span>
+                    <span style="font-size:13px;">${escapeHtml(a.answer_text)}</span>
+                    ${a.is_correct ? '<span style="margin-left:auto; font-size:11px; color:#10B981; font-weight:700;"><i class="fa-solid fa-check"></i> Correcte</span>' : ''}
+                </label>
+                <button type="button" onclick="deleteAnswer(${a.id}, ${q.id})" style="background:none; border:1px solid #FECACA; border-radius:6px; color:#DC2626; cursor:pointer; padding:5px 9px; font-size:12px;" title="Supprimer cette réponse">
+                    <i class="fa-solid fa-trash-can"></i>
+                </button>
+            </div>
             `).join('')}
+            <div style="display:flex; gap:8px; margin-top:10px; padding-top:10px; border-top:1px dashed var(--border);">
+                <input type="text" id="new-answer-input-${q.id}" placeholder="Nouvelle réponse..." class="form-control" style="font-size:12px; height:34px;" onkeydown="if(event.key==='Enter'){event.preventDefault(); addAnswerToQuestion(${q.id});}">
+                <button type="button" class="btn btn-sm" style="background:#EFF6FF; color:var(--primary); border:1px solid #BFDBFE; white-space:nowrap; height:34px;" onclick="addAnswerToQuestion(${q.id})">
+                    <i class="fa-solid fa-plus"></i> Ajouter
+                </button>
+            </div>
             `}
         </div>`;
     });
 
     document.getElementById('qeditor-body').innerHTML = html;
+
+    // Ensure inline box editor initializes even if image is cached and onload does not fire
+    setTimeout(() => {
+        qs.forEach(q => {
+            if (q.question_type === 'image_labeling' && q.image) {
+                const img = document.getElementById(`inline-img-${q.id}`);
+                if (img) {
+                    if (img.complete) {
+                        inlineBoxInit(q.id);
+                    } else {
+                        img.addEventListener('load', () => inlineBoxInit(q.id));
+                    }
+                }
+            }
+        });
+    }, 60);
 }
 
 async function updateQuestionType(qId, newType) {
@@ -1450,16 +2586,60 @@ async function updateQuestionType(qId, newType) {
         const d = await res.json();
         if (d.success) {
             showToast('Type de question mis à jour', 'success');
-            const q = (_currentExamData.questions || []).find(x => x.id === qId);
-            if (q) {
-                q.question_type = newType;
-                renderQuestionsEditor(_currentExamData);
+            if (_editQExamId) {
+                await loadQuestionsEditor(_editQExamId);
+            } else {
+                const q = (_currentExamData.questions || []).find(x => x.id === qId);
+                if (q) {
+                    q.question_type = newType;
+                    renderQuestionsEditor(_currentExamData);
+                }
             }
         } else {
             showToast('Erreur: ' + (d.error || ''), 'danger');
         }
     } catch(e) {
         showToast('Erreur réseau', 'danger');
+    }
+}
+
+async function deleteAnswer(answerId, qId) {
+    if (!confirm('Supprimer cette réponse ?')) return;
+    try {
+        const res = await fetch(`/admin/exam/answer/${answerId}/delete`, { method: 'POST' });
+        const d = await res.json();
+        if (d.success) {
+            showToast('Réponse supprimée.', 'success');
+            await loadQuestionsEditor(_editQExamId);
+        } else {
+            showToast('Erreur: ' + (d.error || ''), 'danger');
+        }
+    } catch(e) {
+        showToast('Erreur réseau: ' + e, 'danger');
+    }
+}
+
+async function addAnswerToQuestion(qId) {
+    const inp = document.getElementById(`new-answer-input-${qId}`);
+    if (!inp) return;
+    const text = inp.value.trim();
+    if (!text) { showToast('Entrez le texte de la réponse.', 'danger'); return; }
+    try {
+        const res = await fetch(`/admin/exam/question/${qId}/add-answer`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ answer_text: text, is_correct: 0 })
+        });
+        const d = await res.json();
+        if (d.success) {
+            showToast('Réponse ajoutée.', 'success');
+            inp.value = '';
+            await loadQuestionsEditor(_editQExamId);
+        } else {
+            showToast('Erreur: ' + (d.error || ''), 'danger');
+        }
+    } catch(e) {
+        showToast('Erreur réseau: ' + e, 'danger');
     }
 }
 
@@ -1701,5 +2881,1411 @@ document.addEventListener('keydown', function(e) {
         document.querySelectorAll('.modal-overlay.open').forEach(el => closeModal(el.id));
     }
 });
+
+/* ── Admin: Checklist History Delete ── */
+async function admDeleteExecution(execId, btn) {
+    if (!confirm('Supprimer définitivement cet enregistrement de checklist ?\nCette action est irréversible.')) return;
+    const row = document.getElementById('adm-exec-row-' + execId);
+    btn.disabled = true;
+    const orig = btn.innerHTML;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+    try {
+        const res = await fetch('/pma/checklist/delete/' + execId, {method: 'POST', headers: {'Content-Type': 'application/json'}});
+        const data = await res.json();
+        if (res.ok && data.status === 'success') {
+            if (row) { row.style.transition='opacity .35s'; row.style.opacity='0'; setTimeout(()=>row.remove(), 360); }
+        } else {
+            btn.disabled = false; btn.innerHTML = orig;
+            alert(data.message || 'Erreur lors de la suppression.');
+        }
+    } catch(e) { btn.disabled = false; btn.innerHTML = orig; alert('Erreur réseau : ' + e); }
+}
+
+function admToggleAllCb(masterCb) {
+    document.querySelectorAll('.adm-exec-cb').forEach(cb => cb.checked = masterCb.checked);
+    admUpdateDeleteBtn();
+}
+
+function admToggleSelectAll() {
+    const cbs = document.querySelectorAll('.adm-exec-cb');
+    const anyUnchecked = Array.from(cbs).some(cb => !cb.checked);
+    cbs.forEach(cb => cb.checked = anyUnchecked);
+    const m = document.getElementById('adm-cb-all'); if(m) m.checked = !anyUnchecked;
+    admUpdateDeleteBtn();
+}
+
+function admUpdateDeleteBtn() {
+    const n = document.querySelectorAll('.adm-exec-cb:checked').length;
+    const btn = document.getElementById('adm-delete-selected-btn');
+    if (btn) { btn.style.display = n > 0 ? 'inline-flex' : 'none'; btn.innerHTML = '<i class="fa-solid fa-trash"></i> Supprimer (' + n + ')'; }
+}
+
+async function admDeleteSelected() {
+    const checked = Array.from(document.querySelectorAll('.adm-exec-cb:checked'));
+    if (!checked.length) return;
+    const ids = checked.map(cb => parseInt(cb.value));
+    if (!confirm('Supprimer définitivement ' + ids.length + ' enregistrement(s) ?\nCette action est irréversible.')) return;
+    const btn = document.getElementById('adm-delete-selected-btn');
+    if (btn) { btn.disabled=true; btn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> Suppression...'; }
+    try {
+        const res = await fetch('/pma/checklist/delete-bulk', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ids})
+        });
+        const data = await res.json();
+        if (res.ok && data.status === 'success') {
+            ids.forEach(id => {
+                const row = document.getElementById('adm-exec-row-' + id);
+                if (row) { row.style.transition='opacity .3s'; row.style.opacity='0'; setTimeout(()=>row.remove(), 320); }
+            });
+            if (btn) { btn.disabled=false; btn.style.display='none'; }
+            const m = document.getElementById('adm-cb-all'); if(m) m.checked=false;
+        } else {
+            if (btn) { btn.disabled=false; btn.innerHTML='<i class="fa-solid fa-trash"></i> Supprimer la sélection'; }
+            alert(data.message || 'Erreur lors de la suppression.');
+        }
+    } catch(e) {
+        if (btn) { btn.disabled=false; btn.innerHTML='<i class="fa-solid fa-trash"></i> Supprimer la sélection'; }
+        alert('Erreur réseau : ' + e);
+    }
+}
+
+/* ── Multi-Email Chips Manager ── */
+let recipientEmails = [];
+
+function initEmailChips() {
+    const hiddenEl = document.getElementById('team_leader_emails');
+    const rawVal = hiddenEl ? hiddenEl.value : '';
+    recipientEmails = [];
+    if (rawVal) {
+        const parts = rawVal.split(/[,;\s\n\r]+/);
+        parts.forEach(p => {
+            const clean = p.trim().toLowerCase();
+            if (clean && clean.includes('@') && clean.includes('.') && !recipientEmails.includes(clean)) {
+                recipientEmails.push(clean);
+            }
+        });
+    }
+    renderEmailChips();
+}
+
+function renderEmailChips() {
+    const container = document.getElementById('email-chips-container');
+    const noMsg = document.getElementById('no-emails-msg');
+    const badge = document.getElementById('email-count-badge');
+    const hiddenInput = document.getElementById('team_leader_emails');
+
+    if (!container) return;
+
+    container.innerHTML = '';
+    if (recipientEmails.length === 0) {
+        if (noMsg) noMsg.style.display = 'block';
+    } else {
+        if (noMsg) noMsg.style.display = 'none';
+        recipientEmails.forEach((email, idx) => {
+            const chip = document.createElement('div');
+            chip.className = 'email-chip';
+            chip.style.cssText = 'display:inline-flex; align-items:center; gap:8px; background:linear-gradient(135deg, var(--primary-light) 0%, #EDE9FE 100%); border:1px solid var(--primary-border); color:var(--primary); padding:6px 12px; border-radius:20px; font-size:12px; font-weight:600; box-shadow:0 1px 3px rgba(0,0,0,0.05); transition:all 0.2s ease;';
+            
+            chip.innerHTML = `
+                <i class="fa-regular fa-envelope" style="font-size:11px;"></i>
+                <span>${escapeHtml(email)}</span>
+                <button type="button" onclick="removeEmailChip(${idx})" title="Supprimer cet email" style="background:rgba(46,0,139,0.12); border:none; width:18px; height:18px; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--primary); font-size:10px; margin-left:2px; transition:background 0.15s ease;" onmouseover="this.style.background='#FEE2E2'; this.style.color='#DC2626';" onmouseout="this.style.background='rgba(46,0,139,0.12)'; this.style.color='var(--primary)';">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            `;
+            container.appendChild(chip);
+        });
+    }
+
+    if (badge) {
+        badge.textContent = `${recipientEmails.length} email(s)`;
+        badge.className = recipientEmails.length > 0 ? 'badge badge-success' : 'badge badge-warning';
+    }
+
+    if (hiddenInput) {
+        hiddenInput.value = recipientEmails.join(', ');
+    }
+}
+
+function addEmailChip() {
+    const input = document.getElementById('new_email_input');
+    if (!input) return;
+    const val = input.value.trim();
+    if (!val) return;
+
+    // Supports pasting single or multiple comma/space separated emails
+    const candidates = val.split(/[,;\s\n\r]+/);
+    let addedCount = 0;
+    candidates.forEach(cand => {
+        const clean = cand.trim().toLowerCase();
+        if (clean && clean.includes('@') && clean.includes('.')) {
+            if (!recipientEmails.includes(clean)) {
+                recipientEmails.push(clean);
+                addedCount++;
+            }
+        }
+    });
+
+    if (addedCount === 0 && candidates.length === 1) {
+        alert("Veuillez saisir une adresse email valide (ex: nom@domaine.com).");
+        return;
+    }
+
+    input.value = '';
+    renderEmailChips();
+    input.focus();
+}
+
+function removeEmailChip(index) {
+    if (index >= 0 && index < recipientEmails.length) {
+        recipientEmails.splice(index, 1);
+        renderEmailChips();
+    }
+}
+
+function clearAllEmails() {
+    if (recipientEmails.length === 0) return;
+    if (confirm("Supprimer tous les emails de la liste des destinataires ?")) {
+        recipientEmails = [];
+        renderEmailChips();
+    }
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+/* ── SMTP Diagnostics & PMA Excel Email ── */
+async function testSmtpConnection() {
+    const btn = document.getElementById('btn-test-email');
+    const resultBox = document.getElementById('smtp-test-result');
+    
+    const payload = {
+        smtp_server: document.getElementById('smtp_server').value.trim(),
+        smtp_port: document.getElementById('smtp_port').value.trim(),
+        security: document.getElementById('smtp_security').value,
+        sender_email: document.getElementById('sender_email').value.trim(),
+        sender_password: document.getElementById('sender_password').value,
+        team_leader_emails: document.getElementById('team_leader_emails').value.trim()
+    };
+
+    if (!payload.team_leader_emails && !payload.sender_email) {
+        alert("Veuillez renseigner au moins une adresse de destinataire ou d'expéditeur pour le test.");
+        return;
+    }
+
+    const origHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Test de connexion en cours...';
+    
+    resultBox.style.display = 'block';
+    resultBox.style.background = '#F8FAFC';
+    resultBox.style.border = '1px solid #CBD5E1';
+    resultBox.style.color = '#334155';
+    resultBox.textContent = 'Connexion au serveur SMTP ' + payload.smtp_server + ':' + payload.smtp_port + '...\nVérification des flux réseau et certificat...';
+
+    try {
+        const res = await fetch('/admin/email/test', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        
+        btn.disabled = false;
+        btn.innerHTML = origHtml;
+
+        if (data.status === 'success') {
+            resultBox.style.background = '#F0FDF4';
+            resultBox.style.border = '1px solid #BBF7D0';
+            resultBox.style.color = '#166534';
+            resultBox.textContent = (data.message || 'Succès') + '\n\n' + (data.details || '');
+        } else {
+            resultBox.style.background = '#FEF2F2';
+            resultBox.style.border = '1px solid #FECACA';
+            resultBox.style.color = '#991B1B';
+            resultBox.textContent = (data.message || 'Échec du test') + '\n\n' + (data.details || '');
+        }
+    } catch (e) {
+        btn.disabled = false;
+        btn.innerHTML = origHtml;
+        resultBox.style.background = '#FEF2F2';
+        resultBox.style.border = '1px solid #FECACA';
+        resultBox.style.color = '#991B1B';
+        resultBox.textContent = 'Erreur réseau lors de la requête de test : ' + e;
+    }
+}
+
+async function sendPmaExcelNow(btn) {
+    if (!confirm("Envoyer le planning préventif Excel au(x) Team Leader(s) configuré(s) ?")) return;
+    const orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Envoi...';
+    try {
+        const res = await fetch('/admin/email/send-pma-excel', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({})
+        });
+        const data = await res.json();
+        btn.disabled = false;
+        btn.innerHTML = orig;
+        if (data.status === 'success') {
+            alert("✅ " + data.message);
+        } else {
+            alert("❌ " + (data.message || "Erreur lors de l'envoi"));
+        }
+    } catch(e) {
+        btn.disabled = false;
+        btn.innerHTML = orig;
+        alert("❌ Erreur réseau : " + e);
+    }
+}
+
+// Auto-switch tab based on hash (e.g. #email) and initialize email chips
+window.addEventListener('DOMContentLoaded', () => {
+    initEmailChips();
+    const h = window.location.hash.replace('#', '');
+    if (h && document.getElementById('panel-' + h)) {
+        switchAdminTab(h);
+    }
+});
+
+// ══════════════════════════════════════════════════════════════════════
+// INLINE BOX EDITOR — per-question-card box placement system
+// State is per-question-id, fully independent of the modal editor
+// ══════════════════════════════════════════════════════════════════════
+
+const _INLINE = {};   // per-question state: { boxes, drawing, dragging, resizing, drawStart, nextId }
+
+function _inlineState(qid) {
+    if (!_INLINE[qid]) {
+        _INLINE[qid] = { boxes: [], drawing: false, dragging: null, resizing: null, drawStart: null, nextId: 200 };
+    }
+    return _INLINE[qid];
+}
+
+// Called by img onload — load existing boxes from server
+function inlineBoxInit(qid) {
+    const hint = document.getElementById(`inline-hint-${qid}`);
+    if (hint) hint.style.display = 'none'; // hide while loading
+
+    fetch(`/admin/exam/question/${qid}/get-boxes`)
+        .then(r => r.json())
+        .then(d => {
+            const st = _inlineState(qid);
+            if (d.boxes && d.boxes.length > 0) {
+                st.boxes = d.boxes.map(b => ({...b}));
+                st.nextId = Math.max(...st.boxes.map(b => b.id)) + 1;
+            } else {
+                st.boxes = [];
+            }
+            inlineBoxRenderBoxes(qid);
+            inlineBoxRenderList(qid);
+            _inlineUpdateCount(qid);
+        })
+        .catch(() => {
+            _inlineState(qid);
+            inlineBoxRenderBoxes(qid);
+            inlineBoxRenderList(qid);
+            _inlineUpdateCount(qid);
+        });
+}
+
+function _inlineUpdateCount(qid) {
+    const st = _inlineState(qid);
+    const badge = document.getElementById(`inline-box-count-${qid}`);
+    if (badge) {
+        const n = st.boxes.length;
+        badge.textContent = n === 0 ? 'Aucune boîte' : `${n} boîte${n > 1 ? 's' : ''} configurée${n > 1 ? 's' : ''}`;
+        badge.style.background = n === 0 ? '#DC2626' : '#166534';
+    }
+    // Show/hide canvas overlay hint
+    const hint = document.getElementById(`inline-hint-${qid}`);
+    if (hint) hint.style.display = st.boxes.length === 0 ? 'flex' : 'none';
+}
+
+// ── Inline canvas mouse events ──────────────────────────────────────────────
+function _inlineRelPos(e, qid) {
+    const wrap = document.getElementById(`inline-canvas-wrap-${qid}`);
+    if (!wrap) return {x:0,y:0};
+    const rect = wrap.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    return {
+        x: Math.max(0, Math.min(100, (clientX - rect.left) / rect.width  * 100)),
+        y: Math.max(0, Math.min(100, (clientY - rect.top)  / rect.height * 100))
+    };
+}
+
+function inlineCanvasMouseDown(e, qid) {
+    // Ignore if clicking on a box or its children
+    const tgt = e.target;
+    if (tgt.classList && (tgt.classList.contains('ibox') || tgt.classList.contains('ibox-resize') || tgt.classList.contains('ibox-del'))) return;
+    const st = _inlineState(qid);
+    const pos = _inlineRelPos(e, qid);
+    st.drawing = true;
+    st.drawStart = pos;
+
+    // Create temp draw box
+    const wrap = document.getElementById(`inline-canvas-wrap-${qid}`);
+    if (!wrap) return;
+    let temp = document.getElementById(`inline-temp-${qid}`);
+    if (temp) temp.remove();
+    temp = document.createElement('div');
+    temp.id = `inline-temp-${qid}`;
+    temp.style.cssText = `position:absolute; border:2px dashed #2563EB; background:rgba(37,99,235,0.08); pointer-events:none; z-index:50; box-sizing:border-box; left:${pos.x}%;top:${pos.y}%;width:0%;height:0%;`;
+    wrap.appendChild(temp);
+    e.preventDefault();
+}
+
+function inlineCanvasMouseMove(e, qid) {
+    const st = _inlineState(qid);
+    const pos = _inlineRelPos(e, qid);
+
+    if (st.drawing && st.drawStart) {
+        const temp = document.getElementById(`inline-temp-${qid}`);
+        if (!temp) return;
+        const x = Math.min(pos.x, st.drawStart.x);
+        const y = Math.min(pos.y, st.drawStart.y);
+        const w = Math.abs(pos.x - st.drawStart.x);
+        const h = Math.abs(pos.y - st.drawStart.y);
+        temp.style.left = `${x}%`; temp.style.top = `${y}%`;
+        temp.style.width = `${w}%`; temp.style.height = `${h}%`;
+    }
+
+    if (st.dragging) {
+        const { boxId, startX, startY, origLeft, origTop } = st.dragging;
+        const box = st.boxes.find(b => b.id === boxId);
+        if (box) {
+            box.left = Math.max(0, Math.min(97 - box.width, origLeft + (pos.x - startX)));
+            box.top  = Math.max(0, Math.min(97 - box.height, origTop  + (pos.y - startY)));
+            const el = document.getElementById(`ibox-${qid}-${boxId}`);
+            if (el) { el.style.left = `${box.left}%`; el.style.top = `${box.top}%`; }
+        }
+    }
+
+    if (st.resizing) {
+        const { boxId, startX, startY, origW, origH } = st.resizing;
+        const box = st.boxes.find(b => b.id === boxId);
+        if (box) {
+            box.width  = Math.max(3, origW + (pos.x - startX));
+            box.height = Math.max(2, origH + (pos.y - startY));
+            const el = document.getElementById(`ibox-${qid}-${boxId}`);
+            if (el) { el.style.width = `${box.width}%`; el.style.height = `${box.height}%`; }
+        }
+    }
+}
+
+function inlineCanvasMouseUp(e, qid) {
+    const st = _inlineState(qid);
+
+    if (st.drawing) {
+        st.drawing = false;
+        const temp = document.getElementById(`inline-temp-${qid}`);
+        if (temp) {
+            const left = parseFloat(temp.style.left);
+            const top  = parseFloat(temp.style.top);
+            const w    = parseFloat(temp.style.width);
+            const h    = parseFloat(temp.style.height);
+            temp.remove();
+            if (w > 1.5 && h > 1.5) {
+                const newBox = {
+                    id: st.nextId++,
+                    num: st.boxes.length + 1,
+                    target: '',
+                    left: parseFloat(left.toFixed(2)),
+                    top:  parseFloat(top.toFixed(2)),
+                    width:  parseFloat(w.toFixed(2)),
+                    height: parseFloat(h.toFixed(2)),
+                    hint: ''
+                };
+                st.boxes.push(newBox);
+                inlineBoxRenderBoxes(qid);
+                inlineBoxRenderList(qid);
+                _inlineUpdateCount(qid);
+                // Auto-focus the target input for this new box
+                setTimeout(() => {
+                    const inp = document.getElementById(`itarget-${qid}-${newBox.id}`);
+                    if (inp) { inp.focus(); inp.select(); }
+                }, 60);
+            }
+        }
+        st.drawStart = null;
+    }
+
+    if (st.dragging) {
+        st.dragging = null;
+        inlineBoxRenderList(qid);
+    }
+    if (st.resizing) {
+        st.resizing = null;
+        inlineBoxRenderList(qid);
+    }
+}
+
+// Global mouseup to end drag/resize even if mouse leaves canvas
+document.addEventListener('mouseup', (e) => {
+    Object.keys(_INLINE).forEach(qidStr => {
+        const qid = parseInt(qidStr);
+        const st = _INLINE[qid];
+        if (st && (st.dragging || st.resizing)) {
+            st.dragging = null; st.resizing = null;
+            inlineBoxRenderList(qid);
+        }
+    });
+});
+
+// ── Render boxes on the canvas ──────────────────────────────────────────────
+function inlineBoxRenderBoxes(qid) {
+    const wrap = document.getElementById(`inline-canvas-wrap-${qid}`);
+    if (!wrap) return;
+    const st = _inlineState(qid);
+
+    // Remove old ibox elements
+    wrap.querySelectorAll('.ibox').forEach(el => el.remove());
+
+    st.boxes.forEach(box => {
+        const el = document.createElement('div');
+        el.id = `ibox-${qid}-${box.id}`;
+        el.className = 'ibox';
+        el.style.cssText = `
+            position:absolute;
+            left:${box.left}%; top:${box.top}%;
+            width:${box.width}%; height:${box.height}%;
+            border:2.5px solid #2563EB;
+            background:rgba(219,234,254,0.60);
+            border-radius:3px;
+            box-sizing:border-box;
+            cursor:move;
+            z-index:30;
+            user-select:none;
+        `;
+
+        // Number label inside box
+        const lbl = document.createElement('div');
+        lbl.style.cssText = 'position:absolute;top:1px;left:2px;font-size:9px;font-weight:900;color:#1D4ED8;pointer-events:none;white-space:nowrap;overflow:hidden;max-width:95%;line-height:1.1;text-shadow:0 0 3px #fff;';
+        lbl.textContent = `#${box.num}${box.target ? ': ' + box.target.substring(0, 16) : ''}`;
+        el.appendChild(lbl);
+
+        // Resize handle (bottom-right corner)
+        const rh = document.createElement('div');
+        rh.className = 'ibox-resize';
+        rh.style.cssText = 'position:absolute;bottom:0;right:0;width:12px;height:12px;background:#2563EB;cursor:se-resize;border-radius:2px 0 3px 0;z-index:35;display:flex;align-items:center;justify-content:center;';
+        rh.innerHTML = '<svg width="6" height="6" viewBox="0 0 6 6" style="pointer-events:none"><path d="M1 5L5 1M3 5L5 3M5 5L5 5" stroke="white" stroke-width="1.2" stroke-linecap="round"/></svg>';
+        rh.addEventListener('mousedown', (ev) => {
+            ev.stopPropagation(); ev.preventDefault();
+            const pos = _inlineRelPos(ev, qid);
+            _inlineState(qid).resizing = { boxId: box.id, startX: pos.x, startY: pos.y, origW: box.width, origH: box.height };
+        });
+        el.appendChild(rh);
+
+        // Delete button
+        const del = document.createElement('div');
+        del.className = 'ibox-del';
+        del.style.cssText = 'position:absolute;top:-9px;right:-9px;width:18px;height:18px;background:#EF4444;border:2px solid #fff;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;font-weight:900;z-index:40;line-height:1;box-shadow:0 1px 4px rgba(0,0,0,0.3);';
+        del.textContent = '×';
+        del.title = 'Supprimer ce cadre';
+        del.addEventListener('mousedown', (ev) => {
+            ev.stopPropagation(); ev.preventDefault();
+            const st2 = _inlineState(qid);
+            st2.boxes = st2.boxes.filter(b => b.id !== box.id);
+            st2.boxes.forEach((b, i) => { b.num = i + 1; });
+            inlineBoxRenderBoxes(qid);
+            inlineBoxRenderList(qid);
+            _inlineUpdateCount(qid);
+        });
+        el.appendChild(del);
+
+        // Drag
+        el.addEventListener('mousedown', (ev) => {
+            if (ev.target === rh || ev.target === del || ev.target.closest('.ibox-del,.ibox-resize')) return;
+            ev.stopPropagation(); ev.preventDefault();
+            const pos = _inlineRelPos(ev, qid);
+            _inlineState(qid).dragging = { boxId: box.id, startX: pos.x, startY: pos.y, origLeft: box.left, origTop: box.top };
+        });
+
+        wrap.appendChild(el);
+    });
+
+    _inlineUpdateCount(qid);
+}
+
+// ── Render box list (table of num, target input, position info) ─────────────
+function inlineBoxRenderList(qid) {
+    const listEl = document.getElementById(`inline-box-list-${qid}`);
+    if (!listEl) return;
+    const st = _inlineState(qid);
+
+    if (st.boxes.length === 0) {
+        listEl.innerHTML = '<div style="color:#94A3B8;font-size:11px;font-style:italic;text-align:center;padding:10px;">Aucune boîte définie — dessinez sur l\'image ci-dessus.</div>';
+        return;
+    }
+
+    const rows = st.boxes.map(box => `
+        <tr style="border-bottom:1px solid #E2E8F0;">
+            <td style="padding:5px 8px; font-size:11px; font-weight:800; color:#1D4ED8; white-space:nowrap; vertical-align:middle; width:28px; text-align:center;">
+                <span style="background:#DBEAFE; border-radius:4px; padding:2px 6px;">#${box.num}</span>
+            </td>
+            <td style="padding:5px 8px; vertical-align:middle;">
+                <input type="text" id="itarget-${qid}-${box.id}"
+                    value="${(box.target || '').replace(/"/g, '&quot;')}"
+                    placeholder="Réponse correcte pour ce cadre..."
+                    class="form-control"
+                    style="font-size:11px; height:28px; border-radius:4px;"
+                    oninput="inlineBoxUpdateTarget(${qid}, ${box.id}, this.value)"
+                    onkeydown="if(event.key==='Enter'){event.preventDefault();}">
+            </td>
+            <td style="padding:5px 8px; font-size:10px; color:#94A3B8; white-space:nowrap; vertical-align:middle;">
+                ${box.left.toFixed(1)}%,${box.top.toFixed(1)}%<br>
+                ${box.width.toFixed(1)}×${box.height.toFixed(1)}%
+            </td>
+            <td style="padding:5px 8px; vertical-align:middle; width:28px;">
+                <button type="button" onclick="inlineBoxDelete(${qid}, ${box.id})"
+                    style="background:#FEE2E2;border:1px solid #FECACA;border-radius:4px;color:#DC2626;cursor:pointer;padding:3px 7px;font-size:11px;">
+                    <i class="fa-solid fa-trash-can"></i>
+                </button>
+            </td>
+        </tr>
+    `).join('');
+
+    listEl.innerHTML = `
+        <div style="font-size:11px; font-weight:800; color:#166534; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:6px;">
+            <i class="fa-solid fa-list"></i> ${st.boxes.length} boîte${st.boxes.length > 1 ? 's' : ''} — entrez la réponse correcte pour chacune :
+        </div>
+        <table style="width:100%; border-collapse:collapse; border:1px solid #BBF7D0; border-radius:8px; overflow:hidden; font-size:12px; background:#fff;">
+            <thead>
+                <tr style="background:#DCFCE7;">
+                    <th style="padding:5px 8px; font-size:10px; font-weight:800; color:#166534; text-align:center;">#</th>
+                    <th style="padding:5px 8px; font-size:10px; font-weight:800; color:#166534; text-align:left;">Réponse correcte (texte exact attendu)</th>
+                    <th style="padding:5px 8px; font-size:10px; font-weight:800; color:#166534;">Position</th>
+                    <th style="padding:5px 8px;"></th>
+                </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+        </table>
+    `;
+}
+
+function inlineBoxUpdateTarget(qid, boxId, value) {
+    const st = _inlineState(qid);
+    const box = st.boxes.find(b => b.id === boxId);
+    if (box) {
+        box.target = value.trim();
+        box.hint = value.trim();
+        // Update label on canvas
+        const el = document.getElementById(`ibox-${qid}-${boxId}`);
+        if (el) {
+            const lbl = el.querySelector('div');
+            if (lbl) lbl.textContent = `#${box.num}${box.target ? ': ' + box.target.substring(0, 16) : ''}`;
+        }
+    }
+}
+
+function inlineBoxDelete(qid, boxId) {
+    const st = _inlineState(qid);
+    st.boxes = st.boxes.filter(b => b.id !== boxId);
+    st.boxes.forEach((b, i) => { b.num = i + 1; });
+    inlineBoxRenderBoxes(qid);
+    inlineBoxRenderList(qid);
+    _inlineUpdateCount(qid);
+}
+
+function inlineBoxClearAll(qid) {
+    if (!confirm('Supprimer toutes les boîtes de cette question ?')) return;
+    const st = _inlineState(qid);
+    st.boxes = [];
+    inlineBoxRenderBoxes(qid);
+    inlineBoxRenderList(qid);
+    _inlineUpdateCount(qid);
+}
+
+function inlineBoxLoadDefaults(qid) {
+    if (!confirm('Charger les 11 boîtes CS WIN par défaut ? Les boîtes actuelles seront remplacées.')) return;
+    const st = _inlineState(qid);
+    st.boxes = [
+        {id:201,num:1, target:"Start Test Mode",             left:5.13,  top:19.33, width:14.45, height:10.81, hint:"Test Mode"},
+        {id:202,num:2, target:"Log Off registered User",     left:23.38, top:1.66,  width:20.44, height:12.06, hint:"Log Off"},
+        {id:203,num:3, target:"Open Setup CS WIN nx",        left:47.24, top:0.21,  width:17.68, height:13.72, hint:"Setup"},
+        {id:204,num:4, target:"Open Expert Mode",            left:68.44, top:0.42,  width:19.39, height:13.51, hint:"Expert Mode"},
+        {id:205,num:5, target:"Start CS WIN nx Helpsheet",   left:81.75, top:17.88, width:16.35, height:11.43, hint:"Helpsheet"},
+        {id:206,num:6, target:"Edit / Create TesterConfiguration", left:1.90,  top:53.85, width:17.40, height:12.06, hint:"TesterConfig"},
+        {id:207,num:7, target:"Edit / Create Programs",      left:13.02, top:88.98, width:19.87, height:8.32,  hint:"Programs"},
+        {id:208,num:8, target:"Edit / Create Connector Library", left:34.98, top:88.36, width:19.30, height:10.81, hint:"Connectors"},
+        {id:209,num:9, target:"Edit / Create Labels",        left:58.17, top:89.19, width:16.63, height:10.60, hint:"Labels"},
+        {id:210,num:10,target:"Edit / Create Projects",      left:81.75, top:57.80, width:16.54, height:11.23, hint:"Projects"},
+        {id:211,num:11,target:"Close CS WIN nx",             left:81.37, top:77.96, width:17.21, height:9.36,  hint:"Close"}
+    ];
+    st.nextId = 212;
+    inlineBoxRenderBoxes(qid);
+    inlineBoxRenderList(qid);
+    _inlineUpdateCount(qid);
+    showToast('Boîtes CS WIN par défaut chargées. Cliquez Sauvegarder.', 'success');
+}
+
+async function inlineBoxSave(qid) {
+    const st = _inlineState(qid);
+
+    // Collect any unsaved target edits from input fields
+    st.boxes.forEach(box => {
+        const inp = document.getElementById(`itarget-${qid}-${box.id}`);
+        if (inp) { box.target = inp.value.trim(); box.hint = box.target; }
+    });
+
+    if (st.boxes.length === 0) {
+        showToast('Ajoutez au moins une boîte avant de sauvegarder.', 'danger'); return;
+    }
+
+    // Warn if any box has no target defined
+    const missing = st.boxes.filter(b => !b.target);
+    if (missing.length > 0) {
+        if (!confirm(`${missing.length} boîte(s) n'ont pas de réponse correcte définie. Sauvegarder quand même ?`)) return;
+    }
+
+    const payload = {
+        boxes: st.boxes.map(b => ({
+            id: b.id, num: b.num, target: b.target, hint: b.hint,
+            left:   parseFloat(b.left.toFixed(3)),
+            top:    parseFloat(b.top.toFixed(3)),
+            width:  parseFloat(b.width.toFixed(3)),
+            height: parseFloat(b.height.toFixed(3))
+        }))
+    };
+
+    try {
+        const res = await fetch(`/admin/exam/question/${qid}/set-boxes`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+        });
+        const d = await res.json();
+        if (d.success) {
+            showToast(`✅ ${d.box_count} boîte(s) sauvegardées avec succès !`, 'success');
+            // Reload questions editor to sync labels
+            await loadQuestionsEditor(_editQExamId);
+        } else {
+            showToast('Erreur: ' + (d.error || ''), 'danger');
+        }
+    } catch(e) {
+        showToast('Erreur réseau: ' + e, 'danger');
+    }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// BOX EDITOR — Visual drag-to-draw box placement on image
+// ══════════════════════════════════════════════════════════════════════
+
+let _boxEditorQId = null;
+let _boxEditorBoxes = [];    // [{id,num,target,left%,top%,width%,height%,hint}]
+let _boxEditorDragging = null;
+let _boxEditorResizing = null;
+let _boxEditorDrawing = false;
+let _boxEditorDrawStart = null;
+let _boxEditorNextId = 100;
+let _boxEditorMode = 'draw'; // 'draw' | 'move'
+
+function openBoxEditor(questionId, imageFile, labels) {
+    _boxEditorQId = questionId;
+    _boxEditorBoxes = [];
+    _boxEditorNextId = 100;
+
+    // Build modal
+    const overlay = document.getElementById('box-editor-overlay');
+    if (!overlay) return;
+    overlay.style.display = 'flex';
+
+    const imgEl = document.getElementById('be-image');
+    if (imageFile) {
+        imgEl.src = `/static/exam_images/${imageFile}`;
+        imgEl.style.display = 'block';
+        document.getElementById('be-no-image').style.display = 'none';
+    } else {
+        imgEl.style.display = 'none';
+        document.getElementById('be-no-image').style.display = 'block';
+    }
+
+    // Load existing boxes from server
+    fetch(`/admin/exam/question/${questionId}/get-boxes`)
+        .then(r => r.json())
+        .then(d => {
+            if (d.boxes && d.boxes.length > 0) {
+                _boxEditorBoxes = d.boxes.map(b => ({...b}));
+                _boxEditorNextId = Math.max(..._boxEditorBoxes.map(b => b.id)) + 1;
+            } else {
+                _boxEditorBoxes = [];
+            }
+            renderBoxEditorBoxes();
+            updateBoxEditorList();
+        })
+        .catch(() => { _boxEditorBoxes = []; renderBoxEditorBoxes(); updateBoxEditorList(); });
+}
+
+function closeBoxEditor() {
+    document.getElementById('box-editor-overlay').style.display = 'none';
+    _boxEditorQId = null;
+}
+
+// ── Draw boxes by dragging on the canvas ───────────────────────────────────
+function getCanvasRelPos(e) {
+    const canvas = document.getElementById('be-canvas');
+    const rect = canvas.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    return {
+        x: Math.max(0, Math.min(1, (clientX - rect.left) / rect.width)) * 100,
+        y: Math.max(0, Math.min(1, (clientY - rect.top)  / rect.height)) * 100
+    };
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const canvas = document.getElementById('be-canvas');
+    if (!canvas) return;
+
+    canvas.addEventListener('mousedown', beMouseDown);
+    canvas.addEventListener('mousemove', beMouseMove);
+    document.addEventListener('mouseup', beMouseUp);
+
+    // Touch support
+    canvas.addEventListener('touchstart', e => { e.preventDefault(); beMouseDown(e); }, {passive:false});
+    canvas.addEventListener('touchmove',  e => { e.preventDefault(); beMouseMove(e); }, {passive:false});
+    document.addEventListener('touchend',  e => beMouseUp(e));
+});
+
+function beMouseDown(e) {
+    if (!_boxEditorQId) return;
+    if (_boxEditorMode !== 'draw') return;
+
+    // Check if clicking on existing box handle
+    const target = e.target || e.touches?.[0]?.target;
+    if (target && target.classList && target.classList.contains('be-box')) return;
+
+    const pos = getCanvasRelPos(e);
+    _boxEditorDrawing = true;
+    _boxEditorDrawStart = pos;
+
+    // Create temp box element
+    const tempBox = document.createElement('div');
+    tempBox.id = 'be-temp-box';
+    tempBox.style.cssText = `position:absolute; border:2px dashed #2563EB; background:rgba(37,99,235,0.08); pointer-events:none; z-index:50; box-sizing:border-box;`;
+    tempBox.style.left = `${pos.x}%`;
+    tempBox.style.top = `${pos.y}%`;
+    tempBox.style.width = '0%';
+    tempBox.style.height = '0%';
+    document.getElementById('be-canvas').appendChild(tempBox);
+}
+
+function beMouseMove(e) {
+    if (!_boxEditorDrawing && !_boxEditorDragging && !_boxEditorResizing) return;
+
+    const pos = getCanvasRelPos(e);
+
+    if (_boxEditorDrawing && _boxEditorDrawStart) {
+        const temp = document.getElementById('be-temp-box');
+        if (!temp) return;
+        const x = Math.min(pos.x, _boxEditorDrawStart.x);
+        const y = Math.min(pos.y, _boxEditorDrawStart.y);
+        const w = Math.abs(pos.x - _boxEditorDrawStart.x);
+        const h = Math.abs(pos.y - _boxEditorDrawStart.y);
+        temp.style.left = `${x}%`;
+        temp.style.top = `${y}%`;
+        temp.style.width = `${w}%`;
+        temp.style.height = `${h}%`;
+    }
+
+    if (_boxEditorDragging) {
+        const { boxId, startX, startY, origLeft, origTop } = _boxEditorDragging;
+        const dx = pos.x - startX;
+        const dy = pos.y - startY;
+        const box = _boxEditorBoxes.find(b => b.id === boxId);
+        if (box) {
+            box.left = Math.max(0, Math.min(95 - box.width, origLeft + dx));
+            box.top  = Math.max(0, Math.min(95 - box.height, origTop + dy));
+            const el = document.getElementById(`be-box-${boxId}`);
+            if (el) { el.style.left = `${box.left}%`; el.style.top = `${box.top}%`; }
+        }
+    }
+
+    if (_boxEditorResizing) {
+        const { boxId, startX, startY, origW, origH } = _boxEditorResizing;
+        const dx = pos.x - startX;
+        const dy = pos.y - startY;
+        const box = _boxEditorBoxes.find(b => b.id === boxId);
+        if (box) {
+            box.width  = Math.max(3, origW + dx);
+            box.height = Math.max(2, origH + dy);
+            const el = document.getElementById(`be-box-${boxId}`);
+            if (el) { el.style.width = `${box.width}%`; el.style.height = `${box.height}%`; }
+        }
+    }
+}
+
+function beMouseUp(e) {
+    if (_boxEditorDrawing) {
+        _boxEditorDrawing = false;
+        const temp = document.getElementById('be-temp-box');
+        if (temp) {
+            const left = parseFloat(temp.style.left);
+            const top  = parseFloat(temp.style.top);
+            const w    = parseFloat(temp.style.width);
+            const h    = parseFloat(temp.style.height);
+            temp.remove();
+
+            if (w > 1.5 && h > 1.5) {
+                // Create new box
+                const newBox = {
+                    id: _boxEditorNextId++,
+                    num: _boxEditorBoxes.length + 1,
+                    target: '',
+                    left: parseFloat(left.toFixed(2)),
+                    top:  parseFloat(top.toFixed(2)),
+                    width:  parseFloat(w.toFixed(2)),
+                    height: parseFloat(h.toFixed(2)),
+                    hint: ''
+                };
+                _boxEditorBoxes.push(newBox);
+                renderBoxEditorBoxes();
+                updateBoxEditorList();
+                // Focus the target input for the new box
+                setTimeout(() => {
+                    const inp = document.getElementById(`be-target-${newBox.id}`);
+                    if (inp) { inp.focus(); inp.select(); }
+                }, 50);
+            }
+        }
+        _boxEditorDrawStart = null;
+    }
+
+    if (_boxEditorDragging) {
+        _boxEditorDragging = null;
+        updateBoxEditorList();
+    }
+
+    if (_boxEditorResizing) {
+        _boxEditorResizing = null;
+        updateBoxEditorList();
+    }
+}
+
+function renderBoxEditorBoxes() {
+    const canvas = document.getElementById('be-canvas');
+    if (!canvas) return;
+
+    // Remove all existing be-box elements
+    canvas.querySelectorAll('.be-box').forEach(el => el.remove());
+
+    _boxEditorBoxes.forEach(box => {
+        const el = document.createElement('div');
+        el.id = `be-box-${box.id}`;
+        el.className = 'be-box';
+        el.setAttribute('data-boxid', box.id);
+        el.style.cssText = `
+            position:absolute;
+            left:${box.left}%; top:${box.top}%;
+            width:${box.width}%; height:${box.height}%;
+            border:2px solid #2563EB;
+            background:rgba(219,234,254,0.55);
+            border-radius:3px;
+            box-sizing:border-box;
+            cursor:move;
+            z-index:30;
+            user-select:none;
+        `;
+
+        // Label inside
+        const lbl = document.createElement('div');
+        lbl.style.cssText = 'position:absolute; top:1px; left:2px; font-size:9px; font-weight:800; color:#1D4ED8; pointer-events:none; white-space:nowrap; overflow:hidden; max-width:95%; line-height:1.1;';
+        lbl.textContent = `#${box.num}${box.target ? ': ' + box.target.substring(0,18) : ''}`;
+        el.appendChild(lbl);
+
+        // Resize handle
+        const rh = document.createElement('div');
+        rh.style.cssText = 'position:absolute; bottom:0; right:0; width:10px; height:10px; background:#2563EB; cursor:se-resize; border-radius:2px 0 3px 0; z-index:35;';
+        rh.addEventListener('mousedown', (ev) => {
+            ev.stopPropagation();
+            const pos = getCanvasRelPos(ev);
+            _boxEditorResizing = { boxId: box.id, startX: pos.x, startY: pos.y, origW: box.width, origH: box.height };
+        });
+        el.appendChild(rh);
+
+        // Delete button
+        const del = document.createElement('div');
+        del.style.cssText = 'position:absolute; top:-8px; right:-8px; width:16px; height:16px; background:#EF4444; border:1.5px solid #fff; border-radius:50%; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:9px; color:#fff; font-weight:900; z-index:40; line-height:1;';
+        del.textContent = '×';
+        del.title = 'Supprimer';
+        del.addEventListener('mousedown', (ev) => {
+            ev.stopPropagation();
+            _boxEditorBoxes = _boxEditorBoxes.filter(b => b.id !== box.id);
+            // Re-number
+            _boxEditorBoxes.forEach((b, i) => { b.num = i + 1; });
+            renderBoxEditorBoxes();
+            updateBoxEditorList();
+        });
+        el.appendChild(del);
+
+        // Drag
+        el.addEventListener('mousedown', (ev) => {
+            if (ev.target === rh || ev.target === del) return;
+            ev.stopPropagation();
+            const pos = getCanvasRelPos(ev);
+            _boxEditorDragging = { boxId: box.id, startX: pos.x, startY: pos.y, origLeft: box.left, origTop: box.top };
+        });
+
+        canvas.appendChild(el);
+    });
+}
+
+function updateBoxEditorList() {
+    const list = document.getElementById('be-box-list');
+    if (!list) return;
+
+    if (_boxEditorBoxes.length === 0) {
+        list.innerHTML = '<div style="color:#94A3B8; font-size:12px; text-align:center; padding:20px;">Dessinez des boîtes sur l\'image en faisant glisser la souris.</div>';
+        return;
+    }
+
+    list.innerHTML = _boxEditorBoxes.map(box => `
+        <div style="border:1px solid #BFDBFE; border-radius:6px; padding:8px 10px; margin-bottom:6px; background:#F8FAFF;">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+                <span style="font-size:11px; font-weight:800; color:#1D4ED8; white-space:nowrap;">#${box.num}</span>
+                <input type="text" id="be-target-${box.id}" value="${escapeHtml(box.target || '')}"
+                    placeholder="Réponse correcte (ex: Start Test Mode)"
+                    class="form-control" style="font-size:11px; height:28px; flex:1;"
+                    oninput="beUpdateTarget(${box.id}, this.value)">
+                <button type="button" onclick="beDeleteBox(${box.id})"
+                    style="background:#FEE2E2; border:1px solid #FECACA; border-radius:4px; color:#DC2626; cursor:pointer; padding:3px 7px; font-size:11px;" title="Supprimer">
+                    <i class="fa-solid fa-trash-can"></i>
+                </button>
+            </div>
+            <div style="display:flex; gap:6px; align-items:center;">
+                <span style="font-size:10px; color:#64748B; white-space:nowrap;">
+                    pos: ${box.left.toFixed(1)}%,${box.top.toFixed(1)}%
+                    taille: ${box.width.toFixed(1)}×${box.height.toFixed(1)}%
+                </span>
+            </div>
+        </div>
+    `).join('');
+}
+
+function beUpdateTarget(boxId, value) {
+    const box = _boxEditorBoxes.find(b => b.id === boxId);
+    if (box) {
+        box.target = value.trim();
+        box.hint = value.trim();
+        // Update label on canvas
+        const el = document.getElementById(`be-box-${boxId}`);
+        if (el) {
+            const lbl = el.querySelector('div');
+            if (lbl) lbl.textContent = `#${box.num}${box.target ? ': ' + box.target.substring(0,18) : ''}`;
+        }
+    }
+}
+
+function beDeleteBox(boxId) {
+    _boxEditorBoxes = _boxEditorBoxes.filter(b => b.id !== boxId);
+    _boxEditorBoxes.forEach((b, i) => { b.num = i + 1; });
+    renderBoxEditorBoxes();
+    updateBoxEditorList();
+}
+
+function beLoadDefaults() {
+    if (!confirm('Charger les boîtes par défaut CS WIN (11 boîtes) ? Cela remplacera les boîtes actuelles.')) return;
+    fetch('/admin/exam/question/' + _boxEditorQId + '/get-boxes')
+        .then(() => {})
+        .catch(() => {});
+    // Use the hardcoded defaults
+    _boxEditorBoxes = [
+        {id:101,num:1,target:"Start Test Mode",left:5.13,top:19.33,width:14.45,height:10.81,hint:"Test Mode"},
+        {id:102,num:2,target:"Log Off registered User",left:23.38,top:1.66,width:20.44,height:12.06,hint:"Log Off"},
+        {id:103,num:3,target:"Open Setup CS WIN nx",left:47.24,top:0.21,width:17.68,height:13.72,hint:"Setup"},
+        {id:104,num:4,target:"Open Expert Mode",left:68.44,top:0.42,width:19.39,height:13.51,hint:"Expert Mode"},
+        {id:105,num:5,target:"Start CS WIN nx Helpsheet",left:81.75,top:17.88,width:16.35,height:11.43,hint:"Helpsheet"},
+        {id:106,num:6,target:"Edit / Create TesterConfiguration",left:1.90,top:53.85,width:17.40,height:12.06,hint:"TesterConfig"},
+        {id:107,num:7,target:"Edit / Create Programs",left:13.02,top:88.98,width:19.87,height:8.32,hint:"Programs"},
+        {id:108,num:8,target:"Edit / Create Connector Library",left:34.98,top:88.36,width:19.30,height:10.81,hint:"Connectors"},
+        {id:109,num:9,target:"Edit / Create Labels",left:58.17,top:89.19,width:16.63,height:10.60,hint:"Labels"},
+        {id:110,num:10,target:"Edit / Create Projects",left:81.75,top:57.80,width:16.54,height:11.23,hint:"Projects"},
+        {id:111,num:11,target:"Close CS WIN nx",left:81.37,top:77.96,width:17.21,height:9.36,hint:"Close"}
+    ];
+    _boxEditorNextId = 112;
+    renderBoxEditorBoxes();
+    updateBoxEditorList();
+    showToast('Boîtes CS WIN par défaut chargées.', 'success');
+}
+
+async function beSaveBoxes() {
+    if (!_boxEditorQId) return;
+
+    // Collect updated targets from inputs before saving
+    _boxEditorBoxes.forEach(box => {
+        const inp = document.getElementById(`be-target-${box.id}`);
+        if (inp) box.target = inp.value.trim();
+        box.hint = box.target;
+    });
+
+    if (_boxEditorBoxes.length === 0) {
+        showToast('Ajoutez au moins une boîte avant de sauvegarder.', 'danger'); return;
+    }
+
+    const payload = {
+        boxes: _boxEditorBoxes.map(b => ({
+            id: b.id, num: b.num, target: b.target, hint: b.hint,
+            left: parseFloat(b.left.toFixed(3)), top: parseFloat(b.top.toFixed(3)),
+            width: parseFloat(b.width.toFixed(3)), height: parseFloat(b.height.toFixed(3))
+        }))
+    };
+
+    try {
+        const res = await fetch(`/admin/exam/question/${_boxEditorQId}/set-boxes`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+        });
+        const d = await res.json();
+        if (d.success) {
+            showToast(`${d.box_count} boîte(s) sauvegardées avec succès !`, 'success');
+            await loadQuestionsEditor(_editQExamId);
+            closeBoxEditor();
+        } else {
+            showToast('Erreur: ' + (d.error || ''), 'danger');
+        }
+    } catch(e) {
+        showToast('Erreur réseau: ' + e, 'danger');
+    }
+}
+
+
+
+// ══════════════════════════════════════════════════════════════════════
+// ATTENDANCE & LEAVES MANAGEMENT JS
+// ══════════════════════════════════════════════════════════════════════
+
+function switchAttSubTab(tabName) {
+    document.querySelectorAll('.att-sub-panel').forEach(p => p.style.display = 'none');
+    document.querySelectorAll('.att-sub-tab').forEach(b => {
+        b.classList.remove('active');
+        b.style.background = '#FFFFFF';
+        b.style.color = 'var(--text)';
+        b.style.border = '1px solid var(--border)';
+    });
+
+    const targetPanel = document.getElementById(`att-sub-${tabName}`);
+    const targetBtn = document.getElementById(`btn-att-tab-${tabName}`);
+    if (targetPanel) targetPanel.style.display = 'block';
+    if (targetBtn) {
+        targetBtn.classList.add('active');
+        targetBtn.style.background = 'var(--primary)';
+        targetBtn.style.color = '#FFFFFF';
+        targetBtn.style.border = 'none';
+    }
+}
+
+function onAttDateChanged(dateVal) {
+    if (!dateVal) return;
+    const dt = new Date(dateVal + 'T00:00:00');
+    const day = dt.getDay(); // 0 is Sunday, 6 is Saturday
+    const isWknd = (day === 0 || day === 6);
+    const alertBox = document.getElementById('att-weekend-alert');
+    const dayName = document.getElementById('att-weekend-dayname');
+    if (alertBox) {
+        if (isWknd) {
+            alertBox.style.display = 'flex';
+            if (dayName) dayName.textContent = day === 6 ? 'Samedi' : 'Dimanche';
+        } else {
+            alertBox.style.display = 'none';
+        }
+    }
+}
+
+function onAttStatusChanged(st) {
+    const hoursRow = document.getElementById('att-hours-row');
+    if (hoursRow) {
+        if (st === 'ABSENT' || st === 'CONGE' || st === 'PERMISSION') {
+            hoursRow.style.opacity = '0.5';
+        } else {
+            hoursRow.style.opacity = '1';
+        }
+    }
+}
+
+function onLeaveTypeChanged(lt) {
+    const tr = document.getElementById('leave-time-row');
+    if (tr) tr.style.display = lt === 'PERMISSION' ? 'grid' : 'none';
+    const durInput = document.getElementById('leave-modal-duration');
+    if (durInput && lt === 'PERMISSION') {
+        durInput.value = '0.5';
+    }
+}
+
+function syncLeaveDates() {
+    const s = document.getElementById('leave-modal-start');
+    const e = document.getElementById('leave-modal-end');
+    if (s && e && !e.value) e.value = s.value;
+}
+
+function openPointageForTech(techId, techName) {
+    const sel = document.getElementById('att-modal-tech-id');
+    if (sel) sel.value = techId;
+    const dInp = document.getElementById('att-modal-date');
+    if (dInp && !dInp.value) {
+        const today = new Date().toISOString().split('T')[0];
+        dInp.value = today;
+        onAttDateChanged(today);
+    }
+    openModal('record-attendance-modal');
+}
+
+async function refreshAttendanceViews() {
+    const techId = document.getElementById('att-filter-tech').value;
+    const month = document.getElementById('att-filter-month').value;
+    const year = document.getElementById('att-filter-year').value || '2026';
+
+    const params = new URLSearchParams();
+    if (techId) params.append('technician_id', techId);
+    if (month) params.append('month', month);
+    if (year) params.append('year', year);
+
+    try {
+        const res = await fetch(`/api/admin/attendance/stats?${params.toString()}`);
+        const data = await res.json();
+        
+        // Update KPI Cards
+        document.getElementById('stat-total-present').textContent = data.total_present_days;
+        document.getElementById('stat-total-weekend').textContent = data.total_weekend_days;
+        document.getElementById('stat-total-hours').textContent = `${data.total_hours}h`;
+        document.getElementById('stat-total-conge').textContent = `${data.total_conge_days}j`;
+        document.getElementById('stat-total-perm').textContent = data.total_permissions;
+        document.getElementById('stat-total-badges').textContent = data.total_missing_badges;
+        document.getElementById('stat-unreg-badges').textContent = `${data.unregularized_badges} non régularisé(s)`;
+        document.getElementById('stat-global-rate').textContent = `${data.global_attendance_rate}%`;
+        document.getElementById('stat-rate-bar').style.width = `${data.global_attendance_rate}%`;
+        document.getElementById('stat-period-label').textContent = `(${data.month_name} ${data.year})`;
+
+        // Update Summary Table
+        const tbody = document.getElementById('att-tech-summary-tbody');
+        if (tbody && data.technicians_summary) {
+            tbody.innerHTML = data.technicians_summary.map(ts => `
+                <tr>
+                    <td style="font-weight:700; color:var(--text);">${escapeHtml(ts.name)}</td>
+                    <td class="td-mono">${escapeHtml(ts.matricule)}</td>
+                    <td><span class="badge badge-info">Équipe ${escapeHtml(ts.shift)}</span></td>
+                    <td><span class="badge badge-primary" style="font-size:11px;">${escapeHtml(ts.level)}</span></td>
+                    <td style="text-align:center; font-weight:700; color:#166534;">${ts.present_days}</td>
+                    <td style="text-align:center;">
+                        ${ts.weekend_days > 0 ? `<span class="badge" style="background:#FEF3C7; color:#B45309; font-weight:700;">${ts.weekend_days}j</span>` : `<span style="color:#94A3B8;">0</span>`}
+                    </td>
+                    <td style="text-align:center;">${ts.conge_days}</td>
+                    <td style="text-align:center;">${ts.permission_count}</td>
+                    <td style="text-align:center;">
+                        ${ts.missing_badges > 0 ? `<span class="badge" style="background:#FEE2E2; color:#DC2626; font-weight:700;">${ts.missing_badges}</span>` : `<span style="color:#94A3B8;">0</span>`}
+                    </td>
+                    <td style="text-align:center; font-weight:600;">${ts.total_hours}h</td>
+                    <td>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <div style="width:60px; height:6px; background:#E2E8F0; border-radius:3px; overflow:hidden;">
+                                <div style="height:100%; width:${ts.attendance_rate}%; background:${ts.attendance_rate >= 90 ? '#10B981' : (ts.attendance_rate >= 75 ? '#F59E0B' : '#EF4444')};"></div>
+                            </div>
+                            <span style="font-weight:700; font-size:12px;">${ts.attendance_rate}%</span>
+                        </div>
+                    </td>
+                    <td style="text-align:right; white-space:nowrap;">
+                        <button type="button" class="btn btn-sm" style="background:#EEF2FF; color:var(--primary); border:1px solid #C7D2FE; font-weight:700; padding:3px 8px;" onclick="openPointageForTech(${ts.id}, '${escapeHtml(ts.name)}')">
+                            <i class="fa-solid fa-plus"></i> Pointer
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+    } catch(e) {
+        console.error("Failed to refresh attendance stats:", e);
+    }
+}
+
+function resetAttendanceFilters() {
+    document.getElementById('att-filter-tech').value = '';
+    document.getElementById('att-filter-month').value = '';
+    document.getElementById('att-filter-year').value = '2026';
+    refreshAttendanceViews();
+}
+
+function filterRecTable(type) {
+    document.querySelectorAll('.att-rec-filter').forEach(b => {
+        b.classList.remove('active');
+        b.style.background = '#FFFFFF';
+        b.style.color = 'var(--text)';
+    });
+    const targetBtn = document.getElementById(`btn-rf-${type.toLowerCase()}`);
+    if (targetBtn) {
+        targetBtn.classList.add('active');
+        targetBtn.style.background = '#1E293B';
+        targetBtn.style.color = '#FFFFFF';
+    }
+
+    const rows = document.querySelectorAll('.att-row-item');
+    rows.forEach(r => {
+        const isWk = r.getAttribute('data-weekend') === '1';
+        const st = r.getAttribute('data-status');
+        if (type === 'all') {
+            r.style.display = '';
+        } else if (type === 'weekend') {
+            r.style.display = isWk ? '' : 'none';
+        } else {
+            r.style.display = (st === type) ? '' : 'none';
+        }
+    });
+}
+
+async function quickRegularizeBadge(badgeId) {
+    const notes = prompt("Note de régularisation (optionnel) :", "Vérifié par chef d'équipe");
+    if (notes === null) return;
+    try {
+        const res = await fetch(`/admin/attendance/badge/regularize/${badgeId}`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ notes: notes })
+        });
+        const d = await res.json();
+        if (d.success) {
+            showToast('Oubli de badgage régularisé.', 'success');
+            setTimeout(() => window.location.reload(), 500);
+        } else {
+            showToast('Erreur lors de la régularisation', 'danger');
+        }
+    } catch(e) {
+        showToast('Erreur réseau', 'danger');
+    }
+}
+
+async function deleteAttendanceRecord(recId) {
+    if (!confirm('Supprimer ce pointage ?')) return;
+    try {
+        const res = await fetch(`/admin/attendance/delete/${recId}`, { method: 'POST' });
+        const d = await res.json();
+        if (d.success) {
+            showToast('Pointage supprimé.', 'success');
+            setTimeout(() => window.location.reload(), 500);
+        } else {
+            showToast('Erreur lors de la suppression', 'danger');
+        }
+    } catch(e) {
+        showToast('Erreur réseau', 'danger');
+    }
+}
+
+async function deleteLeaveRecord(leaveId) {
+    if (!confirm('Supprimer cette demande de congé / permission ?')) return;
+    try {
+        const res = await fetch(`/admin/attendance/leave/delete/${leaveId}`, { method: 'POST' });
+        const d = await res.json();
+        if (d.success) {
+            showToast('Congé / permission supprimé.', 'success');
+            setTimeout(() => window.location.reload(), 500);
+        } else {
+            showToast('Erreur lors de la suppression', 'danger');
+        }
+    } catch(e) {
+        showToast('Erreur réseau', 'danger');
+    }
+}
+
+async function deleteBadgeRecord(badgeId) {
+    if (!confirm("Supprimer cet enregistrement d'oubli de badge ?")) return;
+    try {
+        const res = await fetch(`/admin/attendance/badge/delete/${badgeId}`, { method: 'POST' });
+        const d = await res.json();
+        if (d.success) {
+            showToast('Incident de badge supprimé.', 'success');
+            setTimeout(() => window.location.reload(), 500);
+        } else {
+            showToast('Erreur lors de la suppression', 'danger');
+        }
+    } catch(e) {
+        showToast('Erreur réseau', 'danger');
+    }
+}
+
+function exportAttendanceExcel() {
+    const techId = document.getElementById('att-filter-tech').value;
+    const month = document.getElementById('att-filter-month').value;
+    const year = document.getElementById('att-filter-year').value || '2026';
+
+    const params = new URLSearchParams();
+    if (techId) params.append('technician_id', techId);
+    if (month) params.append('month', month);
+    if (year) params.append('year', year);
+
+    window.location.href = `/admin/attendance/export?${params.toString()}`;
+}
+
 </script>
+
+<!-- ══ BOX EDITOR MODAL ══════════════════════════════════════════════════════ -->
+<div id="box-editor-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.65); z-index:9000; align-items:center; justify-content:center; padding:16px;">
+    <div style="background:#fff; border-radius:16px; width:min(96vw, 1200px); max-height:92vh; display:flex; flex-direction:column; box-shadow:0 24px 64px rgba(0,0,0,0.35); overflow:hidden;">
+        
+        <!-- Header -->
+        <div style="padding:14px 20px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+            <div>
+                <div style="font-weight:800; font-size:15px; color:var(--primary);">
+                    <i class="fa-solid fa-vector-square"></i> Éditeur de Boîtes Interactives
+                </div>
+                <div style="font-size:11px; color:var(--text-sec); margin-top:2px;">
+                    Dessinez des boîtes sur l'image en faisant glisser. Entrez la réponse correcte pour chaque boîte.
+                </div>
+            </div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <button type="button" onclick="beLoadDefaults()" class="btn btn-sm"
+                    style="background:#EFF6FF; color:#1D4ED8; border:1px solid #BFDBFE; font-size:12px;">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> CS WIN défaut
+                </button>
+                <button type="button" onclick="beSaveBoxes()" class="btn btn-sm"
+                    style="background:var(--primary); color:#fff; font-size:12px; font-weight:700;">
+                    <i class="fa-solid fa-floppy-disk"></i> Sauvegarder
+                </button>
+                <button type="button" onclick="closeBoxEditor()"
+                    style="background:none; border:1px solid var(--border); border-radius:8px; padding:6px 12px; cursor:pointer; font-size:12px; color:var(--text-sec);">
+                    <i class="fa-solid fa-xmark"></i> Fermer
+                </button>
+            </div>
+        </div>
+
+        <!-- Body -->
+        <div style="display:flex; flex:1; overflow:hidden; min-height:0;">
+            
+            <!-- Left: Image canvas -->
+            <div style="flex:1; overflow:auto; padding:12px; background:#F1F5F9; display:flex; align-items:flex-start; justify-content:center;">
+                <div style="position:relative; display:inline-block; max-width:100%;">
+                    <div id="be-canvas" style="position:relative; display:inline-block; cursor:crosshair; user-select:none;">
+                        <img id="be-image" src="" alt="Exam image" 
+                            style="display:block; max-width:100%; max-height:68vh; border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,0.12);"
+                            draggable="false">
+                        <div id="be-no-image" style="display:none; padding:60px 40px; color:#94A3B8; text-align:center; font-size:14px; background:#F8FAFC; border-radius:8px; border:2px dashed #E2E8F0;">
+                            <i class="fa-solid fa-image" style="font-size:40px; margin-bottom:12px; display:block;"></i>
+                            Aucune image — ajoutez d'abord une image à cette question
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Box list -->
+            <div style="width:300px; min-width:260px; border-left:1px solid var(--border); display:flex; flex-direction:column; overflow:hidden;">
+                <div style="padding:10px 12px; border-bottom:1px solid var(--border); font-size:12px; font-weight:800; color:var(--text-sec); text-transform:uppercase; letter-spacing:0.5px; display:flex; align-items:center; gap:8px;">
+                    <i class="fa-solid fa-list"></i> Boîtes définies
+                    <span id="be-box-count" style="background:#EEF2FF; color:#4338CA; padding:1px 7px; border-radius:10px; font-size:11px;">0</span>
+                </div>
+                <div style="padding:10px 12px; background:#FFFBEB; border-bottom:1px solid #FDE68A; font-size:11px; color:#92400E;">
+                    <strong>Mode Dessin :</strong> Cliquez-glissez sur l'image pour créer une boîte.<br>
+                    <strong>Déplacer :</strong> Glissez une boîte existante.<br>
+                    <strong>Redimensionner :</strong> Glissez le coin bleu en bas à droite.
+                </div>
+                <div id="be-box-list" style="flex:1; overflow-y:auto; padding:10px 12px;">
+                    <div style="color:#94A3B8; font-size:12px; text-align:center; padding:20px;">Dessinez des boîtes sur l'image.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}

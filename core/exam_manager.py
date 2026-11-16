@@ -772,27 +772,20 @@ class ExamManager:
                 else:
                     q['labeling_boxes'] = []
 
-                # Check if this question is CS WIN Question 6 (or image labeling with cadre vide)
-                q_text_low = (q.get('question_text') or '').lower()
-                is_cswin_q6 = (
-                    q.get('question_type') == 'image_labeling'
-                    or 'cadre vide' in q_text_low
-                    or (q.get('question_number') == 6 and any(k in q_text_low for k in ['cadre', 'réponse', 'reponse', 'ci-dessous']))
-                    or (q.get('question_number') == 6 and 'cswin' in (exam.get('title') or '').lower())
-                )
-
-                if is_cswin_q6:
-                    q['question_type'] = 'image_labeling'
-                    if not q['labeling_boxes']:
-                        q['labeling_boxes'] = list(DEFAULT_CSWIN_Q6_BOXES)
-                    # Clean available_labels if empty or contains merged labels (e.g. slashes/Edit combined)
-                    has_merged_labels = any('/' in str(lbl) and 'Edit' in str(lbl) for lbl in q['available_labels'])
-                    if not q['available_labels'] or len(q['available_labels']) < 10 or has_merged_labels:
-                        q['available_labels'] = list(DEFAULT_CSWIN_Q6_LABELS)
-
                 # Normalise legacy question_type
                 if not q.get('question_type') or q['question_type'] == 'qcm':
                     q['question_type'] = 'multiple_choice'
+
+                # Only provide default CS WIN boxes if question is image_labeling and has no boxes yet
+                if q['question_type'] == 'image_labeling':
+                    q_text_low = (q.get('question_text') or '').lower()
+                    is_cswin_cadre = ('cadre vide' in q_text_low or 'remplissez le cadre' in q_text_low)
+                    if is_cswin_cadre:
+                        if not q['labeling_boxes']:
+                            q['labeling_boxes'] = list(DEFAULT_CSWIN_Q6_BOXES)
+                        has_merged_labels = any('/' in str(lbl) and 'Edit' in str(lbl) for lbl in q['available_labels'])
+                        if not q['available_labels'] or len(q['available_labels']) < 10 or has_merged_labels:
+                            q['available_labels'] = list(DEFAULT_CSWIN_Q6_LABELS)
 
                 # Build combined images list
                 extra = self._get_question_extra_images_cur(cur, q['id'])
@@ -1049,16 +1042,29 @@ class ExamManager:
                         unanswered_count += 1
                         continue
                     
-                    # Grade box answers
+                    # Grade box answers — per-box comparison with normalization
                     box_correct = 0
+                    box_total = len(boxes_def)
                     for b in boxes_def:
                         b_id_str = str(b['id'])
                         target = (b.get('target') or '').strip().lower()
-                        user_val = str(user_boxes.get(b_id_str) or '').strip().lower()
-                        if target and user_val and (target == user_val or target in user_val or user_val in target):
-                            box_correct += 1
+                        # Normalize: strip, lowercase, collapse whitespace
+                        user_val = ' '.join(str(user_boxes.get(b_id_str) or '').strip().lower().split())
+                        target_norm = ' '.join(target.split())
+                        if target_norm and user_val:
+                            # Accept exact match, substring match, or partial word overlap ≥70%
+                            if target_norm == user_val or target_norm in user_val or user_val in target_norm:
+                                box_correct += 1
+                            else:
+                                # Word-overlap score for partially matching answers
+                                t_words = set(target_norm.split())
+                                u_words = set(user_val.split())
+                                overlap = len(t_words & u_words)
+                                if t_words and overlap / len(t_words) >= 0.7:
+                                    box_correct += 1
                     
-                    pass_threshold = max(1, int(len(boxes_def) * 0.7))
+                    # Score: each box is a sub-point; overall question passes at ≥70%
+                    pass_threshold = max(1, int(box_total * 0.7))
                     if box_correct >= pass_threshold:
                         correct_count += 1
                     else:
@@ -1522,7 +1528,7 @@ class ExamManager:
             row = cur.fetchone()
             next_num = (row['mx'] or 0) + 1
             cur.execute(
-                "INSERT INTO exam_questions (exam_id, question_number, question_text, question_type) VALUES (?, ?, ?, 'qcm')",
+                "INSERT INTO exam_questions (exam_id, question_number, question_text, question_type) VALUES (?, ?, ?, 'multiple_choice')",
                 (exam_id, next_num, question_text.strip())
             )
             q_id = cur.lastrowid
@@ -1606,6 +1612,139 @@ class ExamManager:
             return [dict(r) for r in cur.fetchall()]
 
     # ── History & Technician Card Data Retrieval ────────────────────────────
+
+    def get_attempt_review(self, attempt_id: int) -> list:
+        """
+        Returns a per-question review of a completed exam attempt.
+        Each item: { question_number, question_text, question_type, image,
+                     answers, correct_answer, user_answer, user_text, user_boxes,
+                     available_labels, labeling_boxes, is_correct, answered }
+        """
+        import json as _json
+        with self._get_conn() as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT * FROM exam_attempts WHERE id = ?", (attempt_id,))
+            attempt = cur.fetchone()
+            if not attempt:
+                return []
+            exam_id = attempt['exam_id']
+
+            cur.execute("SELECT * FROM exam_questions WHERE exam_id = ? ORDER BY question_number", (exam_id,))
+            questions = [dict(q) for q in cur.fetchall()]
+
+            cur.execute("""
+                SELECT question_id, selected_answer_id, answer_text
+                FROM exam_attempt_answers WHERE attempt_id = ?
+            """, (attempt_id,))
+            answer_map = {}
+            for row in cur.fetchall():
+                answer_map[row['question_id']] = {
+                    'selected_id': row['selected_answer_id'],
+                    'answer_text': row['answer_text']
+                }
+
+            review = []
+            for q in questions:
+                q_type = q.get('question_type') or 'multiple_choice'
+                user = answer_map.get(q['id'], {})
+                user_sel_id = user.get('selected_id')
+                user_text = user.get('answer_text')
+
+                cur.execute("SELECT * FROM exam_answers WHERE question_id = ? ORDER BY id", (q['id'],))
+                answers = [dict(a) for a in cur.fetchall()]
+
+                correct_answer = next((a for a in answers if a['is_correct'] == 1), None)
+                user_answer = next((a for a in answers if a['id'] == user_sel_id), None) if user_sel_id else None
+
+                is_correct = False
+                if q_type == 'image_labeling':
+                    if user_text:
+                        try:
+                            user_boxes = _json.loads(user_text) if isinstance(user_text, str) else {}
+                            raw_b = q.get('boxes_json')
+                            boxes_def = _json.loads(raw_b) if raw_b else DEFAULT_CSWIN_Q6_BOXES
+                            box_correct = 0
+                            for b in boxes_def:
+                                target = (b.get('target') or '').strip().lower()
+                                uval = str(user_boxes.get(str(b['id'])) or '').strip().lower()
+                                if target and uval and (target == uval or target in uval or uval in target):
+                                    box_correct += 1
+                            is_correct = box_correct >= max(1, int(len(boxes_def) * 0.7))
+                        except Exception:
+                            is_correct = False
+                elif q_type == 'text_input':
+                    is_correct = None  # Manual grading
+                else:
+                    if user_sel_id and correct_answer:
+                        is_correct = (user_sel_id == correct_answer['id'])
+
+                raw_labels = q.get('available_labels')
+                available_labels = []
+                if raw_labels:
+                    try:
+                        available_labels = _json.loads(raw_labels)
+                    except Exception:
+                        available_labels = []
+
+                raw_boxes = q.get('boxes_json')
+                labeling_boxes = []
+                if raw_boxes:
+                    try:
+                        labeling_boxes = _json.loads(raw_boxes)
+                    except Exception:
+                        labeling_boxes = []
+
+                user_boxes_parsed = {}
+                if q_type == 'image_labeling' and user_text:
+                    try:
+                        user_boxes_parsed = _json.loads(user_text) if isinstance(user_text, str) else {}
+                    except Exception:
+                        user_boxes_parsed = {}
+
+                review.append({
+                    'question_id': q['id'],
+                    'question_number': q['question_number'],
+                    'question_text': q['question_text'],
+                    'question_type': q_type,
+                    'image': q.get('image'),
+                    'answers': answers,
+                    'correct_answer': correct_answer,
+                    'user_answer': user_answer,
+                    'user_text': user_text,
+                    'user_boxes': user_boxes_parsed,
+                    'available_labels': available_labels,
+                    'labeling_boxes': labeling_boxes,
+                    'is_correct': is_correct,
+                    'answered': bool(user_sel_id or user_text),
+                })
+            return review
+
+    def add_answer_to_question(self, question_id: int, answer_text: str, is_correct: int = 0) -> int:
+        """Adds a new answer choice to a question. Returns new answer id."""
+        with self._get_conn() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                "INSERT INTO exam_answers (question_id, answer_text, is_correct) VALUES (?, ?, ?)",
+                (question_id, answer_text.strip(), is_correct)
+            )
+            conn.commit()
+            return cur.lastrowid
+
+    def delete_answer(self, answer_id: int) -> bool:
+        """Deletes a specific answer choice."""
+        with self._get_conn() as conn:
+            cur = conn.cursor()
+            cur.execute("DELETE FROM exam_answers WHERE id = ?", (answer_id,))
+            conn.commit()
+            return True
+
+    def update_answer_text(self, answer_id: int, text: str) -> bool:
+        """Updates answer text."""
+        with self._get_conn() as conn:
+            cur = conn.cursor()
+            cur.execute("UPDATE exam_answers SET answer_text = ? WHERE id = ?", (text.strip(), answer_id))
+            conn.commit()
+            return True
 
     def get_all_results(self, filters=None):
         query = """
@@ -1693,6 +1832,13 @@ class ExamManager:
         with self._get_conn() as conn:
             cur = conn.cursor()
             cur.execute("UPDATE exam_questions SET question_type = ? WHERE id = ?", (new_type, question_id))
+            if new_type == 'true_false':
+                cur.execute("SELECT id, answer_text FROM exam_answers WHERE question_id = ?", (question_id,))
+                existing = cur.fetchall()
+                texts = [str(e['answer_text'] or '').strip().lower() for e in existing]
+                if not any('vrai' in t for t in texts) and not any('faux' in t for t in texts):
+                    cur.execute("INSERT INTO exam_answers (question_id, answer_text, is_correct) VALUES (?, 'Vrai', 1)", (question_id,))
+                    cur.execute("INSERT INTO exam_answers (question_id, answer_text, is_correct) VALUES (?, 'Faux', 0)", (question_id,))
             conn.commit()
             return True
 
@@ -1704,6 +1850,31 @@ class ExamManager:
             cur.execute("UPDATE exam_questions SET available_labels = ? WHERE id = ?", (labels_json, question_id))
             conn.commit()
             return True
+
+    def set_boxes_json(self, question_id: int, boxes: list) -> bool:
+        """
+        Persist the boxes_json array for an image_labeling question.
+        Each box must have: id, num, target, left%, top%, width%, height%, hint (optional).
+        """
+        boxes_json = json.dumps(boxes, ensure_ascii=False) if boxes else None
+        with self._get_conn() as conn:
+            cur = conn.cursor()
+            cur.execute("UPDATE exam_questions SET boxes_json = ? WHERE id = ?", (boxes_json, question_id))
+            conn.commit()
+            return True
+
+    def get_boxes_json(self, question_id: int):
+        """Returns the parsed boxes list for a question, or [] if none."""
+        with self._get_conn() as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT boxes_json FROM exam_questions WHERE id = ?", (question_id,))
+            row = cur.fetchone()
+            if row and row['boxes_json']:
+                try:
+                    return json.loads(row['boxes_json'])
+                except Exception:
+                    return []
+            return []
 
     def fix_question_types_for_exam(self, exam_id: int) -> dict:
         """
@@ -1845,10 +2016,13 @@ class ExamManager:
                                 for q in questions:
                                     q_type = q.get('question_type', 'multiple_choice')
                                     labels_json = json.dumps(q.get('available_labels', []), ensure_ascii=False) if q.get('available_labels') else None
+                                    boxes = q.get('boxes_json')
+                                    if q_type == 'image_labeling' and not boxes:
+                                        boxes = json.dumps(DEFAULT_CSWIN_Q6_BOXES, ensure_ascii=False)
                                     cur.execute("""
-                                        INSERT INTO exam_questions (exam_id, question_number, question_text, question_type, image, available_labels)
-                                        VALUES (?, ?, ?, ?, ?, ?)
-                                    """, (existing_id, q['question_number'], q['question_text'], q_type, q.get('image'), labels_json))
+                                        INSERT INTO exam_questions (exam_id, question_number, question_text, question_type, image, available_labels, boxes_json)
+                                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                                    """, (existing_id, q['question_number'], q['question_text'], q_type, q.get('image'), labels_json, boxes))
                                     q_id = cur.lastrowid
                                     for sort_i, ef in enumerate(q.get('extra_images', [])):
                                         cur.execute("INSERT INTO exam_question_images (question_id, filename, sort_order) VALUES (?, ?, ?)", (q_id, ef, sort_i + 1))
