@@ -384,8 +384,17 @@ async function completeTask(btn, sheet, rawIndex, taskType) {
         btn.innerHTML = originalHTML;
     }
 }
-</script>
-{% endblock %}
+
+async function deleteHistoryRecord(id, btn) {
+    const row = document.getElementById('exec-row-' + id);
+    if (!confirm('Supprimer cet enregistrement d\'historique ?')) return;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+    try {
+        const res = await fetch('/pma/checklist/delete/' + id, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({})
         });
         const data = await res.json();
         if (res.ok && data.status === 'success') {
