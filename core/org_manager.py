@@ -23,35 +23,35 @@ POSITION_LEVELS = {
     "MANAGER": {
         "code": "MANAGER",
         "rank": 1,
-        "label": "Manager / Direction",
+        "label": "Manager",
         "badge_class": "badge-manager",
         "icon": "fa-solid fa-crown"
     },
     "GROUP_LEADER": {
         "code": "GROUP_LEADER",
         "rank": 2,
-        "label": "Chef de Groupe",
+        "label": "Group Leader",
         "badge_class": "badge-groupleader",
         "icon": "fa-solid fa-users-gear"
     },
     "TEAM_LEADER": {
         "code": "TEAM_LEADER",
         "rank": 3,
-        "label": "Chef d'Équipe",
+        "label": "Team Leader",
         "badge_class": "badge-teamleader",
         "icon": "fa-solid fa-user-tie"
     },
     "SUPERVISOR": {
         "code": "SUPERVISOR",
         "rank": 4,
-        "label": "Superviseur",
+        "label": "Supervisor",
         "badge_class": "badge-supervisor",
         "icon": "fa-solid fa-user-check"
     },
     "TECHNICIAN": {
         "code": "TECHNICIAN",
         "rank": 5,
-        "label": "Technicien",
+        "label": "Technician",
         "badge_class": "badge-technician",
         "icon": "fa-solid fa-wrench"
     }
@@ -768,7 +768,7 @@ class OrgChartManager:
                     INSERT INTO org_assignment_history
                     (assignment_id, user_id, matricule, action_type, new_position_level, new_job_title, new_shift, new_parent_id, details, changed_by)
                     VALUES (?, ?, ?, 'NOUVELLE_AFFECTATION', ?, ?, ?, ?, ?, ?)
-                """, (asgn_id, user_id, matricule, position_level, job_title, shift, parent_id, "Ajout à l'organigramme", changed_by))
+                """, (asgn_id, user_id, matricule, position_level, job_title, shift, parent_id, "Ajout a l'organigramme", changed_by))
 
             # Sync name, matricule, hire_date and shift into users table
             user_updates = ["name = ?", "matricule = ?"]
@@ -999,7 +999,7 @@ class OrgChartManager:
                 INSERT INTO org_assignment_history
                 (assignment_id, user_id, matricule, action_type, old_position_level, old_job_title, old_shift, details, changed_by)
                 VALUES (?, ?, ?, 'RETRAIT_ORGANIGRAMME', ?, ?, ?, ?, ?)
-            """, (assignment_id, user_id, matricule, existing["position_level"], existing["job_title"], existing["shift"], "Retiré de l'organigramme (compte utilisateur préservé)", changed_by))
+            """, (assignment_id, user_id, matricule, existing["position_level"], existing["job_title"], existing["shift"], "Retire de l'organigramme (compte utilisateur preserve)", changed_by))
 
             # Delete the assignment row from org_assignments
             cur.execute("DELETE FROM org_assignments WHERE id = ?", (assignment_id,))

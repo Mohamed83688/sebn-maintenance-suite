@@ -2190,7 +2190,7 @@ def admin():
         org_tree=org_mgr.get_org_tree(),
         org_assignments=org_mgr.get_all_assignments(),
         org_unassigned=org_mgr.get_unassigned_users(),
-        org_levels=POSITION_LEVELS,
+        org_levels=org_mgr.get_position_levels(),
         org_history=org_mgr.get_assignment_history(limit=50),
         org_groups_teams=org_mgr.get_groups_and_teams()
     )
@@ -2632,7 +2632,7 @@ def organigramme_view():
         unassigned=unassigned,
         history=history,
         groups_teams=groups_teams,
-        position_levels=POSITION_LEVELS
+        position_levels=org_mgr.get_position_levels()
     )
 
 
@@ -2875,6 +2875,21 @@ def api_org_remove():
     ok, msg = org_mgr.remove_from_org(asgn_id, changed_by=changed_by)
     if ok:
         flash(msg, "info")
+        return jsonify({'success': True, 'message': msg})
+    return jsonify({'success': False, 'message': msg}), 400
+
+
+@app.route('/api/org/levels/update', methods=['POST'])
+@admin_required
+def api_org_levels_update():
+    """
+    Updates custom labels for the 5 hierarchy levels (Manager, Group Leader, Team Leader, Supervisor, Technician).
+    Strictly restricted to Admin and Owner in backend.
+    """
+    data = request.get_json(silent=True) or request.form or {}
+    ok, msg = org_mgr.update_level_labels(data)
+    if ok:
+        flash(msg, "success")
         return jsonify({'success': True, 'message': msg})
     return jsonify({'success': False, 'message': msg}), 400
 
