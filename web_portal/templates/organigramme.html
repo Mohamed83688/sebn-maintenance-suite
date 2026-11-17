@@ -993,37 +993,37 @@
 
         <div class="org-kpi-card kpi-shift-a">
             <div class="org-kpi-top">
-                <div class="org-kpi-lbl">Shift A (Matin)</div>
+                <div class="org-kpi-lbl">Shift A</div>
                 <div class="org-kpi-icon"><i class="fa-solid fa-sun"></i></div>
             </div>
             <div class="org-kpi-val">{{ tree.stats.shift_a_count }}</div>
             <div style="font-size:11.5px; color:var(--text-sec); display:flex; justify-content:space-between; align-items:center;">
-                <span>06:00 – 14:00</span>
-                <span class="org-kpi-badge shift-pill-a">Matin</span>
+                <span>Équipe A</span>
+                <span class="org-kpi-badge shift-pill-a">Shift A</span>
             </div>
         </div>
 
         <div class="org-kpi-card kpi-shift-b">
             <div class="org-kpi-top">
-                <div class="org-kpi-lbl">Shift B (Soir)</div>
+                <div class="org-kpi-lbl">Shift B</div>
                 <div class="org-kpi-icon"><i class="fa-solid fa-cloud-sun"></i></div>
             </div>
             <div class="org-kpi-val">{{ tree.stats.shift_b_count }}</div>
             <div style="font-size:11.5px; color:var(--text-sec); display:flex; justify-content:space-between; align-items:center;">
-                <span>14:00 – 22:00</span>
-                <span class="org-kpi-badge shift-pill-b">Après-midi</span>
+                <span>Équipe B</span>
+                <span class="org-kpi-badge shift-pill-b">Shift B</span>
             </div>
         </div>
 
         <div class="org-kpi-card kpi-shift-c">
             <div class="org-kpi-top">
-                <div class="org-kpi-lbl">Shift C (Nuit)</div>
+                <div class="org-kpi-lbl">Shift C</div>
                 <div class="org-kpi-icon"><i class="fa-solid fa-moon"></i></div>
             </div>
             <div class="org-kpi-val">{{ tree.stats.shift_c_count }}</div>
             <div style="font-size:11.5px; color:var(--text-sec); display:flex; justify-content:space-between; align-items:center;">
-                <span>22:00 – 06:00</span>
-                <span class="org-kpi-badge shift-pill-c">Nuit</span>
+                <span>Équipe C</span>
+                <span class="org-kpi-badge shift-pill-c">Shift C</span>
             </div>
         </div>
 
@@ -1050,9 +1050,9 @@
         <div class="org-filter-actions">
             <select class="org-form-select" id="org-shift-filter" onchange="filterOrgContent()">
                 <option value="ALL">Tous les Shifts (A, B, C)</option>
-                <option value="A">Shift A (Matin)</option>
-                <option value="B">Shift B (Soir)</option>
-                <option value="C">Shift C (Nuit)</option>
+                <option value="A">Shift A</option>
+                <option value="B">Shift B</option>
+                <option value="C">Shift C</option>
                 <option value="NOT_ASSIGNED">Direction / Non assigné</option>
             </select>
 
@@ -1125,7 +1125,7 @@
                     <div class="org-pillar-box pillar-a" data-shift-box="A">
                         <div class="org-pillar-head">
                             <div class="org-pillar-title">
-                                <i class="fa-solid fa-sun"></i> Shift A (Matin)
+                                <i class="fa-solid fa-sun"></i> Shift A
                             </div>
                             <span class="shift-pill-a" style="font-size:11px; padding:3px 9px;">
                                 {{ tree.levels.shifts.A.total }} pers.
@@ -1180,7 +1180,7 @@
                     <div class="org-pillar-box pillar-b" data-shift-box="B">
                         <div class="org-pillar-head">
                             <div class="org-pillar-title">
-                                <i class="fa-solid fa-cloud-sun"></i> Shift B (Soir)
+                                <i class="fa-solid fa-cloud-sun"></i> Shift B
                             </div>
                             <span class="shift-pill-b" style="font-size:11px; padding:3px 9px;">
                                 {{ tree.levels.shifts.B.total }} pers.
@@ -1235,7 +1235,7 @@
                     <div class="org-pillar-box pillar-c" data-shift-box="C">
                         <div class="org-pillar-head">
                             <div class="org-pillar-title">
-                                <i class="fa-solid fa-moon"></i> Shift C (Nuit)
+                                <i class="fa-solid fa-moon"></i> Shift C
                             </div>
                             <span class="shift-pill-c" style="font-size:11px; padding:3px 9px;">
                                 {{ tree.levels.shifts.C.total }} pers.
@@ -1437,9 +1437,9 @@
                     <div class="form-group">
                         <label class="form-label" style="font-weight:700;">Shift <span style="color:var(--danger);">*</span></label>
                         <select class="form-control" name="shift" id="assign-shift" required>
-                            <option value="A">Shift A (Matin)</option>
-                            <option value="B">Shift B (Soir)</option>
-                            <option value="C">Shift C (Nuit)</option>
+                            <option value="A">Shift A</option>
+                            <option value="B">Shift B</option>
+                            <option value="C">Shift C</option>
                             <option value="NOT_ASSIGNED">Direction / Non assigné</option>
                         </select>
                     </div>
@@ -1529,9 +1529,9 @@
                     <div class="form-group">
                         <label class="form-label" style="font-weight:700;">Shift <span style="color:var(--danger);">*</span></label>
                         <select class="form-control" name="shift" id="edit-shift" required>
-                            <option value="A">Shift A (Matin)</option>
-                            <option value="B">Shift B (Soir)</option>
-                            <option value="C">Shift C (Nuit)</option>
+                            <option value="A">Shift A</option>
+                            <option value="B">Shift B</option>
+                            <option value="C">Shift C</option>
                             <option value="NOT_ASSIGNED">Direction / Non assigné</option>
                         </select>
                     </div>
@@ -1607,9 +1607,9 @@
                 <div class="form-group">
                     <label class="form-label" style="font-weight:700;">Nouveau Shift Cible</label>
                     <select class="form-control" name="new_shift" id="move-target-shift">
-                        <option value="A">Shift A (Matin)</option>
-                        <option value="B">Shift B (Soir)</option>
-                        <option value="C">Shift C (Nuit)</option>
+                        <option value="A">Shift A</option>
+                        <option value="B">Shift B</option>
+                        <option value="C">Shift C</option>
                         <option value="NOT_ASSIGNED">Direction / Non assigné</option>
                     </select>
                 </div>
