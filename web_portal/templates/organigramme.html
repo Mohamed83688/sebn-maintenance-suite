@@ -1,0 +1,1871 @@
+{% extends "base.html" %}
+
+{% block title %}Organigramme & Structure des Équipes — SEBN-TN{% endblock %}
+
+{% block head_extra %}
+<style>
+/* ============================================================
+   ORGANIGRAMME & EMPLOYEE STRUCTURE STYLING
+============================================================ */
+
+.org-container {
+    padding: 24px 32px 60px;
+    max-width: 1600px;
+    margin: 0 auto;
+}
+
+/* Header & Banner */
+.org-header-card {
+    background: #FFFFFF;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 24px 28px;
+    margin-bottom: 24px;
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.org-header-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.org-header-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, var(--primary) 0%, #7C3AED 100%);
+    color: #FFFFFF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    box-shadow: 0 6px 16px rgba(46, 0, 139, 0.22);
+}
+
+.org-header-title {
+    font-family: var(--font-display);
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--text);
+    line-height: 1.2;
+}
+
+.org-header-sub {
+    font-size: 13px;
+    color: var(--text-sec);
+    margin-top: 4px;
+}
+
+.org-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+/* Stats Row */
+.org-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 14px;
+    margin-bottom: 24px;
+}
+
+.org-stat-card {
+    background: #FFFFFF;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    box-shadow: var(--shadow-xs);
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    transition: var(--transition);
+}
+
+.org-stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-sm);
+    border-color: var(--border-h);
+}
+
+.org-stat-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+}
+
+.org-stat-icon.total     { background: rgba(46, 0, 139, 0.08); color: var(--primary); }
+.org-stat-icon.shift-a   { background: #ECFEFF; color: #0891B2; }
+.org-stat-icon.shift-b   { background: #F5F3FF; color: #7C3AED; }
+.org-stat-icon.shift-c   { background: #FFFBEB; color: #D97706; }
+.org-stat-icon.seniority { background: #ECFDF5; color: #059669; }
+
+.org-stat-val {
+    font-family: var(--font-display);
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--text);
+    line-height: 1.1;
+}
+
+.org-stat-lbl {
+    font-size: 12px;
+    color: var(--text-sec);
+    margin-top: 3px;
+    font-weight: 500;
+}
+
+/* Controls & Filters Bar */
+.org-controls-bar {
+    background: #FFFFFF;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    margin-bottom: 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 14px;
+    box-shadow: var(--shadow-xs);
+}
+
+.org-search-box {
+    display: flex;
+    align-items: center;
+    background: var(--bg-page);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 7px 12px;
+    gap: 8px;
+    flex: 1;
+    min-width: 240px;
+    max-width: 380px;
+}
+
+.org-search-box input {
+    border: none;
+    background: transparent;
+    outline: none;
+    font-size: 13px;
+    color: var(--text);
+    width: 100%;
+}
+
+.org-filter-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.org-select {
+    padding: 7px 12px;
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--text);
+    background: #FFFFFF;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    outline: none;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.org-select:hover, .org-select:focus {
+    border-color: var(--primary);
+}
+
+.view-toggle-btns {
+    display: flex;
+    background: var(--bg-page);
+    padding: 3px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+}
+
+.view-toggle-btn {
+    padding: 6px 14px;
+    font-size: 12.5px;
+    font-weight: 600;
+    border-radius: 7px;
+    border: none;
+    background: transparent;
+    color: var(--text-sec);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: var(--transition);
+}
+
+.view-toggle-btn.active {
+    background: #FFFFFF;
+    color: var(--primary);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+
+/* ============================================================
+   TREE / ORGANIGRAMME VIEW
+============================================================ */
+.org-tree-wrapper {
+    position: relative;
+    overflow-x: auto;
+    padding: 30px 10px 40px;
+    background: #FFFFFF;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    min-height: 600px;
+}
+
+.org-tree-canvas {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 36px;
+    min-width: 1050px;
+    position: relative;
+}
+
+/* Node Levels */
+.org-level-row {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 24px;
+    width: 100%;
+    position: relative;
+}
+
+/* Tree Connector Lines */
+.org-connector-vertical {
+    width: 2px;
+    height: 32px;
+    background: linear-gradient(180deg, var(--primary) 0%, #A5B4FC 100%);
+    margin: 0 auto;
+}
+
+.org-connector-horizontal {
+    height: 2px;
+    background: #CBD5E1;
+    position: absolute;
+    top: -18px;
+    left: 15%;
+    right: 15%;
+}
+
+/* Employee Cards in Tree */
+.org-card {
+    background: #FFFFFF;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px;
+    box-shadow: var(--shadow-xs);
+    width: 280px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    position: relative;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+}
+
+.org-card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow);
+    border-color: var(--primary-border);
+}
+
+/* Distinct Level Border Accents */
+.org-card.level-manager {
+    border-top: 4px solid #F59E0B;
+    background: linear-gradient(180deg, #FFFDF8 0%, #FFFFFF 100%);
+    width: 320px;
+}
+
+.org-card.level-groupleader {
+    border-top: 4px solid #7C3AED;
+    background: linear-gradient(180deg, #FBF9FF 0%, #FFFFFF 100%);
+    width: 300px;
+}
+
+.org-card.level-teamleader {
+    border-top: 4px solid #2563EB;
+    background: linear-gradient(180deg, #F8FAFF 0%, #FFFFFF 100%);
+    width: 290px;
+}
+
+.org-card.level-supervisor {
+    border-top: 4px solid #0891B2;
+}
+
+.org-card.level-technician {
+    border-top: 3px solid #64748B;
+    width: 260px;
+}
+
+/* Card Header (Photo/Avatar + Name + Job) */
+.org-card-top {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.org-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, var(--primary) 0%, #6366F1 100%);
+    color: #FFFFFF;
+    font-weight: 700;
+    font-size: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    box-shadow: 0 3px 8px rgba(46,0,139,0.18);
+    overflow: hidden;
+}
+
+.org-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.org-avatar.avatar-a { background: linear-gradient(135deg, #0891B2 0%, #06B6D4 100%); }
+.org-avatar.avatar-b { background: linear-gradient(135deg, #7C3AED 0%, #8B5CF6 100%); }
+.org-avatar.avatar-c { background: linear-gradient(135deg, #D97706 0%, #F59E0B 100%); }
+.org-avatar.avatar-mgr { background: linear-gradient(135deg, #D97706 0%, #EAB308 100%); }
+
+.org-card-meta {
+    overflow: hidden;
+    flex: 1;
+}
+
+.org-card-name {
+    font-family: var(--font-display);
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.org-card-title {
+    font-size: 12px;
+    color: var(--text-sec);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 1px;
+}
+
+/* Badges row inside card */
+.org-card-badges {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.badge-level {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 5px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.badge-manager     { background: #FEF3C7; color: #92400E; border: 1px solid #FDE68A; }
+.badge-groupleader { background: #EDE9FE; color: #5B21B6; border: 1px solid #DDD6FE; }
+.badge-teamleader  { background: #DBEAFE; color: #1E40AF; border: 1px solid #BFDBFE; }
+.badge-supervisor  { background: #CFFAFE; color: #155E75; border: 1px solid #A5F3FC; }
+.badge-technician  { background: #F1F5F9; color: #334155; border: 1px solid #E2E8F0; }
+
+.badge-shift-a { background: #ECFEFF; color: #0E7490; border: 1px solid #A5F3FC; font-weight: 700; }
+.badge-shift-b { background: #F5F3FF; color: #6D28D9; border: 1px solid #DDD6FE; font-weight: 700; }
+.badge-shift-c { background: #FFFBEB; color: #B45309; border: 1px solid #FDE68A; font-weight: 700; }
+.badge-shift-none { background: #F8FAFC; color: #64748B; border: 1px solid #E2E8F0; }
+
+/* Seniority & Details Row */
+.org-card-details {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--bg-page);
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 11.5px;
+    border: 1px solid rgba(0,0,0,0.03);
+}
+
+.org-card-seniority {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--primary);
+    font-weight: 600;
+}
+
+.org-card-matricule {
+    color: var(--text-dim);
+    font-family: monospace;
+    font-weight: 600;
+}
+
+/* Card Actions (Admin Only) */
+.org-card-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    border-top: 1px dashed var(--border);
+    padding-top: 8px;
+    margin-top: 2px;
+}
+
+.org-action-btn {
+    padding: 4px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: #FFFFFF;
+    color: var(--text-sec);
+    cursor: pointer;
+    transition: var(--transition-s);
+}
+
+.org-action-btn:hover {
+    background: var(--bg-page);
+    color: var(--primary);
+    border-color: var(--primary);
+}
+
+.org-action-btn.btn-remove:hover {
+    background: var(--danger-bg);
+    color: var(--danger);
+    border-color: var(--danger-border);
+}
+
+/* ============================================================
+   SHIFTS PILLARS LAYOUT (Under Supervisors)
+============================================================ */
+.org-shifts-section {
+    width: 100%;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 2px dashed #E2E8F0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.org-shifts-header-title {
+    font-family: var(--font-display);
+    font-size: 14px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: var(--text-sec);
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.org-shifts-header-title::before, .org-shifts-header-title::after {
+    content: '';
+    display: inline-block;
+    width: 40px;
+    height: 2px;
+    background: #CBD5E1;
+}
+
+.org-shifts-pillars {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    width: 100%;
+}
+
+.org-shift-pillar {
+    background: var(--bg-page);
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    padding: 18px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.org-shift-pillar.pillar-a { border-top: 4px solid #0891B2; }
+.org-shift-pillar.pillar-b { border-top: 4px solid #7C3AED; }
+.org-shift-pillar.pillar-c { border-top: 4px solid #D97706; }
+
+.org-pillar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+}
+
+.org-pillar-title {
+    font-family: var(--font-display);
+    font-size: 15px;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.pillar-a .org-pillar-title { color: #0E7490; }
+.pillar-b .org-pillar-title { color: #6D28D9; }
+.pillar-c .org-pillar-title { color: #B45309; }
+
+.org-pillar-badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 6px;
+    background: #FFFFFF;
+    border: 1px solid var(--border);
+}
+
+.org-sub-group-title {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-dim);
+    margin: 8px 0 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.org-pillar-cards-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* ============================================================
+   EMPLOYEE LIST VIEW (TABLE)
+============================================================ */
+.org-table-view {
+    background: #FFFFFF;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+    display: none;
+}
+
+.org-table-view.active {
+    display: block;
+}
+
+.org-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    text-align: left;
+}
+
+.org-table th {
+    background: var(--bg-page);
+    padding: 13px 16px;
+    font-family: var(--font-display);
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--text-sec);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+}
+
+.org-table td {
+    padding: 13px 16px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+    vertical-align: middle;
+}
+
+.org-table tr:hover td {
+    background: #FAF8FF;
+}
+
+.org-user-cell {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.org-user-avatar-sm {
+    width: 36px;
+    height: 36px;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    color: #FFFFFF;
+    background: var(--primary);
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.org-user-avatar-sm img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* Seniority Pill */
+.seniority-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 9px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    background: #ECFDF5;
+    color: #047857;
+    border: 1px solid #A7F3D0;
+}
+
+/* ============================================================
+   MODALS
+============================================================ */
+.modal-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(15, 23, 42, 0.45);
+    backdrop-filter: blur(4px);
+    z-index: 9999;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.modal-overlay.open {
+    display: flex;
+    animation: fadeIn 0.2s ease;
+}
+
+.modal-box {
+    background: #FFFFFF;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-xl);
+    width: 100%;
+    max-width: 600px;
+    max-height: 90vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.modal-header {
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-title {
+    font-family: var(--font-display);
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.modal-close {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: var(--bg-page);
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--text-sec);
+    transition: var(--transition-s);
+}
+
+.modal-close:hover {
+    background: var(--danger-bg);
+    color: var(--danger);
+    border-color: var(--danger-border);
+}
+
+.modal-body {
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.modal-footer {
+    padding: 16px 24px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    background: var(--bg-page);
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+/* History Timeline inside Employee Details Modal */
+.org-history-timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin-top: 10px;
+    position: relative;
+    padding-left: 20px;
+}
+
+.org-history-timeline::before {
+    content: '';
+    position: absolute;
+    top: 4px;
+    bottom: 4px;
+    left: 6px;
+    width: 2px;
+    background: #CBD5E1;
+}
+
+.org-history-item {
+    position: relative;
+    font-size: 12px;
+}
+
+.org-history-item::before {
+    content: '';
+    position: absolute;
+    left: -18px;
+    top: 4px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--primary);
+    border: 2px solid #FFFFFF;
+    box-shadow: 0 0 0 2px var(--primary-border);
+}
+
+.org-history-date {
+    font-size: 10.5px;
+    color: var(--text-dim);
+    margin-bottom: 2px;
+}
+
+.org-history-desc {
+    color: var(--text);
+    font-weight: 500;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: scale(0.97); }
+    to { opacity: 1; transform: scale(1); }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+{% macro render_org_card(emp, is_admin_or_owner) %}
+<div class="org-card level-{{ emp.position_level|lower }}"
+     id="org-card-{{ emp.id }}"
+     data-card-id="{{ emp.id }}"
+     data-shift="{{ emp.shift }}"
+     data-level="{{ emp.position_level }}"
+     data-name="{{ emp.full_name|lower }}"
+     data-mat="{{ emp.matricule|lower }}"
+     data-title="{{ emp.job_title|lower }}"
+     onclick="viewEmployeeDetails({{ emp.id }})">
+
+    <div class="org-card-top">
+        <div class="org-avatar {% if emp.shift == 'A' %}avatar-a{% elif emp.shift == 'B' %}avatar-b{% elif emp.shift == 'C' %}avatar-c{% elif emp.position_level == 'MANAGER' %}avatar-mgr{% endif %}">
+            {% if emp.photo %}
+                <img src="{{ emp.photo }}" alt="{{ emp.full_name }}">
+            {% else %}
+                {{ emp.full_name[:2]|upper }}
+            {% endif %}
+        </div>
+        <div class="org-card-meta">
+            <div class="org-card-name" title="{{ emp.full_name }}">{{ emp.full_name }}</div>
+            <div class="org-card-title" title="{{ emp.job_title }}">{{ emp.job_title }}</div>
+        </div>
+    </div>
+
+    <div class="org-card-badges">
+        <span class="badge-level {{ emp.level_badge_class }}">
+            <i class="{{ emp.level_icon }}"></i> {{ emp.level_label }}
+        </span>
+        {% if emp.shift == 'A' %}
+            <span class="badge badge-shift-a"><i class="fa-solid fa-sun"></i> Shift A</span>
+        {% elif emp.shift == 'B' %}
+            <span class="badge badge-shift-b"><i class="fa-solid fa-cloud-sun"></i> Shift B</span>
+        {% elif emp.shift == 'C' %}
+            <span class="badge badge-shift-c"><i class="fa-solid fa-moon"></i> Shift C</span>
+        {% else %}
+            <span class="badge badge-shift-none">Direction</span>
+        {% endif %}
+    </div>
+
+    <div class="org-card-details">
+        <div class="org-card-seniority" title="Date d'embauche : {{ emp.seniority.formatted_hire_date }}">
+            <i class="fa-solid fa-hourglass-half"></i> {{ emp.seniority.text }}
+        </div>
+        <div class="org-card-matricule">{{ emp.matricule }}</div>
+    </div>
+
+    {% if is_admin_or_owner %}
+    <div class="org-card-actions" onclick="event.stopPropagation()">
+        <button class="org-action-btn" onclick="openEditModal({{ emp.id }})" title="Modifier affectation">
+            <i class="fa-solid fa-pen"></i> Modifier
+        </button>
+        <button class="org-action-btn" onclick="openQuickMoveModal({{ emp.id }}, '{{ emp.shift }}', '{{ emp.parent_id or '' }}')" title="Changer Shift / Supérieur">
+            <i class="fa-solid fa-arrow-right-arrow-left"></i>
+        </button>
+        <button class="org-action-btn btn-remove" onclick="confirmRemoveEmployee({{ emp.id }}, '{{ emp.full_name|replace("'", "\\'") }}')" title="Retirer">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+    </div>
+    {% endif %}
+</div>
+{% endmacro %}
+
+<div class="org-container">
+
+    <!-- ── HEADER BANNER ────────────────────────────────────────── -->
+    <div class="org-header-card animate-up">
+        <div class="org-header-left">
+            <div class="org-header-icon">
+                <i class="fa-solid fa-sitemap"></i>
+            </div>
+            <div>
+                <div class="org-header-title">Organigramme &amp; Structure Hiérarchique</div>
+                <div class="org-header-sub">
+                    SEBN-TN Maintenance — Hiérarchie générale, découpage par shift (A, B, C) et suivi de l'ancienneté.
+                </div>
+            </div>
+        </div>
+        <div class="org-header-actions">
+            {% if is_admin_or_owner %}
+            <button class="btn btn-primary" onclick="openAssignModal()">
+                <i class="fa-solid fa-user-plus"></i> Affecter un Employé
+            </button>
+            <button class="btn btn-secondary" onclick="openQuickMoveModal()">
+                <i class="fa-solid fa-arrow-right-arrow-left"></i> Déplacer / Changer Shift
+            </button>
+            {% else %}
+            <span class="badge badge-info" style="padding:6px 12px; font-size:12px;">
+                <i class="fa-solid fa-eye"></i> Mode Consultation (Lecture Seule)
+            </span>
+            {% endif %}
+            <button class="btn btn-secondary" onclick="window.print()">
+                <i class="fa-solid fa-print"></i> Imprimer
+            </button>
+        </div>
+    </div>
+
+    <!-- ── STATS CARDS ─────────────────────────────────────────── -->
+    <div class="org-stats-grid animate-up">
+        <div class="org-stat-card">
+            <div class="org-stat-icon total"><i class="fa-solid fa-users"></i></div>
+            <div>
+                <div class="org-stat-val" id="stat-total">{{ tree.stats.total_employees }}</div>
+                <div class="org-stat-lbl">Effectif Total</div>
+            </div>
+        </div>
+        <div class="org-stat-card">
+            <div class="org-stat-icon shift-a"><i class="fa-solid fa-sun"></i></div>
+            <div>
+                <div class="org-stat-val" id="stat-shift-a">{{ tree.stats.shift_a_count }}</div>
+                <div class="org-stat-lbl">Shift A (Matin)</div>
+            </div>
+        </div>
+        <div class="org-stat-card">
+            <div class="org-stat-icon shift-b"><i class="fa-solid fa-cloud-sun"></i></div>
+            <div>
+                <div class="org-stat-val" id="stat-shift-b">{{ tree.stats.shift_b_count }}</div>
+                <div class="org-stat-lbl">Shift B (Soir)</div>
+            </div>
+        </div>
+        <div class="org-stat-card">
+            <div class="org-stat-icon shift-c"><i class="fa-solid fa-moon"></i></div>
+            <div>
+                <div class="org-stat-val" id="stat-shift-c">{{ tree.stats.shift_c_count }}</div>
+                <div class="org-stat-lbl">Shift C (Nuit)</div>
+            </div>
+        </div>
+        <div class="org-stat-card">
+            <div class="org-stat-icon seniority"><i class="fa-solid fa-clock-rotate-left"></i></div>
+            <div>
+                <div class="org-stat-val" id="stat-avg-seniority">{{ tree.stats.avg_seniority }}</div>
+                <div class="org-stat-lbl">Ancienneté Moyenne</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── CONTROLS & FILTER BAR ───────────────────────────────── -->
+    <div class="org-controls-bar animate-up">
+        <div class="org-search-box">
+            <i class="fa-solid fa-magnifying-glass" style="color:var(--text-dim); font-size:12px;"></i>
+            <input type="text" id="org-search-input" placeholder="Rechercher par nom, matricule ou poste..." oninput="handleOrgFilter()">
+        </div>
+
+        <div class="org-filter-group">
+            <select class="org-select" id="org-filter-shift" onchange="handleOrgFilter()">
+                <option value="ALL">Tous les Shifts (A, B, C)</option>
+                <option value="A">Shift A</option>
+                <option value="B">Shift B</option>
+                <option value="C">Shift C</option>
+                <option value="NOT_ASSIGNED">Direction / Non assigné</option>
+            </select>
+
+            <select class="org-select" id="org-filter-level" onchange="handleOrgFilter()">
+                <option value="ALL">Tous les Niveaux</option>
+                <option value="MANAGER">Manager / Direction</option>
+                <option value="GROUP_LEADER">Chef de Groupe</option>
+                <option value="TEAM_LEADER">Chef d'Équipe</option>
+                <option value="SUPERVISOR">Superviseur</option>
+                <option value="TECHNICIAN">Technicien</option>
+            </select>
+
+            <div class="view-toggle-btns">
+                <button class="view-toggle-btn active" id="btn-view-tree" onclick="switchView('tree')">
+                    <i class="fa-solid fa-network-wired"></i> Organigramme
+                </button>
+                <button class="view-toggle-btn" id="btn-view-table" onclick="switchView('table')">
+                    <i class="fa-solid fa-table-list"></i> Liste des Employés
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── 1. ORGANIGRAMME VIEW (TREE) ─────────────────────────── -->
+    <div class="org-tree-wrapper animate-up" id="view-tree-container">
+        <div class="org-tree-canvas" id="org-tree-canvas">
+
+            <!-- LEVEL 1: MANAGERS -->
+            <div class="org-level-row" id="tree-managers-row">
+                {% for mgr in tree.levels.managers %}
+                    {{ render_org_card(mgr, is_admin_or_owner) }}
+                {% else %}
+                    <div style="color:var(--text-dim); font-size:13px;">Aucun manager défini.</div>
+                {% endfor %}
+            </div>
+
+            <div class="org-connector-vertical"></div>
+
+            <!-- LEVEL 2: GROUP LEADERS -->
+            <div class="org-level-row" id="tree-groupleaders-row">
+                {% for gl in tree.levels.group_leaders %}
+                    {{ render_org_card(gl, is_admin_or_owner) }}
+                {% else %}
+                    <div style="color:var(--text-dim); font-size:13px; font-style:italic;">Aucun chef de groupe défini.</div>
+                {% endfor %}
+            </div>
+
+            {% if tree.levels.team_leaders %}
+            <div class="org-connector-vertical"></div>
+            <!-- LEVEL 3: TEAM LEADERS (If any defined) -->
+            <div class="org-level-row" id="tree-teamleaders-row">
+                {% for tl in tree.levels.team_leaders %}
+                    {{ render_org_card(tl, is_admin_or_owner) }}
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- LEVEL 4 & 5: SHIFT PILLARS (Shift A, B, C) -->
+            <div class="org-shifts-section">
+                <div class="org-shifts-header-title">
+                    <i class="fa-solid fa-layer-group"></i> Organisation des Shifts &amp; Équipes Opérationnelles
+                </div>
+
+                <div class="org-shifts-pillars">
+
+                    <!-- ── SHIFT A ────────────────────────────── -->
+                    <div class="org-shift-pillar pillar-a" data-shift-box="A">
+                        <div class="org-pillar-header">
+                            <div class="org-pillar-title">
+                                <i class="fa-solid fa-sun"></i> Shift A
+                            </div>
+                            <span class="org-pillar-badge" style="color:#0E7490;">
+                                {{ tree.levels.shifts.A.total }} employés
+                            </span>
+                        </div>
+
+                        <!-- Supervisors -->
+                        <div class="org-sub-group-title"><i class="fa-solid fa-user-check"></i> Superviseurs Shift A</div>
+                        <div class="org-pillar-cards-list">
+                            {% for sup in tree.levels.shifts.A.supervisors %}
+                                {{ render_org_card(sup, is_admin_or_owner) }}
+                            {% else %}
+                                <div style="font-size:11.5px; color:var(--text-dim); padding:6px;">Aucun superviseur assigné</div>
+                            {% endfor %}
+                        </div>
+
+                        <!-- Technicians -->
+                        <div class="org-sub-group-title" style="margin-top:14px;"><i class="fa-solid fa-wrench"></i> Techniciens Shift A</div>
+                        <div class="org-pillar-cards-list">
+                            {% for tech in tree.levels.shifts.A.technicians %}
+                                {{ render_org_card(tech, is_admin_or_owner) }}
+                            {% else %}
+                                <div style="font-size:11.5px; color:var(--text-dim); padding:6px;">Aucun technicien assigné</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <!-- ── SHIFT B ────────────────────────────── -->
+                    <div class="org-shift-pillar pillar-b" data-shift-box="B">
+                        <div class="org-pillar-header">
+                            <div class="org-pillar-title">
+                                <i class="fa-solid fa-cloud-sun"></i> Shift B
+                            </div>
+                            <span class="org-pillar-badge" style="color:#6D28D9;">
+                                {{ tree.levels.shifts.B.total }} employés
+                            </span>
+                        </div>
+
+                        <!-- Supervisors -->
+                        <div class="org-sub-group-title"><i class="fa-solid fa-user-check"></i> Superviseurs Shift B</div>
+                        <div class="org-pillar-cards-list">
+                            {% for sup in tree.levels.shifts.B.supervisors %}
+                                {{ render_org_card(sup, is_admin_or_owner) }}
+                            {% else %}
+                                <div style="font-size:11.5px; color:var(--text-dim); padding:6px;">Aucun superviseur assigné</div>
+                            {% endfor %}
+                        </div>
+
+                        <!-- Technicians -->
+                        <div class="org-sub-group-title" style="margin-top:14px;"><i class="fa-solid fa-wrench"></i> Techniciens Shift B</div>
+                        <div class="org-pillar-cards-list">
+                            {% for tech in tree.levels.shifts.B.technicians %}
+                                {{ render_org_card(tech, is_admin_or_owner) }}
+                            {% else %}
+                                <div style="font-size:11.5px; color:var(--text-dim); padding:6px;">Aucun technicien assigné</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <!-- ── SHIFT C ────────────────────────────── -->
+                    <div class="org-shift-pillar pillar-c" data-shift-box="C">
+                        <div class="org-pillar-header">
+                            <div class="org-pillar-title">
+                                <i class="fa-solid fa-moon"></i> Shift C
+                            </div>
+                            <span class="org-pillar-badge" style="color:#B45309;">
+                                {{ tree.levels.shifts.C.total }} employés
+                            </span>
+                        </div>
+
+                        <!-- Supervisors -->
+                        <div class="org-sub-group-title"><i class="fa-solid fa-user-check"></i> Superviseurs Shift C</div>
+                        <div class="org-pillar-cards-list">
+                            {% for sup in tree.levels.shifts.C.supervisors %}
+                                {{ render_org_card(sup, is_admin_or_owner) }}
+                            {% else %}
+                                <div style="font-size:11.5px; color:var(--text-dim); padding:6px;">Aucun superviseur assigné</div>
+                            {% endfor %}
+                        </div>
+
+                        <!-- Technicians -->
+                        <div class="org-sub-group-title" style="margin-top:14px;"><i class="fa-solid fa-wrench"></i> Techniciens Shift C</div>
+                        <div class="org-pillar-cards-list">
+                            {% for tech in tree.levels.shifts.C.technicians %}
+                                {{ render_org_card(tech, is_admin_or_owner) }}
+                            {% else %}
+                                <div style="font-size:11.5px; color:var(--text-dim); padding:6px;">Aucun technicien assigné</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- ── 2. EMPLOYEE LIST VIEW (TABLE) ───────────────────────── -->
+    <div class="org-table-view animate-up" id="view-table-container">
+        <table class="org-table" id="org-main-table">
+            <thead>
+                <tr>
+                    <th>Employé</th>
+                    <th>Matricule</th>
+                    <th>Niveau</th>
+                    <th>Poste / Titre</th>
+                    <th>Shift</th>
+                    <th>Supérieur Direct</th>
+                    <th>Date d'Embauche</th>
+                    <th>Ancienneté</th>
+                    <th>Statut</th>
+                    <th style="text-align:right;">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="org-table-tbody">
+                {% for emp in assignments %}
+                <tr data-emp-id="{{ emp.id }}" data-shift="{{ emp.shift }}" data-level="{{ emp.position_level }}" data-name="{{ emp.full_name|lower }}" data-mat="{{ emp.matricule|lower }}" data-title="{{ emp.job_title|lower }}">
+                    <td>
+                        <div class="org-user-cell">
+                            <div class="org-user-avatar-sm">
+                                {% if emp.photo %}
+                                    <img src="{{ emp.photo }}" alt="{{ emp.full_name }}">
+                                {% else %}
+                                    {{ emp.full_name[:2]|upper }}
+                                {% endif %}
+                            </div>
+                            <div>
+                                <div style="font-weight:700; color:var(--text);">{{ emp.full_name }}</div>
+                                <div style="font-size:11.5px; color:var(--text-sec);">{{ emp.group_name or 'SEBN-TN Maintenance' }}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td><span style="font-family:monospace; font-weight:700; color:var(--primary);">{{ emp.matricule }}</span></td>
+                    <td>
+                        <span class="badge-level {{ emp.level_badge_class }}">
+                            <i class="{{ emp.level_icon }}"></i> {{ emp.level_label }}
+                        </span>
+                    </td>
+                    <td style="font-weight:600; color:var(--text);">{{ emp.job_title }}</td>
+                    <td>
+                        {% if emp.shift == 'A' %}
+                            <span class="badge badge-shift-a"><i class="fa-solid fa-sun"></i> Shift A</span>
+                        {% elif emp.shift == 'B' %}
+                            <span class="badge badge-shift-b"><i class="fa-solid fa-cloud-sun"></i> Shift B</span>
+                        {% elif emp.shift == 'C' %}
+                            <span class="badge badge-shift-c"><i class="fa-solid fa-moon"></i> Shift C</span>
+                        {% else %}
+                            <span class="badge badge-shift-none">Direction</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if emp.parent_name %}
+                            <div style="font-size:12px; font-weight:600; color:var(--text);">{{ emp.parent_name }}</div>
+                            <div style="font-size:10.5px; color:var(--text-dim);">{{ emp.parent_job_title }}</div>
+                        {% else %}
+                            <span style="color:var(--text-dim); font-size:11.5px;">—</span>
+                        {% endif %}
+                    </td>
+                    <td style="font-size:12px; color:var(--text-sec); font-family:monospace;">
+                        {{ emp.seniority.formatted_hire_date }}
+                    </td>
+                    <td>
+                        <span class="seniority-pill">
+                            <i class="fa-solid fa-hourglass-half"></i> {{ emp.seniority.text }}
+                        </span>
+                    </td>
+                    <td>
+                        {% if emp.user_is_active %}
+                            <span class="badge badge-success"><i class="fa-solid fa-circle-check"></i> Actif</span>
+                        {% else %}
+                            <span class="badge badge-neutral"><i class="fa-solid fa-ban"></i> Inactif</span>
+                        {% endif %}
+                    </td>
+                    <td style="text-align:right; white-space:nowrap;">
+                        <button class="btn btn-secondary btn-xs" onclick="viewEmployeeDetails({{ emp.id }})" title="Voir la fiche complète">
+                            <i class="fa-solid fa-id-card"></i> Fiche
+                        </button>
+                        {% if is_admin_or_owner %}
+                        <button class="btn btn-secondary btn-xs" onclick="openEditModal({{ emp.id }})" title="Modifier">
+                            <i class="fa-solid fa-pen"></i>
+                        </button>
+                        <button class="btn btn-secondary btn-xs" onclick="openQuickMoveModal({{ emp.id }}, '{{ emp.shift }}', '{{ emp.parent_id or '' }}')" title="Déplacer">
+                            <i class="fa-solid fa-arrow-right-arrow-left"></i>
+                        </button>
+                        <button class="btn btn-danger btn-xs" onclick="confirmRemoveEmployee({{ emp.id }}, '{{ emp.full_name|replace("'", "\\'") }}')" title="Retirer de l'organigramme">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="10" style="text-align:center; padding:30px; color:var(--text-sec);">
+                        Aucun employé trouvé dans l'organigramme.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+</div>
+
+<!-- ============================================================
+     MODALS
+============================================================ -->
+
+<!-- 1. ASSIGN / ADD EMPLOYEE MODAL (ADMIN ONLY) -->
+{% if is_admin_or_owner %}
+<div class="modal-overlay" id="modal-assign">
+    <div class="modal-box">
+        <div class="modal-header">
+            <div class="modal-title"><i class="fa-solid fa-user-plus" style="color:var(--primary);"></i> Affecter un Employé à l'Organigramme</div>
+            <div class="modal-close" onclick="closeModal('modal-assign')"><i class="fa-solid fa-xmark"></i></div>
+        </div>
+        <form id="form-assign-employee" onsubmit="submitAssignEmployee(event)">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label" style="font-weight:700;">Sélectionner un Compte Existant <span style="color:var(--danger);">*</span></label>
+                    <select class="form-control" name="user_id" id="assign-user-select" required onchange="onAssignUserChanged()">
+                        <option value="">-- Choisir un utilisateur / technicien --</option>
+                        {% for u in unassigned %}
+                            <option value="{{ u.id }}" data-shift="{{ u.shift or 'A' }}" data-mat="{{ u.matricule }}" data-hire="{{ u.hire_date or '' }}">
+                                {{ u.name }} ({{ u.matricule }}) — Rôle: {{ u.role }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                    <small style="color:var(--text-sec); font-size:11.5px; display:block; margin-top:4px;">
+                        Synchronisé avec la liste des techniciens existante. Aucun compte en double créé.
+                    </small>
+                </div>
+
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label class="form-label" style="font-weight:700;">Niveau Hiérarchique <span style="color:var(--danger);">*</span></label>
+                        <select class="form-control" name="position_level" id="assign-level-select" required onchange="onPositionLevelChanged()">
+                            <option value="TECHNICIAN">5. Technicien</option>
+                            <option value="SUPERVISOR">4. Superviseur</option>
+                            <option value="TEAM_LEADER">3. Chef d'Équipe</option>
+                            <option value="GROUP_LEADER">2. Chef de Groupe</option>
+                            <option value="MANAGER">1. Manager / Direction</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" style="font-weight:700;">Affectation Shift <span style="color:var(--danger);">*</span></label>
+                        <select class="form-control" name="shift" id="assign-shift-select" required>
+                            <option value="A">Shift A (Matin)</option>
+                            <option value="B">Shift B (Soir)</option>
+                            <option value="C">Shift C (Nuit)</option>
+                            <option value="NOT_ASSIGNED">Direction / Non assigné</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" style="font-weight:700;">Intitulé du Poste / Titre <span style="color:var(--danger);">*</span></label>
+                    <input type="text" class="form-control" name="job_title" id="assign-job-title" placeholder="Ex: Superviseur Maintenance, Technicien Câblage..." required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" style="font-weight:700;">Supérieur Hiérarchique Direct</label>
+                    <select class="form-control" name="parent_id" id="assign-parent-select">
+                        <option value="">-- Aucun (Sommet hiérarchique) --</option>
+                        {% for emp in assignments %}
+                            <option value="{{ emp.id }}">
+                                {{ emp.full_name }} — {{ emp.job_title }} ({{ emp.position_level }})
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label class="form-label" style="font-weight:700;">Date d'Embauche</label>
+                        <input type="date" class="form-control" name="hire_date" id="assign-hire-date" onchange="previewSeniority('assign-hire-date', 'assign-seniority-preview')">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" style="font-weight:700;">Ancienneté Calculée</label>
+                        <div id="assign-seniority-preview" style="padding:9px 12px; background:var(--bg-page); border:1px solid var(--border); border-radius:8px; font-weight:700; color:var(--primary); font-size:13px;">
+                            —
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label class="form-label">Groupe</label>
+                        <input type="text" class="form-control" name="group_name" id="assign-group-name" placeholder="Ex: Maintenance Générale" list="group-suggestions">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Équipe</label>
+                        <input type="text" class="form-control" name="team_name" id="assign-team-name" placeholder="Ex: Équipe Shift B" list="team-suggestions">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('modal-assign')">Annuler</button>
+                <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check"></i> Enregistrer Affectation</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 2. EDIT EMPLOYEE MODAL (ADMIN ONLY) -->
+<div class="modal-overlay" id="modal-edit">
+    <div class="modal-box">
+        <div class="modal-header">
+            <div class="modal-title"><i class="fa-solid fa-pen-to-square" style="color:var(--primary);"></i> Modifier l'Affectation</div>
+            <div class="modal-close" onclick="closeModal('modal-edit')"><i class="fa-solid fa-xmark"></i></div>
+        </div>
+        <form id="form-edit-employee" onsubmit="submitEditEmployee(event)">
+            <input type="hidden" name="assignment_id" id="edit-asgn-id">
+            <div class="modal-body">
+                <div style="background:var(--bg-page); border:1px solid var(--border); border-radius:10px; padding:12px 14px; margin-bottom:4px;">
+                    <div style="font-size:11px; text-transform:uppercase; color:var(--text-dim); font-weight:700;">Employé sélectionné</div>
+                    <div style="font-size:15px; font-weight:800; color:var(--text);" id="edit-emp-name">—</div>
+                    <div style="font-size:12px; color:var(--primary); font-family:monospace;" id="edit-emp-mat">—</div>
+                </div>
+
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label class="form-label" style="font-weight:700;">Niveau Hiérarchique <span style="color:var(--danger);">*</span></label>
+                        <select class="form-control" name="position_level" id="edit-level-select" required>
+                            <option value="TECHNICIAN">5. Technicien</option>
+                            <option value="SUPERVISOR">4. Superviseur</option>
+                            <option value="TEAM_LEADER">3. Chef d'Équipe</option>
+                            <option value="GROUP_LEADER">2. Chef de Groupe</option>
+                            <option value="MANAGER">1. Manager / Direction</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" style="font-weight:700;">Shift <span style="color:var(--danger);">*</span></label>
+                        <select class="form-control" name="shift" id="edit-shift-select" required>
+                            <option value="A">Shift A (Matin)</option>
+                            <option value="B">Shift B (Soir)</option>
+                            <option value="C">Shift C (Nuit)</option>
+                            <option value="NOT_ASSIGNED">Direction / Non assigné</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" style="font-weight:700;">Intitulé du Poste / Titre <span style="color:var(--danger);">*</span></label>
+                    <input type="text" class="form-control" name="job_title" id="edit-job-title" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" style="font-weight:700;">Supérieur Hiérarchique Direct</label>
+                    <select class="form-control" name="parent_id" id="edit-parent-select">
+                        <option value="">-- Aucun (Direction) --</option>
+                        {% for emp in assignments %}
+                            <option value="{{ emp.id }}">{{ emp.full_name }} ({{ emp.job_title }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label class="form-label" style="font-weight:700;">Date d'Embauche</label>
+                        <input type="date" class="form-control" name="hire_date" id="edit-hire-date" onchange="previewSeniority('edit-hire-date', 'edit-seniority-preview')">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" style="font-weight:700;">Ancienneté Calculée</label>
+                        <div id="edit-seniority-preview" style="padding:9px 12px; background:var(--bg-page); border:1px solid var(--border); border-radius:8px; font-weight:700; color:var(--primary); font-size:13px;">
+                            —
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label class="form-label">Groupe</label>
+                        <input type="text" class="form-control" name="group_name" id="edit-group-name" list="group-suggestions">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Équipe</label>
+                        <input type="text" class="form-control" name="team_name" id="edit-team-name" list="team-suggestions">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('modal-edit')">Annuler</button>
+                <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check"></i> Enregistrer les Modifications</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 3. QUICK MOVE MODAL (ADMIN ONLY) -->
+<div class="modal-overlay" id="modal-quick-move">
+    <div class="modal-box" style="max-width:480px;">
+        <div class="modal-header">
+            <div class="modal-title"><i class="fa-solid fa-arrow-right-arrow-left" style="color:var(--primary);"></i> Déplacement Rapide / Changement de Shift</div>
+            <div class="modal-close" onclick="closeModal('modal-quick-move')"><i class="fa-solid fa-xmark"></i></div>
+        </div>
+        <form id="form-quick-move" onsubmit="submitQuickMove(event)">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label" style="font-weight:700;">Sélectionner l'Employé</label>
+                    <select class="form-control" name="assignment_id" id="move-asgn-select" required onchange="onMoveSelectChanged()">
+                        {% for emp in assignments %}
+                            <option value="{{ emp.id }}" data-shift="{{ emp.shift }}" data-parent="{{ emp.parent_id or '' }}">
+                                {{ emp.full_name }} ({{ emp.matricule }}) — Shift actuel: {{ emp.shift }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" style="font-weight:700;">Nouveau Shift Cible</label>
+                    <select class="form-control" name="new_shift" id="move-new-shift">
+                        <option value="A">Shift A (Matin)</option>
+                        <option value="B">Shift B (Soir)</option>
+                        <option value="C">Shift C (Nuit)</option>
+                        <option value="NOT_ASSIGNED">Direction / Non assigné</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" style="font-weight:700;">Nouveau Supérieur Direct (Optionnel)</label>
+                    <select class="form-control" name="new_parent_id" id="move-new-parent">
+                        <option value="">-- Conserver le supérieur actuel --</option>
+                        {% for emp in assignments %}
+                            <option value="{{ emp.id }}">{{ emp.full_name }} ({{ emp.job_title }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('modal-quick-move')">Annuler</button>
+                <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check"></i> Confirmer le Déplacement</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+
+<!-- 4. EMPLOYEE DETAIL & SENIORITY / AUDIT MODAL (ALL USERS) -->
+<div class="modal-overlay" id="modal-employee-details">
+    <div class="modal-box" style="max-width:560px;">
+        <div class="modal-header">
+            <div class="modal-title"><i class="fa-solid fa-id-badge" style="color:var(--primary);"></i> Fiche Employé &amp; Parcours</div>
+            <div class="modal-close" onclick="closeModal('modal-employee-details')"><i class="fa-solid fa-xmark"></i></div>
+        </div>
+        <div class="modal-body">
+            <div style="display:flex; align-items:center; gap:16px; padding-bottom:16px; border-bottom:1px solid var(--border);">
+                <div class="org-avatar" id="det-avatar" style="width:58px; height:58px; font-size:18px;">--</div>
+                <div>
+                    <div style="font-family:var(--font-display); font-size:18px; font-weight:800; color:var(--text);" id="det-name">—</div>
+                    <div style="font-size:13px; color:var(--primary); font-weight:600;" id="det-title">—</div>
+                    <div style="font-size:12px; color:var(--text-dim); font-family:monospace; margin-top:2px;" id="det-mat">—</div>
+                </div>
+            </div>
+
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:4px;">
+                <div style="background:var(--bg-page); border:1px solid var(--border); border-radius:10px; padding:10px 14px;">
+                    <div style="font-size:11px; text-transform:uppercase; color:var(--text-dim); font-weight:700;">Niveau Hiérarchique</div>
+                    <div style="font-size:13.5px; font-weight:700; color:var(--text); margin-top:3px;" id="det-level">—</div>
+                </div>
+                <div style="background:var(--bg-page); border:1px solid var(--border); border-radius:10px; padding:10px 14px;">
+                    <div style="font-size:11px; text-transform:uppercase; color:var(--text-dim); font-weight:700;">Affectation Shift</div>
+                    <div style="font-size:13.5px; font-weight:700; color:var(--text); margin-top:3px;" id="det-shift">—</div>
+                </div>
+                <div style="background:var(--bg-page); border:1px solid var(--border); border-radius:10px; padding:10px 14px;">
+                    <div style="font-size:11px; text-transform:uppercase; color:var(--text-dim); font-weight:700;">Date d'Embauche</div>
+                    <div style="font-size:13.5px; font-weight:700; color:var(--text); margin-top:3px;" id="det-hire-date">—</div>
+                </div>
+                <div style="background:#ECFDF5; border:1px solid #A7F3D0; border-radius:10px; padding:10px 14px;">
+                    <div style="font-size:11px; text-transform:uppercase; color:#065F46; font-weight:700;">Ancienneté Calculée</div>
+                    <div style="font-size:13.5px; font-weight:800; color:#047857; margin-top:3px;" id="det-seniority">—</div>
+                </div>
+            </div>
+
+            <div style="background:var(--bg-page); border:1px solid var(--border); border-radius:10px; padding:10px 14px;">
+                <div style="font-size:11px; text-transform:uppercase; color:var(--text-dim); font-weight:700;">Supérieur Hiérarchique Direct</div>
+                <div style="font-size:13.5px; font-weight:700; color:var(--text); margin-top:3px;" id="det-supervisor">—</div>
+            </div>
+
+            <div style="margin-top:6px;">
+                <div style="font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:0.5px; color:var(--text); display:flex; align-items:center; gap:6px;">
+                    <i class="fa-solid fa-clock-rotate-left" style="color:var(--primary);"></i> Historique des Affectations &amp; Promotions
+                </div>
+                <div class="org-history-timeline" id="det-history-timeline">
+                    <div style="font-size:12px; color:var(--text-dim);">Chargement de l'historique...</div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" onclick="closeModal('modal-employee-details')">Fermer</button>
+        </div>
+    </div>
+</div>
+
+<!-- Datalists for suggestions -->
+<datalist id="group-suggestions">
+    {% for g in groups_teams.groups %}
+        <option value="{{ g }}">
+    {% endfor %}
+</datalist>
+<datalist id="team-suggestions">
+    {% for t in groups_teams.teams %}
+        <option value="{{ t }}">
+    {% endfor %}
+</datalist>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+/* ============================================================
+   ORGANIGRAMME CLIENT JAVASCRIPT
+============================================================ */
+
+const IS_ADMIN_OR_OWNER = {{ 'true' if is_admin_or_owner else 'false' }};
+const ALL_ASSIGNMENTS = {{ assignments|tojson }};
+
+function switchView(mode) {
+    const treeBtn = document.getElementById('btn-view-tree');
+    const tableBtn = document.getElementById('btn-view-table');
+    const treeContainer = document.getElementById('view-tree-container');
+    const tableContainer = document.getElementById('view-table-container');
+
+    if (mode === 'table') {
+        treeBtn.classList.remove('active');
+        tableBtn.classList.add('active');
+        treeContainer.style.display = 'none';
+        tableContainer.classList.add('active');
+    } else {
+        tableBtn.classList.remove('active');
+        treeBtn.classList.add('active');
+        tableContainer.classList.remove('active');
+        treeContainer.style.display = 'block';
+    }
+}
+
+function handleOrgFilter() {
+    const query = (document.getElementById('org-search-input').value || '').toLowerCase().trim();
+    const shift = document.getElementById('org-filter-shift').value;
+    const level = document.getElementById('org-filter-level').value;
+
+    // Filter Cards in Tree View
+    document.querySelectorAll('.org-card').forEach(card => {
+        const cShift = card.getAttribute('data-shift') || '';
+        const cLevel = card.getAttribute('data-level') || '';
+        const cName = card.getAttribute('data-name') || '';
+        const cMat = card.getAttribute('data-mat') || '';
+        const cTitle = card.getAttribute('data-title') || '';
+
+        const matchShift = (shift === 'ALL' || cShift === shift);
+        const matchLevel = (level === 'ALL' || cLevel === level);
+        const matchQuery = (!query || cName.includes(query) || cMat.includes(query) || cTitle.includes(query));
+
+        if (matchShift && matchLevel && matchQuery) {
+            card.style.display = 'flex';
+        } else {
+            card.style.display = 'none';
+        }
+    });
+
+    // Also toggle shift pillar boxes if empty or matching
+    document.querySelectorAll('[data-shift-box]').forEach(box => {
+        const bShift = box.getAttribute('data-shift-box');
+        if (shift === 'ALL' || shift === bShift) {
+            box.style.display = 'flex';
+        } else {
+            box.style.display = 'none';
+        }
+    });
+
+    // Filter Rows in Table View
+    document.querySelectorAll('#org-table-tbody tr').forEach(row => {
+        const rShift = row.getAttribute('data-shift') || '';
+        const rLevel = row.getAttribute('data-level') || '';
+        const rName = row.getAttribute('data-name') || '';
+        const rMat = row.getAttribute('data-mat') || '';
+        const rTitle = row.getAttribute('data-title') || '';
+
+        const matchShift = (shift === 'ALL' || rShift === shift);
+        const matchLevel = (level === 'ALL' || rLevel === level);
+        const matchQuery = (!query || rName.includes(query) || rMat.includes(query) || rTitle.includes(query));
+
+        if (matchShift && matchLevel && matchQuery) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+}
+
+function openModal(id) {
+    const m = document.getElementById(id);
+    if (m) m.classList.add('open');
+}
+
+function closeModal(id) {
+    const m = document.getElementById(id);
+    if (m) m.classList.remove('open');
+}
+
+// Seniority Preview Calculation on Date Input Change
+function previewSeniority(inputId, targetId) {
+    const val = document.getElementById(inputId).value;
+    const target = document.getElementById(targetId);
+    if (!val) {
+        target.textContent = '—';
+        return;
+    }
+    const parts = val.split('-');
+    if (parts.length !== 3) {
+        target.textContent = 'Date invalide';
+        return;
+    }
+    const hDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+    const now = new Date();
+    if (hDate > now) {
+        target.textContent = 'À venir';
+        return;
+    }
+    let years = now.getFullYear() - hDate.getFullYear();
+    let months = now.getMonth() - hDate.getMonth();
+    let days = now.getDate() - hDate.getDate();
+
+    if (days < 0) {
+        months -= 1;
+        days += 30;
+    }
+    if (months < 0) {
+        years -= 1;
+        months += 12;
+    }
+
+    let fr = [];
+    if (years > 0) fr.push(years + (years === 1 ? ' an' : ' ans'));
+    if (months > 0) fr.push(months + ' mois');
+    if (fr.length === 0) fr.push((days > 0 ? days + ' jours' : "Aujourd'hui"));
+    target.textContent = fr.join(' ');
+}
+
+// Open Assign Modal
+function openAssignModal() {
+    openModal('modal-assign');
+}
+
+function onAssignUserChanged() {
+    const sel = document.getElementById('assign-user-select');
+    const opt = sel.options[sel.selectedIndex];
+    if (opt && opt.value) {
+        const shift = opt.getAttribute('data-shift') || 'A';
+        const hire = opt.getAttribute('data-hire') || '';
+        document.getElementById('assign-shift-select').value = (shift in {'A':1, 'B':1, 'C':1}) ? shift : 'NOT_ASSIGNED';
+        if (hire) {
+            document.getElementById('assign-hire-date').value = hire;
+            previewSeniority('assign-hire-date', 'assign-seniority-preview');
+        }
+    }
+}
+
+function onPositionLevelChanged() {
+    const lvl = document.getElementById('assign-level-select').value;
+    const titleInput = document.getElementById('assign-job-title');
+    if (!titleInput.value) {
+        if (lvl === 'SUPERVISOR') titleInput.value = 'Superviseur Maintenance';
+        else if (lvl === 'TEAM_LEADER') titleInput.value = "Chef d'Équipe Maintenance";
+        else if (lvl === 'GROUP_LEADER') titleInput.value = 'Chef de Groupe Maintenance';
+        else if (lvl === 'MANAGER') titleInput.value = 'Responsable Maintenance';
+        else if (lvl === 'TECHNICIAN') titleInput.value = 'Technicien de Maintenance';
+    }
+}
+
+// Submit Assign Employee
+async function submitAssignEmployee(e) {
+    e.preventDefault();
+    const form = document.getElementById('form-assign-employee');
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData.entries());
+
+    try {
+        const res = await fetch('/api/org/assign', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        });
+        const json = await res.json();
+        if (res.ok && json.success) {
+            window.location.reload();
+        } else {
+            alert(json.message || "Erreur lors de l'enregistrement de l'affectation.");
+        }
+    } catch (err) {
+        alert("Erreur réseau : " + err.message);
+    }
+}
+
+// Open Edit Modal
+function openEditModal(assignmentId) {
+    const emp = ALL_ASSIGNMENTS.find(a => a.id === assignmentId);
+    if (!emp) return;
+
+    document.getElementById('edit-asgn-id').value = emp.id;
+    document.getElementById('edit-emp-name').textContent = emp.full_name;
+    document.getElementById('edit-emp-mat').textContent = emp.matricule;
+    document.getElementById('edit-level-select').value = emp.position_level;
+    document.getElementById('edit-shift-select').value = emp.shift || 'NOT_ASSIGNED';
+    document.getElementById('edit-job-title').value = emp.job_title;
+    document.getElementById('edit-parent-select').value = emp.parent_id || '';
+    document.getElementById('edit-group-name').value = emp.group_name || '';
+    document.getElementById('edit-team-name').value = emp.team_name || '';
+
+    const rawHire = emp.seniority && emp.seniority.raw_hire_date ? emp.seniority.raw_hire_date : (emp.hire_date || '');
+    document.getElementById('edit-hire-date').value = rawHire;
+    previewSeniority('edit-hire-date', 'edit-seniority-preview');
+
+    openModal('modal-edit');
+}
+
+// Submit Edit Employee
+async function submitEditEmployee(e) {
+    e.preventDefault();
+    const form = document.getElementById('form-edit-employee');
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData.entries());
+
+    try {
+        const res = await fetch('/api/org/update', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        });
+        const json = await res.json();
+        if (res.ok && json.success) {
+            window.location.reload();
+        } else {
+            alert(json.message || "Erreur lors de la mise à jour.");
+        }
+    } catch (err) {
+        alert("Erreur réseau : " + err.message);
+    }
+}
+
+// Open Quick Move Modal
+function openQuickMoveModal(assignmentId, currentShift, currentParentId) {
+    if (assignmentId) {
+        document.getElementById('move-asgn-select').value = assignmentId;
+    }
+    if (currentShift) {
+        document.getElementById('move-new-shift').value = currentShift;
+    }
+    if (currentParentId) {
+        document.getElementById('move-new-parent').value = currentParentId;
+    }
+    openModal('modal-quick-move');
+}
+
+function onMoveSelectChanged() {
+    const sel = document.getElementById('move-asgn-select');
+    const opt = sel.options[sel.selectedIndex];
+    if (opt) {
+        const s = opt.getAttribute('data-shift');
+        const p = opt.getAttribute('data-parent');
+        if (s) document.getElementById('move-new-shift').value = s;
+        if (p) document.getElementById('move-new-parent').value = p;
+    }
+}
+
+// Submit Quick Move
+async function submitQuickMove(e) {
+    e.preventDefault();
+    const form = document.getElementById('form-quick-move');
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData.entries());
+
+    try {
+        const res = await fetch('/api/org/move', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        });
+        const json = await res.json();
+        if (res.ok && json.success) {
+            window.location.reload();
+        } else {
+            alert(json.message || "Erreur lors du déplacement.");
+        }
+    } catch (err) {
+        alert("Erreur réseau : " + err.message);
+    }
+}
+
+// Confirm Remove Employee
+async function confirmRemoveEmployee(assignmentId, name) {
+    if (!confirm(`Êtes-vous sûr de vouloir retirer '${name}' de l'organigramme ?\n\n(Son compte utilisateur, ses interventions et ses historiques resteront totalement préservés).`)) {
+        return;
+    }
+
+    try {
+        const res = await fetch('/api/org/remove', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({assignment_id: assignmentId})
+        });
+        const json = await res.json();
+        if (res.ok && json.success) {
+            window.location.reload();
+        } else {
+            alert(json.message || "Erreur lors du retrait.");
+        }
+    } catch (err) {
+        alert("Erreur réseau : " + err.message);
+    }
+}
+
+// View Employee Details Modal (All users)
+async function viewEmployeeDetails(assignmentId) {
+    const emp = ALL_ASSIGNMENTS.find(a => a.id === assignmentId);
+    if (!emp) return;
+
+    document.getElementById('det-avatar').textContent = emp.full_name ? emp.full_name.substring(0,2).toUpperCase() : '--';
+    document.getElementById('det-name').textContent = emp.full_name;
+    document.getElementById('det-title').textContent = emp.job_title;
+    document.getElementById('det-mat').textContent = 'Matricule : ' + emp.matricule;
+    document.getElementById('det-level').textContent = emp.level_label;
+    document.getElementById('det-shift').textContent = emp.shift === 'NOT_ASSIGNED' ? 'Direction' : 'Shift ' + emp.shift;
+    document.getElementById('det-hire-date').textContent = emp.seniority ? emp.seniority.formatted_hire_date : '—';
+    document.getElementById('det-seniority').textContent = emp.seniority ? emp.seniority.text : '—';
+    document.getElementById('det-supervisor').textContent = emp.parent_name ? (emp.parent_name + ' (' + (emp.parent_job_title || '') + ')') : 'Aucun (Sommet hiérarchique)';
+
+    const timeline = document.getElementById('det-history-timeline');
+    timeline.innerHTML = '<div style="font-size:12px; color:var(--text-dim);"><i class="fa-solid fa-spinner fa-spin"></i> Chargement de l\'historique...</div>';
+
+    openModal('modal-employee-details');
+
+    try {
+        const res = await fetch(`/api/org/employee/${assignmentId}`);
+        const data = await res.json();
+        if (data && data.history && data.history.length > 0) {
+            timeline.innerHTML = data.history.map(h => `
+                <div class="org-history-item">
+                    <div class="org-history-date">${h.created_at || ''} — par ${h.changed_by || 'Système'}</div>
+                    <div class="org-history-desc"><strong>${h.action_type || 'Mise à jour'} :</strong> ${h.details || ''}</div>
+                </div>
+            `).join('');
+        } else {
+            timeline.innerHTML = '<div style="font-size:12px; color:var(--text-dim); font-style:italic;">Aucun historique enregistré pour le moment.</div>';
+        }
+    } catch (err) {
+        timeline.innerHTML = '<div style="font-size:12px; color:var(--text-dim);">Impossible de charger l\'historique.</div>';
+    }
+}
+</script>
+{% endblock %}

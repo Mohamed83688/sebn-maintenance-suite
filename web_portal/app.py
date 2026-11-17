@@ -26,6 +26,7 @@ from ima.config import IMAConfig
 from ima.database import IMADatabase
 from core.checklist_manager import ChecklistManager
 from core.attendance_manager import AttendanceManager
+from core.org_manager import OrgChartManager, POSITION_LEVELS, calculate_seniority
 from web_portal.utils.export_helper import export_interventions_to_excel
 from web_portal.utils.email_service import send_simple_alert
 from web_portal.utils.pdf_helper import export_dashboard_pdf
@@ -88,6 +89,9 @@ checklist_mgr = ChecklistManager(
 
 # Attendance, Leaves & Missing Badge Manager (SQLite)
 attendance_mgr = AttendanceManager(db_path=IMA_DB_PATH, data_dir=pma_config.active_base)
+
+# Organizational Chart & Structure Manager (SQLite)
+org_mgr = OrgChartManager(db_path=IMA_DB_PATH, data_dir=pma_config.active_base)
 
 # Manager Action Plan workbook path
 MANAGER_PLAN_PATH = os.path.join(pma_config.active_base, "manager_plan_performance.xlsx")
@@ -534,6 +538,8 @@ def admin_required(f):
             return redirect(url_for('login'))
         r = str(session.get('role', '')).upper().strip()
         if r not in ('OWNER', 'ADMIN', 'ADMINISTRATEUR', 'PROPRIETAIRE', 'PROPRIÉTAIRE'):
+            if request.path.startswith('/api/'):
+                return jsonify({'error': 'Forbidden', 'message': 'Accès refusé : Droits Administrateur requis.'}), 403
             flash("Accès refusé : Droits Administrateur requis.", "danger")
             return render_template('403.html'), 403
         return f(*args, **kwargs)
@@ -2180,7 +2186,13 @@ def admin():
         badge_records=badge_records,
         attendance_techs=attendance_techs,
         cur_year=cur_year,
-        cur_month=cur_month
+        cur_month=cur_month,
+        org_tree=org_mgr.get_org_tree(),
+        org_assignments=org_mgr.get_all_assignments(),
+        org_unassigned=org_mgr.get_unassigned_users(),
+        org_levels=POSITION_LEVELS,
+        org_history=org_mgr.get_assignment_history(limit=50),
+        org_groups_teams=org_mgr.get_groups_and_teams()
     )
 
 @app.route('/admin/credentials', methods=['POST'])
@@ -2588,6 +2600,312 @@ def admin_attendance_export():
         download_name=filename,
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
+
+# =============================================================
+# ORGANIZATIONAL CHART & EMPLOYEE STRUCTURE (ORGANIGRAMME)
+# =============================================================
+
+@app.route('/organigramme')
+@login_required
+def organigramme_view():
+    """
+    Universal Organizational Chart page.
+    Visible to ALL authenticated users (Owner, Admin, Technicians).
+    - Technicians view in read-only mode (no edit/add/delete/move actions).
+    - Owner and Admin have full editing, promotion, transfer, and assignment capabilities.
+    """
+    user_role = str(session.get('role', '')).upper().strip()
+    is_admin_or_owner = user_role in ('OWNER', 'ADMIN', 'ADMINISTRATEUR', 'PROPRIETAIRE', 'PROPRIÉTAIRE')
+
+    tree_data = org_mgr.get_org_tree()
+    all_asgns = org_mgr.get_all_assignments()
+    unassigned = org_mgr.get_unassigned_users() if is_admin_or_owner else []
+    history = org_mgr.get_assignment_history(limit=50)
+    groups_teams = org_mgr.get_groups_and_teams()
+
+    return render_template(
+        'organigramme.html',
+        is_admin_or_owner=is_admin_or_owner,
+        user_role=user_role,
+        tree=tree_data,
+        assignments=all_asgns,
+        unassigned=unassigned,
+        history=history,
+        groups_teams=groups_teams,
+        position_levels=POSITION_LEVELS
+    )
+
+
+@app.route('/api/org/tree')
+@login_required
+def api_org_tree():
+    """Returns organizational hierarchy tree, shift groupings and summary statistics."""
+    tree = org_mgr.get_org_tree()
+    return jsonify(tree)
+
+
+@app.route('/api/org/employees')
+@login_required
+def api_org_employees():
+    """Returns filtered list of all employees in the organizational chart."""
+    shift = request.args.get('shift', 'ALL')
+    pos_level = request.args.get('position_level', 'ALL')
+    group = request.args.get('group_name', '')
+    team = request.args.get('team_name', '')
+    search = request.args.get('search', '')
+
+    filters = {
+        'shift': shift,
+        'position_level': pos_level,
+        'group_name': group,
+        'team_name': team,
+        'search': search,
+        'is_active': 1
+    }
+    employees = org_mgr.get_all_assignments(filters)
+    return jsonify({'employees': employees})
+
+
+@app.route('/api/org/employee/<int:assignment_id>')
+@login_required
+def api_org_employee_detail(assignment_id: int):
+    """Returns detailed information and assignment history for a single employee."""
+    emp = org_mgr.get_assignment_by_id(assignment_id)
+    if not emp:
+        return jsonify({'error': 'Employé introuvable'}), 404
+
+    history = org_mgr.get_assignment_history(assignment_id=assignment_id, limit=20)
+    return jsonify({'employee': emp, 'history': history})
+
+
+@app.route('/api/org/unassigned')
+@admin_required
+def api_org_unassigned():
+    """Returns active users not yet assigned to the organizational chart."""
+    users = org_mgr.get_unassigned_users()
+    return jsonify({'unassigned_users': users})
+
+
+@app.route('/api/org/assign', methods=['POST'])
+@admin_required
+def api_org_assign():
+    """
+    Assigns an existing user to the organizational structure.
+    Strictly restricted to Admin and Owner in backend.
+    """
+    data = request.get_json(silent=True) or request.form
+    try:
+        user_id = int(data.get('user_id')) if data.get('user_id') else None
+    except Exception:
+        user_id = None
+
+    pos_level = str(data.get('position_level', '')).strip().upper()
+    job_title = str(data.get('job_title', '')).strip()
+    shift = str(data.get('shift', 'NOT_ASSIGNED')).strip().upper()
+    parent_id = data.get('parent_id')
+    if parent_id and str(parent_id).strip() != '':
+        try:
+            parent_id = int(parent_id)
+            if parent_id <= 0:
+                parent_id = None
+        except Exception:
+            parent_id = None
+    else:
+        parent_id = None
+
+    group_name = str(data.get('group_name', '')).strip()
+    team_name = str(data.get('team_name', '')).strip()
+    hire_date = str(data.get('hire_date', '')).strip()
+    notes = str(data.get('notes', '')).strip()
+    changed_by = session.get('user', 'Admin')
+
+    if not user_id:
+        return jsonify({'success': False, 'message': 'Veuillez sélectionner un employé.'}), 400
+    if not pos_level or pos_level not in POSITION_LEVELS:
+        return jsonify({'success': False, 'message': 'Niveau hiérarchique invalide.'}), 400
+    if not job_title:
+        return jsonify({'success': False, 'message': 'L\'intitulé du poste est obligatoire.'}), 400
+
+    ok, msg, asgn_id = org_mgr.assign_employee(
+        user_id=user_id,
+        position_level=pos_level,
+        job_title=job_title,
+        shift=shift,
+        parent_id=parent_id,
+        group_name=group_name,
+        team_name=team_name,
+        hire_date=hire_date,
+        notes=notes,
+        changed_by=changed_by
+    )
+
+    if ok:
+        flash(msg, "success")
+        return jsonify({'success': True, 'message': msg, 'assignment_id': asgn_id})
+    return jsonify({'success': False, 'message': msg}), 400
+
+
+@app.route('/api/org/update', methods=['POST'])
+@admin_required
+def api_org_update():
+    """
+    Updates an employee's position, shift, superior, group, or hiring date.
+    Strictly restricted to Admin and Owner in backend.
+    """
+    data = request.get_json(silent=True) or request.form
+    try:
+        asgn_id = int(data.get('assignment_id')) if data.get('assignment_id') else None
+    except Exception:
+        asgn_id = None
+
+    pos_level = str(data.get('position_level', '')).strip().upper()
+    job_title = str(data.get('job_title', '')).strip()
+    shift = str(data.get('shift', 'NOT_ASSIGNED')).strip().upper()
+    parent_id = data.get('parent_id')
+    if parent_id and str(parent_id).strip() != '':
+        try:
+            parent_id = int(parent_id)
+            if parent_id <= 0:
+                parent_id = None
+        except Exception:
+            parent_id = None
+    else:
+        parent_id = None
+
+    group_name = str(data.get('group_name', '')).strip()
+    team_name = str(data.get('team_name', '')).strip()
+    hire_date = str(data.get('hire_date', '')).strip()
+    notes = str(data.get('notes', '')).strip()
+    changed_by = session.get('user', 'Admin')
+
+    if not asgn_id:
+        return jsonify({'success': False, 'message': 'Identifiant d\'affectation manquant.'}), 400
+    if not pos_level or pos_level not in POSITION_LEVELS:
+        return jsonify({'success': False, 'message': 'Niveau hiérarchique invalide.'}), 400
+    if not job_title:
+        return jsonify({'success': False, 'message': 'L\'intitulé du poste est obligatoire.'}), 400
+
+    ok, msg = org_mgr.update_assignment(
+        assignment_id=asgn_id,
+        position_level=pos_level,
+        job_title=job_title,
+        shift=shift,
+        parent_id=parent_id,
+        group_name=group_name,
+        team_name=team_name,
+        hire_date=hire_date,
+        notes=notes,
+        changed_by=changed_by
+    )
+
+    if ok:
+        flash(msg, "success")
+        return jsonify({'success': True, 'message': msg})
+    return jsonify({'success': False, 'message': msg}), 400
+
+
+@app.route('/api/org/move', methods=['POST'])
+@admin_required
+def api_org_move():
+    """
+    Quick action to change an employee's shift (e.g. Shift A -> Shift B)
+    or change their direct supervisor.
+    Strictly restricted to Admin and Owner in backend.
+    """
+    data = request.get_json(silent=True) or request.form
+    try:
+        asgn_id = int(data.get('assignment_id')) if data.get('assignment_id') else None
+    except Exception:
+        asgn_id = None
+
+    new_shift = data.get('new_shift')
+    new_parent_id = data.get('new_parent_id')
+    if new_parent_id is not None and str(new_parent_id).strip() != '':
+        try:
+            new_parent_id = int(new_parent_id)
+        except Exception:
+            new_parent_id = None
+    else:
+        new_parent_id = None
+
+    changed_by = session.get('user', 'Admin')
+
+    if not asgn_id:
+        return jsonify({'success': False, 'message': 'Affectation introuvable.'}), 400
+
+    ok, msg = org_mgr.move_employee(
+        assignment_id=asgn_id,
+        new_shift=new_shift,
+        new_parent_id=new_parent_id,
+        changed_by=changed_by
+    )
+
+    if ok:
+        return jsonify({'success': True, 'message': msg})
+    return jsonify({'success': False, 'message': msg}), 400
+
+
+@app.route('/api/org/remove', methods=['POST'])
+@admin_required
+def api_org_remove():
+    """
+    Removes an employee from the organizational chart without deleting their user account.
+    Strictly restricted to Admin and Owner in backend.
+    """
+    data = request.get_json(silent=True) or request.form
+    try:
+        asgn_id = int(data.get('assignment_id')) if data.get('assignment_id') else None
+    except Exception:
+        asgn_id = None
+
+    changed_by = session.get('user', 'Admin')
+
+    if not asgn_id:
+        return jsonify({'success': False, 'message': 'Identifiant d\'affectation manquant.'}), 400
+
+    ok, msg = org_mgr.remove_from_org(asgn_id, changed_by=changed_by)
+    if ok:
+        flash(msg, "info")
+        return jsonify({'success': True, 'message': msg})
+    return jsonify({'success': False, 'message': msg}), 400
+
+
+@app.route('/api/org/hire-date', methods=['POST'])
+@admin_required
+def api_org_hire_date():
+    """
+    Edits hiring date for an employee and recalculates seniority in real-time.
+    Strictly restricted to Admin and Owner in backend.
+    """
+    data = request.get_json(silent=True) or request.form
+    try:
+        user_id = int(data.get('user_id')) if data.get('user_id') else None
+    except Exception:
+        user_id = None
+
+    hire_date = str(data.get('hire_date', '')).strip()
+    changed_by = session.get('user', 'Admin')
+
+    if not user_id:
+        return jsonify({'success': False, 'message': 'Identifiant utilisateur manquant.'}), 400
+    if not hire_date:
+        return jsonify({'success': False, 'message': 'Veuillez saisir une date d\'embauche valide.'}), 400
+
+    ok, msg, seniority = org_mgr.update_hire_date(user_id=user_id, hire_date_str=hire_date, changed_by=changed_by)
+    if ok:
+        return jsonify({'success': True, 'message': msg, 'seniority': seniority})
+    return jsonify({'success': False, 'message': msg}), 400
+
+
+@app.route('/api/org/history')
+@login_required
+def api_org_history():
+    """Returns organizational assignment audit history."""
+    user_id = request.args.get('user_id', type=int)
+    assignment_id = request.args.get('assignment_id', type=int)
+    limit = request.args.get('limit', 50, type=int)
+    history = org_mgr.get_assignment_history(user_id=user_id, assignment_id=assignment_id, limit=limit)
+    return jsonify({'history': history})
 
 # =============================================================
 # IMA — INTERVENTION ROUTES

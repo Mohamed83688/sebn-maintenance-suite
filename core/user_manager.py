@@ -79,6 +79,9 @@ class UserManager:
             if "photo" not in existing_cols:
                 cur.execute("ALTER TABLE users ADD COLUMN photo TEXT")
 
+            if "hire_date" not in existing_cols:
+                cur.execute("ALTER TABLE users ADD COLUMN hire_date TEXT")
+
             cur.execute("CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_users_matricule ON users(matricule)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_users_role ON users(role)")
@@ -251,7 +254,7 @@ class UserManager:
         with self._get_conn() as conn:
             cur = conn.cursor()
             cur.execute("""
-                SELECT id, name, matricule, username, role, shift, is_active, created_at, updated_at, last_login, technician_level, photo 
+                SELECT id, name, matricule, username, role, shift, is_active, created_at, updated_at, last_login, technician_level, photo, hire_date 
                 FROM users 
                 ORDER BY 
                     CASE role 
@@ -304,7 +307,8 @@ class UserManager:
         shift: str = 'A',
         is_active: bool = True,
         technician_level: str = None,
-        photo: str = None
+        photo: str = None,
+        hire_date: str = None
     ) -> Tuple[bool, str, Optional[int]]:
         """Creates a new user with hashed password."""
         name = name.strip()
@@ -351,15 +355,15 @@ class UserManager:
             if "nom" in cols and "prenom" in cols:
                 cur.execute("""
                     INSERT INTO users (
-                        nom, prenom, name, matricule, username, password_hash, role, shift, is_active, status, technician_level, photo, created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                """, (nom, prenom, name, matricule or '', username, pwd_hash, role, shift, active_int, st_text, technician_level, photo))
+                        nom, prenom, name, matricule, username, password_hash, role, shift, is_active, status, technician_level, photo, hire_date, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """, (nom, prenom, name, matricule or '', username, pwd_hash, role, shift, active_int, st_text, technician_level, photo, hire_date or ''))
             else:
                 cur.execute("""
                     INSERT INTO users (
-                        name, matricule, username, password_hash, role, shift, is_active, technician_level, photo, created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                """, (name, matricule or '', username, pwd_hash, role, shift, active_int, technician_level, photo))
+                        name, matricule, username, password_hash, role, shift, is_active, technician_level, photo, hire_date, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """, (name, matricule or '', username, pwd_hash, role, shift, active_int, technician_level, photo, hire_date or ''))
 
             conn.commit()
             new_id = cur.lastrowid
@@ -394,7 +398,8 @@ class UserManager:
         shift: str = 'A',
         is_active: bool = True,
         technician_level: str = None,
-        photo: str = None
+        photo: str = None,
+        hire_date: str = None
     ) -> Tuple[bool, str]:
         """Updates user profile information."""
         name = name.strip()
@@ -436,21 +441,39 @@ class UserManager:
                 if exist_photo:
                     photo = exist_photo["photo"]
 
-            cur.execute("""
-                UPDATE users 
-                SET name = ?, username = ?, matricule = ?, role = ?, shift = ?, is_active = ?, technician_level = ?, photo = ?, updated_at = CURRENT_TIMESTAMP
-                WHERE id = ?
-            """, (
-                name,
-                username,
-                matricule or None,
-                role,
-                shift or 'A',
-                1 if is_active else 0,
-                technician_level,
-                photo,
-                user_id
-            ))
+            if hire_date is not None:
+                cur.execute("""
+                    UPDATE users 
+                    SET name = ?, username = ?, matricule = ?, role = ?, shift = ?, is_active = ?, technician_level = ?, photo = ?, hire_date = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                """, (
+                    name,
+                    username,
+                    matricule or None,
+                    role,
+                    shift or 'A',
+                    1 if is_active else 0,
+                    technician_level,
+                    photo,
+                    hire_date,
+                    user_id
+                ))
+            else:
+                cur.execute("""
+                    UPDATE users 
+                    SET name = ?, username = ?, matricule = ?, role = ?, shift = ?, is_active = ?, technician_level = ?, photo = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                """, (
+                    name,
+                    username,
+                    matricule or None,
+                    role,
+                    shift or 'A',
+                    1 if is_active else 0,
+                    technician_level,
+                    photo,
+                    user_id
+                ))
             conn.commit()
 
             # Sync to JSON profile if technician
@@ -463,7 +486,7 @@ class UserManager:
                     "name": name,
                     "matricule": matricule,
                     "shift": shift,
-                    "hire_date": "",
+                    "hire_date": hire_date or "",
                     "technician_level": technician_level,
                     "exams": []
                 }
@@ -473,7 +496,8 @@ class UserManager:
                         with open(p, 'r', encoding='utf-8') as f:
                             old = json.load(f)
                             profile["exams"] = old.get("exams", [])
-                            profile["hire_date"] = old.get("hire_date", "")
+                            if hire_date is None:
+                                profile["hire_date"] = old.get("hire_date", "")
                     except Exception:
                         pass
                 with open(p, 'w', encoding='utf-8') as f:

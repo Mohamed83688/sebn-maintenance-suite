@@ -970,7 +970,13 @@
             {% endif %}
 
             <!-- ── DOCUMENTS (ALL AUTHENTICATED USERS) ──── -->
-            <div class="nav-section-title">Documents</div>
+            <div class="nav-section-title">Documents &amp; Structure</div>
+            <a href="{{ url_for('organigramme_view') }}"
+               class="nav-item {% if request.endpoint == 'organigramme_view' %}active{% endif %}"
+               data-tooltip="Organigramme">
+                <span class="nav-icon"><i class="fa-solid fa-sitemap"></i></span>
+                <span class="nav-label">Organigramme</span>
+            </a>
             <a href="{{ url_for('documents_page') }}"
                class="nav-item {% if request.endpoint in ['documents_page','document_view','document_download'] %}active{% endif %}"
                data-tooltip="Bibliothèque de documents">
