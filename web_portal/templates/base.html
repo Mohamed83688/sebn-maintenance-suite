@@ -933,6 +933,23 @@
             </a>
             {% endif %}
 
+            <!-- ── MON ESPACE (TECHNICIEN) ─────────────────── -->
+            {% if session.get('role') == 'TECHNICIAN' %}
+            <div class="nav-section-title">Mon Espace</div>
+            <a href="{{ url_for('technician_my_profile') }}"
+               class="nav-item {% if request.endpoint in ['technician_my_profile','technician_profile_view','training_profile'] %}active{% endif %}"
+               data-tooltip="Ma Fiche Technicien">
+                <span class="nav-icon"><i class="fa-solid fa-id-card-clip"></i></span>
+                <span class="nav-label">Fiche Technicien</span>
+            </a>
+            <a href="{{ url_for('tech_my_exams') }}"
+               class="nav-item {% if request.endpoint == 'tech_my_exams' %}active{% endif %}"
+               data-tooltip="Formation &amp; Examens">
+                <span class="nav-icon"><i class="fa-solid fa-graduation-cap"></i></span>
+                <span class="nav-label">Formation &amp; Examens</span>
+            </a>
+            {% endif %}
+
             <!-- ── PILOTAGE ────────────────────────────────── -->
             {% if session.get('role') in ['OWNER', 'ADMIN', 'admin'] %}
             <div class="nav-section-title">Pilotage</div>
@@ -955,7 +972,7 @@
                 <span class="nav-label">Documents &amp; Archives</span>
             </a>
             <a href="{{ url_for('training') }}"
-               class="nav-item {% if request.endpoint in ['training','training_profile'] %}active{% endif %}"
+               class="nav-item {% if request.endpoint in ['training','training_profile','technician_profile_view','training_cards','tech_card_view'] %}active{% endif %}"
                data-tooltip="Formation">
                 <span class="nav-icon"><i class="fa-solid fa-graduation-cap"></i></span>
                 <span class="nav-label">Formation</span>

@@ -1,237 +1,1045 @@
 {% extends 'base.html' %}
-{% block title %}Profil {{ profile.name }} — SEBN-TN{% endblock %}
-{% block page_title %}{{ profile.name }}{% endblock %}
-{% block page_subtitle %}Dossier de compétences & Habilitations{% endblock %}
+{% block title %}Fiche Technicien — {{ profile.name }} — SEBN-TN{% endblock %}
+{% block page_title %}Fiche Technicien{% endblock %}
+{% block page_subtitle %}Dossier individuel de compétences, habilitations et données professionnelles{% endblock %}
 
 {% block topbar_actions %}
+{% if is_admin_or_owner %}
 <a href="{{ url_for('training') }}" class="btn btn-glass btn-sm">
-    <i class="fa-solid fa-arrow-left"></i> Équipe
+    <i class="fa-solid fa-arrow-left"></i> Liste Techniciens
 </a>
-{% if role == 'admin' %}
-<button class="btn btn-primary btn-sm" onclick="document.getElementById('exam-modal').classList.add('open')">
+<a href="{{ url_for('tech_card_view', user_id=profile.id) }}" class="btn btn-glass btn-sm" title="Voir la carte d'habilitation">
+    <i class="fa-solid fa-id-card"></i> Carte d'Habilitation
+</a>
+<button type="button" class="btn btn-primary btn-sm" onclick="openEditProfileModal()">
+    <i class="fa-solid fa-user-pen"></i> Modifier la Fiche
+</button>
+<button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('exam-modal').classList.add('open')">
     <i class="fa-solid fa-plus"></i> Saisir Examen
 </button>
+{% else %}
+<a href="{{ url_for('tech_my_exams') }}" class="btn btn-glass btn-sm">
+    <i class="fa-solid fa-graduation-cap"></i> Mon Espace Formation
+</a>
+<a href="{{ url_for('tech_card_view', user_id=profile.id) }}" class="btn btn-primary btn-sm">
+    <i class="fa-solid fa-id-card"></i> Ma Carte d'Habilitation
+</a>
 {% endif %}
 {% endblock %}
 
 {% block extra_css %}
 <style>
-.profile-header {
-    background: linear-gradient(135deg, #FFFFFF 0%, var(--primary-light) 100%);
-    border: 1px solid var(--primary-border);
-    border-radius: var(--radius-lg);
-    padding: 32px;
-    display: flex; gap: 32px; align-items: center;
-    margin-bottom: 24px;
-    animation: slideInDown 0.3s ease;
-    box-shadow: var(--shadow);
-}
-.profile-avatar {
-    width: 100px; height: 100px; border-radius: 24px;
-    background: linear-gradient(135deg, var(--primary), #5B21B6);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 42px; font-weight: 900; color: white;
-    box-shadow: 0 10px 30px rgba(46,0,139,0.30); flex-shrink: 0;
-}
-.profile-info { flex: 1; }
-.profile-name { font-size: 28px; font-weight: 900; color: var(--text); margin-bottom: 8px; }
-.profile-meta { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
-.meta-item {
-    font-size: 13px; color: var(--text-sec);
-    display: flex; align-items: center; gap: 6px;
-    background: #FFFFFF; padding: 6px 14px; border-radius: 20px;
+/* ── Main Layout & Hero ─────────────────────────────────── */
+.profile-hero {
+    background: #FFFFFF;
     border: 1px solid var(--border);
-    box-shadow: var(--shadow-xs);
+    border-top: 4px solid var(--primary);
+    border-radius: 16px;
+    padding: 28px 32px;
+    display: flex;
+    gap: 30px;
+    align-items: center;
+    margin-bottom: 24px;
+    box-shadow: 0 4px 16px -2px rgba(46,0,139,0.06);
+    position: relative;
+    overflow: hidden;
 }
-.meta-item i { color: var(--primary); }
 
-.prog-wrap { width: 100%; max-width: 400px; }
-.prog-head { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 8px; color: var(--text-sec); font-weight: 600; }
-.prog-bar-bg { height: 9px; background: var(--border); border-radius: 5px; overflow: hidden; }
-.prog-bar-fill { height: 100%; background: linear-gradient(90deg, var(--primary), var(--success)); border-radius: 5px; transition: width 1s ease; }
+.profile-photo-container {
+    position: relative;
+    flex-shrink: 0;
+}
 
-.levels-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; margin-bottom: 24px; }
+.profile-photo-img {
+    width: 110px;
+    height: 130px;
+    border-radius: 14px;
+    object-fit: cover;
+    border: 2px solid var(--border);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.08);
+}
+
+.profile-photo-avatar {
+    width: 110px;
+    height: 130px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, var(--primary), #5B21B6);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #FFFFFF;
+    font-size: 38px;
+    font-weight: 900;
+    box-shadow: 0 8px 24px rgba(46,0,139,0.25);
+}
+
+.profile-photo-badge {
+    position: absolute;
+    bottom: -6px;
+    right: -6px;
+    background: var(--primary);
+    color: white;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    border: 2px solid #FFFFFF;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+}
+
+.profile-hero-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.profile-hero-title {
+    font-size: 26px;
+    font-weight: 900;
+    color: var(--text);
+    margin: 0 0 6px 0;
+    text-transform: uppercase;
+    letter-spacing: -0.3px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.profile-chips-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 12px 0 16px;
+}
+
+.chip-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 6px 14px;
+    border-radius: 20px;
+    background: #F8FAFC;
+    border: 1px solid var(--border);
+    color: var(--text);
+}
+.chip-badge i { color: var(--primary); }
+.chip-badge.chip-matricule code {
+    font-family: monospace;
+    font-weight: 800;
+    color: var(--primary);
+}
+.chip-badge.chip-shift-A { background: #ECFEFF; color: #0891B2; border-color: #A5F3FC; }
+.chip-badge.chip-shift-A i { color: #0891B2; }
+.chip-badge.chip-shift-B { background: #F5F3FF; color: #7C3AED; border-color: #DDD6FE; }
+.chip-badge.chip-shift-B i { color: #7C3AED; }
+.chip-badge.chip-shift-C { background: #FFFBEB; color: #D97706; border-color: #FDE68A; }
+.chip-badge.chip-shift-C i { color: #D97706; }
+.chip-badge.chip-level { background: #EFF6FF; color: #2563EB; border-color: #BFDBFE; }
+.chip-badge.chip-level i { color: #2563EB; }
+.chip-badge.chip-seniority { background: #FAF5FF; color: #6B21A8; border-color: #E9D5FF; }
+.chip-badge.chip-seniority i { color: #7C3AED; }
+
+.hero-progression {
+    max-width: 420px;
+    background: #F8FAFC;
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+}
+.hero-prog-header {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-sec);
+    margin-bottom: 6px;
+}
+.hero-prog-bar-bg {
+    height: 8px;
+    background: #E2E8F0;
+    border-radius: 4px;
+    overflow: hidden;
+}
+.hero-prog-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary), #10B981);
+    border-radius: 4px;
+    transition: width 0.6s ease;
+}
+
+/* ── Section Cards ─────────────────────────────────────── */
+.section-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+    gap: 24px;
+    margin-bottom: 24px;
+}
+
+.info-section-card {
+    background: #FFFFFF;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    box-shadow: 0 4px 12px -2px rgba(0,0,0,0.03);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.info-section-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    background: #FAFAFA;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.info-section-header h3 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.info-section-header h3 i {
+    color: var(--primary);
+    font-size: 15px;
+}
+
+.info-items-grid {
+    padding: 20px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+@media (max-width: 540px) {
+    .info-items-grid { grid-template-columns: 1fr; }
+}
+
+.info-field-box {
+    background: #F8FAFC;
+    border: 1px solid #E2E8F0;
+    border-radius: 10px;
+    padding: 12px 14px;
+    transition: all 0.2s ease;
+}
+.info-field-box:hover {
+    border-color: #CBD5E1;
+    background: #F1F5F9;
+}
+.info-field-box.full-width {
+    grid-column: 1 / -1;
+}
+.info-field-box.highlight {
+    background: linear-gradient(135deg, #FAF5FF 0%, #F5F3FF 100%);
+    border-color: #DDD6FE;
+}
+
+.info-field-label {
+    font-size: 10.5px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #64748B;
+    margin-bottom: 5px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.info-field-label i {
+    color: var(--primary);
+    font-size: 11px;
+}
+
+.info-field-val {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: #0F172A;
+    word-break: break-word;
+}
+.info-field-val.empty {
+    color: #94A3B8;
+    font-style: italic;
+    font-weight: 500;
+}
+
+/* ── Levels Grid ────────────────────────────────────────── */
+.levels-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+}
+@media (max-width: 768px) {
+    .levels-grid { grid-template-columns: repeat(2, 1fr); }
+}
 .level-card {
-    background: #FFFFFF; border: 1px solid var(--border); border-radius: var(--radius-lg);
-    padding: 24px; text-align: center; transition: var(--transition);
-    box-shadow: var(--shadow-sm);
+    background: #FFFFFF;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px 16px;
+    text-align: center;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+    transition: transform 0.2s ease, border-color 0.2s ease;
 }
-.level-card:hover { transform: translateY(-3px); border-color: var(--border-h); box-shadow: var(--shadow); }
+.level-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--primary-light);
+}
+.level-card.active {
+    border-color: #10B981;
+    background: #F0FDF4;
+}
 .level-badge {
-    width: 48px; height: 48px; border-radius: 50%;
-    display: inline-flex; align-items: center; justify-content: center;
-    font-size: 18px; font-weight: 800; margin-bottom: 12px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    margin: 0 auto 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    font-weight: 900;
+    background: #E2E8F0;
+    color: #64748B;
 }
-.level-card.active-N1 { border-color: rgba(6,182,212,0.3); }
-.level-card.active-N1 .level-badge { background: rgba(6,182,212,0.15); color: #0891B2; }
-.level-card.active-N2 { border-color: var(--success-border); }
-.level-card.active-N2 .level-badge { background: var(--success-bg); color: var(--success); }
-.level-card.active-N3 { border-color: var(--warning-border); }
-.level-card.active-N3 .level-badge { background: var(--warning-bg); color: var(--warning); }
-.level-card.active-N4 { border-color: var(--danger-border); }
-.level-card.active-N4 .level-badge { background: var(--danger-bg); color: var(--danger); }
-.level-card.inactive .level-badge { background: var(--neutral-bg); color: var(--text-dim); border: 1px solid var(--border); }
-.level-name { font-size: 13px; font-weight: 700; color: var(--text); }
-.level-stat { font-size: 11px; color: var(--text-sec); margin-top: 4px; }
+.level-card.active .level-badge {
+    background: #10B981;
+    color: #FFFFFF;
+}
 
-.timeline { position: relative; margin-top: 20px; padding-left: 20px; }
-.timeline::before {
-    content: ''; position: absolute; left: 0; top: 0; bottom: 0;
-    width: 2px; background: var(--border);
+/* ── Timeline ───────────────────────────────────────────── */
+.timeline {
+    position: relative;
+    padding-left: 20px;
+    margin-top: 16px;
 }
-.tl-item { position: relative; padding-bottom: 24px; animation: slideInUp 0.3s ease both; }
+.timeline::before {
+    content: '';
+    position: absolute;
+    left: 4px;
+    top: 6px;
+    bottom: 6px;
+    width: 2px;
+    background: #E2E8F0;
+}
+.tl-item {
+    position: relative;
+    padding-bottom: 20px;
+}
 .tl-item:last-child { padding-bottom: 0; }
 .tl-dot {
-    position: absolute; left: -26px; top: 0;
-    width: 14px; height: 14px; border-radius: 50%;
-    background: var(--bg-deep); border: 2px solid var(--primary);
+    position: absolute;
+    left: -20px;
+    top: 4px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #FFFFFF;
+    border: 2px solid var(--primary);
 }
 .tl-card {
-    background: var(--bg-card); border: 1px solid var(--border);
-    border-radius: var(--radius-sm); padding: 16px;
+    background: #F8FAFC;
+    border: 1px solid #E2E8F0;
+    border-radius: 10px;
+    padding: 14px;
 }
-.tl-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
-.tl-type { font-size: 13px; font-weight: 700; color: var(--text); }
-.tl-date { font-size: 11px; color: var(--text-sec); }
+
+/* ── Modals ─────────────────────────────────────────────── */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(4px);
+    z-index: 9999;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    overflow-y: auto;
+}
+.modal-overlay.open { display: flex; }
+.modal-box-lg {
+    background: #FFFFFF;
+    border-radius: 16px;
+    width: 100%;
+    max-width: 680px;
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
+    padding: 28px;
+    position: relative;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+}
+.modal-header-custom {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 16px;
+    margin-bottom: 20px;
+}
+.modal-header-custom h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.modal-close-btn {
+    background: none;
+    border: none;
+    font-size: 18px;
+    color: var(--text-sec);
+    cursor: pointer;
+    padding: 4px;
+}
+.modal-close-btn:hover { color: var(--danger); }
+
+.form-section-title {
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+    color: var(--primary);
+    letter-spacing: 0.5px;
+    margin: 18px 0 10px;
+    border-left: 3px solid var(--primary);
+    padding-left: 8px;
+}
+.grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+}
+@media (max-width: 600px) {
+    .grid-2 { grid-template-columns: 1fr; }
+}
+
+.seniority-preview-box {
+    background: #F5F3FF;
+    border: 1px dashed #7C3AED;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 12px;
+    color: #4C1D95;
+    margin-top: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
 </style>
 {% endblock %}
 
 {% block content %}
-{% set validations = profile.get('exams', []) | selectattr('type', 'equalto', 'Validation') | list %}
-{% set v_levels = [] %}
-{% for v in validations %}{% if v.exam_level %}{% set _ = v_levels.append(v.exam_level) %}{% endif %}{% endfor %}
-{% set prog = [v_levels|length * 25, 100]|min %}
+<div class="animate-up">
 
-<!-- Header -->
-<div class="profile-header">
-    <div class="profile-avatar">{{ profile.name[0]|upper }}</div>
-    <div class="profile-info">
-        <div class="profile-name">{{ profile.name }}</div>
-        <div class="profile-meta">
-            <div class="meta-item"><i class="fa-solid fa-id-badge"></i> {{ profile.matricule }}</div>
-            <div class="meta-item"><i class="fa-solid fa-users"></i> Équipe {{ profile.shift or '?' }}</div>
-            {% if prog == 100 %}
-            <div class="meta-item" style="border-color:rgba(16,185,129,0.3); color:var(--success); background:var(--success-bg);">
-                <i class="fa-solid fa-medal" style="color:var(--success);"></i> Expert
+    <!-- ── 1. HERO BANNER ────────────────────────────────────────────── -->
+    <div class="profile-hero">
+        <div class="profile-photo-container">
+            {% if profile.photo %}
+            <img src="{{ url_for('static_photo_download', filename=profile.photo) }}" alt="Photo {{ profile.name }}" class="profile-photo-img">
+            {% else %}
+            <div class="profile-photo-avatar">
+                <span>{{ (profile.name or 'T')[0]|upper }}</span>
+                <span style="font-size:11px; font-weight:700; margin-top:4px; opacity:0.85;">SEBN-TN</span>
+            </div>
+            {% endif %}
+
+            {% if is_admin_or_owner %}
+            <div class="profile-photo-badge" onclick="openEditProfileModal()" title="Changer la photo ou les données">
+                <i class="fa-solid fa-camera"></i>
             </div>
             {% endif %}
         </div>
-        <div class="prog-wrap">
-            <div class="prog-head"><span>Progression Globale</span><span style="color:var(--success);">{{ prog }}%</span></div>
-            <div class="prog-bar-bg"><div class="prog-bar-fill" style="width:{{ prog }}%;"></div></div>
-        </div>
-    </div>
-</div>
 
-<!-- Levels -->
-<div class="levels-grid stagger">
-    <div class="level-card {% if 'N1' in v_levels %}active-N1{% else %}inactive{% endif %}">
-        <div class="level-badge">N1</div>
-        <div class="level-name">Intervention Mineure</div>
-        <div class="level-stat">{{ 'Acquis' if 'N1' in v_levels else 'Non acquis' }}</div>
-    </div>
-    <div class="level-card {% if 'N2' in v_levels %}active-N2{% else %}inactive{% endif %}">
-        <div class="level-badge">N2</div>
-        <div class="level-name">Diagnostic Courant</div>
-        <div class="level-stat">{{ 'Acquis' if 'N2' in v_levels else 'Non acquis' }}</div>
-    </div>
-    <div class="level-card {% if 'N3' in v_levels %}active-N3{% else %}inactive{% endif %}">
-        <div class="level-badge">N3</div>
-        <div class="level-name">Expertise Avancée</div>
-        <div class="level-stat">{{ 'Acquis' if 'N3' in v_levels else 'Non acquis' }}</div>
-    </div>
-    <div class="level-card {% if 'N4' in v_levels %}active-N4{% else %}inactive{% endif %}">
-        <div class="level-badge">N4</div>
-        <div class="level-name">Dépannage Complexe</div>
-        <div class="level-stat">{{ 'Acquis' if 'N4' in v_levels else 'Non acquis' }}</div>
-    </div>
-</div>
-
-<!-- History -->
-<div class="glass-card animate-up" style="padding:24px;">
-    <div class="card-title"><i class="fa-solid fa-timeline"></i> Historique des Formations & Examens</div>
-    {% if profile.get('exams') %}
-    <div class="timeline">
-        {% for ex in profile.exams | reverse %}
-        <div class="tl-item" style="animation-delay:{{ loop.index0 * 0.1 }}s;">
-            <div class="tl-dot" style="border-color:{% if ex.type=='Validation' %}var(--success){% elif ex.type=='Echec' %}var(--danger){% else %}var(--info){% endif %};"></div>
-            <div class="tl-card">
-                <div class="tl-head">
-                    <div class="tl-type">
-                        {% if ex.type=='Validation' %}<span style="color:var(--success);"><i class="fa-solid fa-check"></i> Validation</span>
-                        {% elif ex.type=='Echec' %}<span style="color:var(--danger);"><i class="fa-solid fa-xmark"></i> Échec</span>
-                        {% else %}<span style="color:var(--info);"><i class="fa-solid fa-chalkboard-user"></i> Formation</span>{% endif %}
-                        &nbsp;·&nbsp; Niveau {{ ex.exam_level or '?' }}
-                    </div>
-                    <div class="tl-date">{{ ex.date[:10] }}</div>
-                </div>
-                {% if ex.notes %}
-                <div style="font-size:12px; color:var(--text-sec); margin-top:8px;">{{ ex.notes }}</div>
+        <div class="profile-hero-content">
+            <h1 class="profile-hero-title">
+                {{ profile.name }}
+                {% if profile.is_active == 1 or profile.is_active is not defined %}
+                <span class="badge badge-success" style="font-size:11px; padding:3px 10px; text-transform:none;">
+                    <i class="fa-solid fa-circle-check"></i> Actif
+                </span>
+                {% else %}
+                <span class="badge badge-danger" style="font-size:11px; padding:3px 10px; text-transform:none;">
+                    <i class="fa-solid fa-ban"></i> Inactif
+                </span>
                 {% endif %}
+            </h1>
+
+            <div style="font-size:13px; color:var(--text-sec); font-weight:600;">
+                <i class="fa-solid fa-wrench" style="color:var(--primary); margin-right:6px;"></i>
+                {{ profile.job_title or 'Technicien de Maintenance' }}
+            </div>
+
+            <!-- Chips strip -->
+            <div class="profile-chips-row">
+                <div class="chip-badge chip-matricule" title="Matricule officiel">
+                    <i class="fa-solid fa-id-badge"></i>
+                    <span>Matricule : <code>{{ profile.matricule or '—' }}</code></span>
+                </div>
+
+                <div class="chip-badge chip-shift-{{ profile.shift or 'A' }}" title="Équipe d'affectation">
+                    <i class="fa-solid fa-clock"></i>
+                    <span>Shift {{ profile.shift or 'A' }}</span>
+                </div>
+
+                <div class="chip-badge chip-level" title="Niveau d'habilitation technique">
+                    <i class="fa-solid fa-award"></i>
+                    <span>{{ profile.technician_level or 'Level 0' }}</span>
+                </div>
+
+                <div class="chip-badge chip-seniority" title="Ancienneté automatique">
+                    <i class="fa-solid fa-business-time"></i>
+                    <span>{{ profile.seniority.text_fr if profile.seniority else 'Non renseignée' }}</span>
+                </div>
+            </div>
+
+            <!-- Global Qualification Progression Bar -->
+            {% set prog_pct = profile.progression_pct if profile.progression_pct is defined else 25 %}
+            <div class="hero-progression">
+                <div class="hero-prog-header">
+                    <span>Progression Globale de Qualification</span>
+                    <strong style="color:var(--primary);">{{ prog_pct }}%</strong>
+                </div>
+                <div class="hero-prog-bar-bg">
+                    <div class="hero-prog-bar-fill" style="width:{{ prog_pct }}%;"></div>
+                </div>
             </div>
         </div>
-        {% endfor %}
     </div>
-    {% else %}
-    <div class="empty-state">
-        <i class="fa-solid fa-clipboard-list empty-icon"></i>
-        <div class="empty-title">Aucun historique</div>
-        <div class="empty-desc">Aucune formation ou examen enregistré pour ce technicien.</div>
+
+    <!-- ── 2. THREE PRIMARY INFORMATION SECTIONS ──────────────────────── -->
+    <div class="section-grid">
+
+        <!-- ── Section A: Personal Information ──────────────────────── -->
+        <div class="info-section-card">
+            <div class="info-section-header">
+                <h3><i class="fa-solid fa-user-circle"></i> Informations Personnelles</h3>
+                {% if is_admin_or_owner %}
+                <button type="button" class="btn btn-xs btn-glass" onclick="openEditProfileModal()">
+                    <i class="fa-solid fa-pen"></i> Modifier
+                </button>
+                {% endif %}
+            </div>
+            <div class="info-items-grid">
+                <div class="info-field-box">
+                    <div class="info-field-label"><i class="fa-solid fa-user"></i> Nom Complet</div>
+                    <div class="info-field-val">{{ profile.name }}</div>
+                </div>
+
+                <div class="info-field-box">
+                    <div class="info-field-label"><i class="fa-solid fa-id-badge"></i> Matricule</div>
+                    <div class="info-field-val">
+                        <code style="background:#EEF2FF; color:var(--primary); padding:2px 6px; border-radius:4px; font-weight:800;">
+                            {{ profile.matricule or '—' }}
+                        </code>
+                    </div>
+                </div>
+
+                <div class="info-field-box full-width">
+                    <div class="info-field-label"><i class="fa-solid fa-phone"></i> Numéro de téléphone</div>
+                    <div class="info-field-val">
+                        {% if profile.phone %}
+                        <a href="tel:{{ profile.phone }}" style="color:var(--primary); text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
+                            <i class="fa-solid fa-phone-volume"></i> {{ profile.phone }}
+                        </a>
+                        {% else %}
+                        <span class="info-field-val empty">Non renseigné</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="info-field-box full-width">
+                    <div class="info-field-label"><i class="fa-solid fa-location-dot"></i> Adresse / Lieu de résidence</div>
+                    <div class="info-field-val">
+                        {% if profile.address %}
+                        <span style="display:inline-flex; align-items:center; gap:6px;">
+                            <i class="fa-solid fa-map-pin" style="color:var(--danger);"></i> {{ profile.address }}
+                        </span>
+                        {% else %}
+                        <span class="info-field-val empty">Non renseigné</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Section B: Professional Information ──────────────────── -->
+        <div class="info-section-card">
+            <div class="info-section-header">
+                <h3><i class="fa-solid fa-briefcase"></i> Informations Professionnelles</h3>
+                {% if is_admin_or_owner %}
+                <button type="button" class="btn btn-xs btn-glass" onclick="openEditProfileModal()">
+                    <i class="fa-solid fa-pen"></i> Modifier
+                </button>
+                {% endif %}
+            </div>
+            <div class="info-items-grid">
+                <div class="info-field-box">
+                    <div class="info-field-label"><i class="fa-solid fa-award"></i> Position / Niveau</div>
+                    <div class="info-field-val">
+                        <span class="badge badge-info" style="font-size:11px;">
+                            {{ profile.technician_level or 'Level 0' }}
+                        </span>
+                    </div>
+                </div>
+
+                <div class="info-field-box">
+                    <div class="info-field-label"><i class="fa-solid fa-clock"></i> Équipe (Shift)</div>
+                    <div class="info-field-val">
+                        <span class="badge" style="background:#F1F5F9; color:#0F172A; font-size:11px;">
+                            Shift {{ profile.shift or 'A' }}
+                        </span>
+                    </div>
+                </div>
+
+                <div class="info-field-box">
+                    <div class="info-field-label"><i class="fa-solid fa-calendar-day"></i> Date de recrutement</div>
+                    <div class="info-field-val">
+                        {% if profile.seniority and profile.seniority.formatted_hire_date and profile.seniority.formatted_hire_date != '-' %}
+                        <span style="color:var(--text); font-weight:700;">{{ profile.seniority.formatted_hire_date }}</span>
+                        {% elif profile.hire_date %}
+                        <span style="color:var(--text); font-weight:700;">{{ profile.hire_date }}</span>
+                        {% else %}
+                        <span class="info-field-val empty">Non renseignée</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="info-field-box highlight">
+                    <div class="info-field-label" style="color:#6B21A8;">
+                        <i class="fa-solid fa-hourglass-half" style="color:#7C3AED;"></i> Ancienneté
+                    </div>
+                    <div class="info-field-val" style="color:#4C1D95; font-size:14px; font-weight:900;">
+                        {{ profile.seniority.text_fr if profile.seniority else 'Non renseignée' }}
+                    </div>
+                    <div style="font-size:10px; color:#7C3AED; font-weight:600; margin-top:3px;">
+                        <i class="fa-solid fa-calculator"></i> Calculée automatiquement
+                        {% if profile.seniority and profile.seniority.text_en %}
+                        · {{ profile.seniority.text_en }}
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="info-field-box full-width">
+                    <div class="info-field-label"><i class="fa-solid fa-user-tie"></i> Supérieur Hiérarchique (Supervisor)</div>
+                    <div class="info-field-val" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+                        <div>
+                            <strong>{{ profile.supervisor.name if profile.supervisor else 'Non assigné' }}</strong>
+                            <div style="font-size:11px; color:var(--text-sec); font-weight:500;">
+                                {{ profile.supervisor.title if profile.supervisor else 'Superviseur de Maintenance' }}
+                            </div>
+                        </div>
+                        {% if profile.supervisor and profile.supervisor.matricule and profile.supervisor.matricule != '—' %}
+                        <code style="font-size:11px; background:#F1F5F9; padding:2px 6px; border-radius:4px;">{{ profile.supervisor.matricule }}</code>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
-    {% endif %}
+
+    <!-- ── Section C: Education & Qualifications ──────────────────────── -->
+    <div class="info-section-card" style="margin-bottom:24px;">
+        <div class="info-section-header">
+            <h3><i class="fa-solid fa-graduation-cap"></i> Formation &amp; Diplômes</h3>
+            {% if is_admin_or_owner %}
+            <button type="button" class="btn btn-xs btn-glass" onclick="openEditProfileModal()">
+                <i class="fa-solid fa-pen"></i> Modifier
+            </button>
+            {% endif %}
+        </div>
+        <div class="info-items-grid" style="grid-template-columns: 1fr 1fr;">
+            <div class="info-field-box">
+                <div class="info-field-label"><i class="fa-solid fa-school"></i> Niveau Scolaire</div>
+                <div class="info-field-val">
+                    {% if profile.education_level %}
+                    <span style="display:inline-flex; align-items:center; gap:8px;">
+                        <i class="fa-solid fa-book-open-reader" style="color:#4F46E5;"></i>
+                        <strong>{{ profile.education_level }}</strong>
+                    </span>
+                    {% else %}
+                    <span class="info-field-val empty">Non renseigné</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="info-field-box">
+                <div class="info-field-label"><i class="fa-solid fa-certificate"></i> Diplôme Obtenu</div>
+                <div class="info-field-val">
+                    {% if profile.diploma %}
+                    <span style="display:inline-flex; align-items:center; gap:8px;">
+                        <i class="fa-solid fa-award" style="color:#059669;"></i>
+                        <strong>{{ profile.diploma }}</strong>
+                    </span>
+                    {% else %}
+                    <span class="info-field-val empty">Non renseigné</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── 3. TECHNICAL LEVELS LADDER (N1 - N4) ───────────────────────── -->
+    {% set current_lvl = profile.technician_level or 'Level 0' %}
+    <div class="info-section-card" style="margin-bottom:24px;">
+        <div class="info-section-header">
+            <h3><i class="fa-solid fa-layer-group"></i> Habilitations &amp; Paliers de Compétences</h3>
+            <span style="font-size:12px; color:var(--text-sec); font-weight:600;">Standard SEBN-TN CSwin</span>
+        </div>
+        <div style="padding:20px;">
+            <div class="levels-grid">
+                <div class="level-card {% if '1' in current_lvl or '2' in current_lvl or '3' in current_lvl or '4' in current_lvl %}active{% endif %}">
+                    <div class="level-badge">N1</div>
+                    <div style="font-size:13px; font-weight:800; color:var(--text);">Intervention Mineure</div>
+                    <div style="font-size:11px; color:var(--text-sec); margin-top:4px;">
+                        {% if '1' in current_lvl or '2' in current_lvl or '3' in current_lvl or '4' in current_lvl %}
+                        <span style="color:#059669; font-weight:700;"><i class="fa-solid fa-check"></i> Acquis</span>
+                        {% else %}
+                        <span>En cours</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="level-card {% if '2' in current_lvl or '3' in current_lvl or '4' in current_lvl %}active{% endif %}">
+                    <div class="level-badge">N2</div>
+                    <div style="font-size:13px; font-weight:800; color:var(--text);">Diagnostic Courant</div>
+                    <div style="font-size:11px; color:var(--text-sec); margin-top:4px;">
+                        {% if '2' in current_lvl or '3' in current_lvl or '4' in current_lvl %}
+                        <span style="color:#059669; font-weight:700;"><i class="fa-solid fa-check"></i> Acquis</span>
+                        {% else %}
+                        <span>Non acquis</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="level-card {% if '3' in current_lvl or '4' in current_lvl %}active{% endif %}">
+                    <div class="level-badge">N3</div>
+                    <div style="font-size:13px; font-weight:800; color:var(--text);">Expertise Avancée</div>
+                    <div style="font-size:11px; color:var(--text-sec); margin-top:4px;">
+                        {% if '3' in current_lvl or '4' in current_lvl %}
+                        <span style="color:#059669; font-weight:700;"><i class="fa-solid fa-check"></i> Acquis</span>
+                        {% else %}
+                        <span>Non acquis</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="level-card {% if '4' in current_lvl or 'Expert' in current_lvl %}active{% endif %}">
+                    <div class="level-badge">N4</div>
+                    <div style="font-size:13px; font-weight:800; color:var(--text);">Dépannage Complexe</div>
+                    <div style="font-size:11px; color:var(--text-sec); margin-top:4px;">
+                        {% if '4' in current_lvl or 'Expert' in current_lvl %}
+                        <span style="color:#059669; font-weight:700;"><i class="fa-solid fa-star"></i> Expert</span>
+                        {% else %}
+                        <span>Non acquis</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── 4. TRAINING & EXAMS HISTORY ────────────────────────────────── -->
+    <div class="info-section-card">
+        <div class="info-section-header">
+            <h3><i class="fa-solid fa-timeline"></i> Historique des Formations, Examens &amp; Certifications</h3>
+            {% if is_admin_or_owner %}
+            <button type="button" class="btn btn-xs btn-primary" onclick="document.getElementById('exam-modal').classList.add('open')">
+                <i class="fa-solid fa-plus"></i> Ajouter un Événement
+            </button>
+            {% endif %}
+        </div>
+        <div style="padding:20px;">
+            {% if profile.exams and profile.exams|length > 0 %}
+            <div class="timeline">
+                {% for ex in profile.exams %}
+                <div class="tl-item">
+                    <div class="tl-dot" style="border-color:{% if ex.status=='RÉUSSI' or ex.type=='Validation' %}#10B981{% elif ex.status=='ÉCHOUÉ' or ex.type=='Echec' %}#EF4444{% else %}var(--primary){% endif %};"></div>
+                    <div class="tl-card">
+                        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px; flex-wrap:wrap; gap:8px;">
+                            <div>
+                                <span style="font-size:13px; font-weight:800; color:var(--text);">{{ ex.name }}</span>
+                                <span class="badge" style="margin-left:8px; font-size:10px; background:{% if ex.status=='RÉUSSI' or ex.type=='Validation' %}#D1FAE5; color:#065F46;{% elif ex.status=='ÉCHOUÉ' or ex.type=='Echec' %}#FEE2E2; color:#991B1B;{% else %}#EEF2FF; color:#4338CA;{% endif %}">
+                                    {{ ex.status or ex.type or 'Formation' }}
+                                </span>
+                            </div>
+                            <div style="font-size:11px; color:var(--text-sec); font-weight:600;">
+                                <i class="fa-regular fa-calendar"></i> {{ ex.date }}
+                            </div>
+                        </div>
+                        <div style="display:flex; gap:16px; font-size:12px; color:var(--text-sec); flex-wrap:wrap;">
+                            {% if ex.score %}
+                            <div>Score : <strong style="color:var(--text);">{{ ex.score }}</strong> ({{ ex.percentage }}%)</div>
+                            {% endif %}
+                            {% if ex.exam_level %}
+                            <div>Niveau : <strong style="color:var(--text);">{{ ex.exam_level }}</strong></div>
+                            {% endif %}
+                            {% if ex.notes %}
+                            <div style="width:100%; margin-top:4px; font-style:italic;">{{ ex.notes }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div style="padding:32px; text-align:center; color:var(--text-sec);">
+                <i class="fa-solid fa-clipboard-list" style="font-size:36px; color:#CBD5E1; margin-bottom:10px; display:block;"></i>
+                <div style="font-weight:700; font-size:14px; color:var(--text);">Aucun examen ou formation enregistré</div>
+                <div style="font-size:12px; margin-top:4px;">Les résultats d'examens CSwin et les sessions de formation apparaîtront ici.</div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
 </div>
 
-<!-- Modal -->
-{% if role == 'admin' %}
-<div class="modal-overlay" id="exam-modal">
-    <div class="modal-box">
-        <div class="modal-close" onclick="document.getElementById('exam-modal').classList.remove('open')">
-            <i class="fa-solid fa-xmark"></i>
+<!-- ── 5. MODAL ÉDITION FICHE TECHNICIEN (ADMIN & OWNER ONLY) ──────── -->
+{% if is_admin_or_owner %}
+<div class="modal-overlay" id="edit-profile-modal">
+    <div class="modal-box-lg">
+        <div class="modal-header-custom">
+            <h3><i class="fa-solid fa-user-pen" style="color:var(--primary);"></i> Modifier la Fiche Technicien</h3>
+            <button type="button" class="modal-close-btn" onclick="closeEditProfileModal()">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
         </div>
-        <h3 style="margin-bottom:20px; font-size:17px; font-weight:800;">Ajouter un Événement</h3>
+
+        <form method="POST" action="{{ url_for('technician_profile_update', user_id=profile.id) }}" enctype="multipart/form-data">
+            
+            <!-- Section 1: Informations Personnelles -->
+            <div class="form-section-title">1. Informations Personnelles</div>
+            <div class="grid-2">
+                <div class="form-group">
+                    <label class="form-label">Nom Complet *</label>
+                    <div class="input-with-icon">
+                        <i class="input-icon fa-solid fa-user"></i>
+                        <input type="text" name="name" class="form-control" value="{{ profile.name }}" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Matricule *</label>
+                    <div class="input-with-icon">
+                        <i class="input-icon fa-solid fa-id-badge"></i>
+                        <input type="text" name="matricule" class="form-control" value="{{ profile.matricule }}" required>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid-2">
+                <div class="form-group">
+                    <label class="form-label">Numéro de téléphone</label>
+                    <div class="input-with-icon">
+                        <i class="input-icon fa-solid fa-phone"></i>
+                        <input type="text" name="phone" class="form-control" value="{{ profile.phone or '' }}" placeholder="Ex: +216 98 123 456">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Adresse / Lieu de résidence</label>
+                    <div class="input-with-icon">
+                        <i class="input-icon fa-solid fa-location-dot"></i>
+                        <input type="text" name="address" class="form-control" value="{{ profile.address or '' }}" placeholder="Ex: Grombalia, Nabeul">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section 2: Informations Professionnelles -->
+            <div class="form-section-title">2. Informations Professionnelles</div>
+            <div class="grid-2">
+                <div class="form-group">
+                    <label class="form-label">Date de recrutement *</label>
+                    <div class="input-with-icon">
+                        <i class="input-icon fa-solid fa-calendar-day"></i>
+                        <input type="date" name="hire_date" id="input-hire-date" class="form-control" value="{{ profile.hire_date or '' }}" onchange="updateSeniorityPreview(this.value)">
+                    </div>
+                    <div class="seniority-preview-box">
+                        <i class="fa-solid fa-calculator"></i>
+                        <div>
+                            <span>Ancienneté automatique :</span>
+                            <span id="modal-seniority-preview" style="font-weight:700;">
+                                {{ profile.seniority.text_fr if profile.seniority else 'Sélectionnez une date' }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Équipe (Shift) *</label>
+                    <div class="input-with-icon">
+                        <i class="input-icon fa-solid fa-clock"></i>
+                        <select name="shift" class="form-control" required>
+                            <option value="A" {% if profile.shift == 'A' %}selected{% endif %}>Shift A</option>
+                            <option value="B" {% if profile.shift == 'B' %}selected{% endif %}>Shift B</option>
+                            <option value="C" {% if profile.shift == 'C' %}selected{% endif %}>Shift C</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid-2">
+                <div class="form-group">
+                    <label class="form-label">Niveau d'habilitation *</label>
+                    <div class="input-with-icon">
+                        <i class="input-icon fa-solid fa-award"></i>
+                        <select name="technician_level" class="form-control" required>
+                            <option value="Level 0" {% if profile.technician_level == 'Level 0' %}selected{% endif %}>Level 0 — Débutant</option>
+                            <option value="Level 1" {% if profile.technician_level == 'Level 1' %}selected{% endif %}>Level 1 — CSwin Basic</option>
+                            <option value="Level 2" {% if profile.technician_level == 'Level 2' %}selected{% endif %}>Level 2 — CSwin Hardware</option>
+                            <option value="Level 3" {% if profile.technician_level == 'Level 3' %}selected{% endif %}>Level 3 — Brainware & Vacuum</option>
+                            <option value="Level 4" {% if profile.technician_level == 'Level 4' %}selected{% endif %}>Level 4 — Expert</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Photo du technicien</label>
+                    <div class="input-with-icon">
+                        <i class="input-icon fa-solid fa-image"></i>
+                        <input type="file" name="photo_file" class="form-control" accept="image/png,image/jpeg,image/jpg">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section 3: Formation & Diplômes -->
+            <div class="form-section-title">3. Formation Scolaire &amp; Diplômes</div>
+            <div class="grid-2">
+                <div class="form-group">
+                    <label class="form-label">Niveau scolaire</label>
+                    <div class="input-with-icon">
+                        <i class="input-icon fa-solid fa-school"></i>
+                        <input type="text" name="education_level" class="form-control" value="{{ profile.education_level or '' }}" placeholder="Ex: Bac + 2 (BTS), Baccalauréat Technique">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Diplôme obtenu</label>
+                    <div class="input-with-icon">
+                        <i class="input-icon fa-solid fa-certificate"></i>
+                        <input type="text" name="diploma" class="form-control" value="{{ profile.diploma or '' }}" placeholder="Ex: BTS Maintenance Industrielle">
+                    </div>
+                </div>
+            </div>
+
+            <div style="margin-top:24px; display:flex; justify-content:flex-end; gap:12px; border-top:1px solid var(--border); padding-top:18px;">
+                <button type="button" class="btn btn-secondary" onclick="closeEditProfileModal()">Annuler</button>
+                <button type="submit" class="btn btn-primary" style="padding:9px 24px; font-weight:700;">
+                    <i class="fa-solid fa-floppy-disk"></i> Enregistrer les modifications
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal Saisie Examen Manuel -->
+<div class="modal-overlay" id="exam-modal">
+    <div class="modal-box-lg" style="max-width:500px;">
+        <div class="modal-header-custom">
+            <h3><i class="fa-solid fa-plus-circle" style="color:var(--primary);"></i> Saisir un Examen ou Formation</h3>
+            <button type="button" class="modal-close-btn" onclick="document.getElementById('exam-modal').classList.remove('open')">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
         <form method="POST" action="{{ url_for('training_add_exam', matricule=profile.matricule) }}">
             <div class="grid-2">
                 <div class="form-group">
                     <label class="form-label">Type</label>
-                    <div class="input-with-icon">
-                        <i class="input-icon fa-solid fa-tag"></i>
-                        <select name="type" class="form-control" required>
-                            <option value="Formation">Formation</option>
-                            <option value="Validation">Validation (Succès)</option>
-                            <option value="Echec">Échec Examen</option>
-                        </select>
-                    </div>
+                    <select name="type" class="form-control" required>
+                        <option value="Validation">Validation (Succès)</option>
+                        <option value="Formation">Formation</option>
+                        <option value="Echec">Échec Examen</option>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Niveau Visé</label>
-                    <div class="input-with-icon">
-                        <i class="input-icon fa-solid fa-layer-group"></i>
-                        <select name="exam_level" class="form-control" required>
-                            <option value="N1">N1</option><option value="N2">N2</option>
-                            <option value="N3">N3</option><option value="N4">N4</option>
-                        </select>
-                    </div>
+                    <select name="exam_level" class="form-control" required>
+                        <option value="Level 1">Level 1</option>
+                        <option value="Level 2">Level 2</option>
+                        <option value="Level 3">Level 3</option>
+                        <option value="Level 4">Level 4</option>
+                    </select>
                 </div>
             </div>
             <div class="form-group">
                 <label class="form-label">Date</label>
-                <div class="input-with-icon">
-                    <i class="input-icon fa-solid fa-calendar"></i>
-                    <input type="date" name="date" class="form-control" required>
-                </div>
+                <input type="date" name="date" class="form-control" required value="{{ profile.hire_date or '' }}">
             </div>
             <div class="form-group">
-                <label class="form-label">Notes / Sujet</label>
-                <div class="input-with-icon">
-                    <i class="input-icon fa-solid fa-align-left" style="top:14px; transform:none;"></i>
-                    <textarea name="notes" class="form-control" rows="2" style="padding-left:36px;"></textarea>
-                </div>
+                <label class="form-label">Notes / Titre</label>
+                <textarea name="notes" class="form-control" rows="2" placeholder="Détails de l'évaluation ou de la certification..."></textarea>
             </div>
-            <button type="submit" class="btn btn-primary w-full" style="justify-content:center;">
-                <i class="fa-solid fa-save"></i> Enregistrer
-            </button>
+            <div style="margin-top:20px; display:flex; justify-content:flex-end; gap:10px;">
+                <button type="button" class="btn btn-secondary" onclick="document.getElementById('exam-modal').classList.remove('open')">Annuler</button>
+                <button type="submit" class="btn btn-primary"><i class="fa-solid fa-save"></i> Enregistrer</button>
+            </div>
         </form>
     </div>
 </div>
+
+<script>
+function openEditProfileModal() {
+    document.getElementById('edit-profile-modal').classList.add('open');
+    const curDate = document.getElementById('input-hire-date').value;
+    if (curDate) updateSeniorityPreview(curDate);
+}
+function closeEditProfileModal() {
+    document.getElementById('edit-profile-modal').classList.remove('open');
+}
+
+function updateSeniorityPreview(dateStr) {
+    const el = document.getElementById('modal-seniority-preview');
+    if (!el) return;
+    if (!dateStr) {
+        el.textContent = 'Sélectionnez une date de recrutement';
+        return;
+    }
+    const parts = dateStr.split('-');
+    if (parts.length !== 3) return;
+    const hireDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+    const today = new Date();
+    
+    if (hireDate > today) {
+        el.textContent = 'À venir (embauche future)';
+        return;
+    }
+    
+    let years = today.getFullYear() - hireDate.getFullYear();
+    let months = today.getMonth() - hireDate.getMonth();
+    let days = today.getDate() - hireDate.getDate();
+    if (days < 0) {
+        months -= 1;
+    }
+    if (months < 0) {
+        years -= 1;
+        months += 12;
+    }
+    
+    let partsFr = [];
+    if (years > 0) partsFr.push(years + (years === 1 ? ' an' : ' ans'));
+    if (months > 0) partsFr.push(months + ' mois');
+    let fr = partsFr.length > 0 ? partsFr.join(' et ') : (days > 0 ? days + ' jours' : "Aujourd'hui");
+    
+    let partsEn = [];
+    if (years > 0) partsEn.push(years + (years === 1 ? ' year' : ' years'));
+    if (months > 0) partsEn.push(months + (months === 1 ? ' month' : ' months'));
+    let en = partsEn.length > 0 ? partsEn.join(' and ') : "Today";
+    
+    el.innerHTML = fr + ' <span style="font-size:11px; color:#6B21A8; font-weight:600;">(' + en + ')</span>';
+}
+</script>
 {% endif %}
 {% endblock %}

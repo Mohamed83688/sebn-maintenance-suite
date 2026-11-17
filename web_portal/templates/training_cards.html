@@ -119,12 +119,15 @@
             </div>
 
             <!-- Actions buttons -->
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
+            <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px;">
+                <a href="{{ url_for('technician_profile_view', user_id=row.id) }}" class="btn btn-secondary" style="font-size:11px; padding:6px 0; justify-content:center; text-align:center;" title="Fiche complète technicien">
+                    <i class="fa-solid fa-id-card-clip"></i> Fiche
+                </a>
                 <a href="{{ url_for('tech_card_view', user_id=row.id) }}" class="btn btn-primary" style="font-size:11px; padding:6px 0; justify-content:center; text-align:center;">
-                    <i class="fa-solid fa-eye"></i> Voir Carte
+                    <i class="fa-solid fa-eye"></i> Carte
                 </a>
                 <a href="{{ url_for('tech_card_print', user_id=row.id) }}" target="_blank" class="btn btn-glass" style="font-size:11px; padding:6px 0; justify-content:center; text-align:center; color:var(--primary); border-color:var(--primary-light);">
-                    <i class="fa-solid fa-print"></i> Imprimer
+                    <i class="fa-solid fa-print"></i> Impr.
                 </a>
             </div>
         </div>

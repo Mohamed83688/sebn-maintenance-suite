@@ -82,6 +82,18 @@ class UserManager:
             if "hire_date" not in existing_cols:
                 cur.execute("ALTER TABLE users ADD COLUMN hire_date TEXT")
 
+            if "phone" not in existing_cols:
+                cur.execute("ALTER TABLE users ADD COLUMN phone TEXT DEFAULT ''")
+
+            if "address" not in existing_cols:
+                cur.execute("ALTER TABLE users ADD COLUMN address TEXT DEFAULT ''")
+
+            if "education_level" not in existing_cols:
+                cur.execute("ALTER TABLE users ADD COLUMN education_level TEXT DEFAULT ''")
+
+            if "diploma" not in existing_cols:
+                cur.execute("ALTER TABLE users ADD COLUMN diploma TEXT DEFAULT ''")
+
             cur.execute("CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_users_matricule ON users(matricule)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_users_role ON users(role)")
@@ -542,3 +554,257 @@ class UserManager:
             conn.commit()
             status_label = "activé" if new_status == 1 else "désactivé"
             return True, f"Le compte '{row['name']}' a été {status_label}.", new_status
+
+    def get_technician_full_profile(self, user_id_or_matricule: Any) -> Optional[Dict[str, Any]]:
+        """
+        Loads the complete technician employee file (Fiche Technicien):
+        - Personal Information: photo, name, matricule, phone, address
+        - Professional Information: technician_level, hire_date, seniority (auto-calculated), shift, supervisor
+        - Education & Qualifications: education_level, diploma
+        - Exam/training history and progression
+        """
+        with self._get_conn() as conn:
+            cur = conn.cursor()
+            
+            # Fetch user record by id or by matricule
+            cur.execute("SELECT * FROM users WHERE LOWER(matricule) = LOWER(?)", (str(user_id_or_matricule).strip(),))
+            row = cur.fetchone()
+            if not row and (isinstance(user_id_or_matricule, int) or str(user_id_or_matricule).isdigit()):
+                cur.execute("SELECT * FROM users WHERE id = ?", (int(user_id_or_matricule),))
+                row = cur.fetchone()
+
+            if not row:
+                return None
+                
+            u = dict(row)
+            user_id = u["id"]
+            
+            # Auto-calculate Seniority using calculate_seniority from core.org_manager
+            from core.org_manager import calculate_seniority
+            u["seniority"] = calculate_seniority(u.get("hire_date"))
+            
+            # Resolve direct supervisor from org_assignments (or by shift if unassigned)
+            supervisor = {
+                "name": "Non assigné",
+                "title": "Superviseur Direct",
+                "matricule": "—",
+                "shift": u.get("shift") or "A"
+            }
+            try:
+                cur.execute("""
+                    SELECT oa.id as assignment_id, oa.job_title, oa.group_name, oa.team_name, oa.shift as org_shift,
+                           parent.full_name as supervisor_name, parent.job_title as supervisor_job_title,
+                           parent.matricule as supervisor_matricule, parent.shift as supervisor_shift
+                    FROM org_assignments oa
+                    LEFT JOIN org_assignments parent ON oa.parent_id = parent.id
+                    WHERE oa.user_id = ?
+                """, (user_id,))
+                oa_row = cur.fetchone()
+                if oa_row:
+                    oa_dict = dict(oa_row)
+                    u["org_info"] = oa_dict
+                    if oa_dict.get("supervisor_name"):
+                        supervisor = {
+                            "name": oa_dict["supervisor_name"],
+                            "title": oa_dict.get("supervisor_job_title") or "Supervisor",
+                            "matricule": oa_dict.get("supervisor_matricule") or "—",
+                            "shift": oa_dict.get("supervisor_shift") or u.get("shift") or "A"
+                        }
+                    else:
+                        # Fallback: find supervisor of the same shift in org_assignments
+                        cur.execute("""
+                            SELECT full_name, job_title, matricule, shift
+                            FROM org_assignments
+                            WHERE position_level = 'SUPERVISOR' AND shift = ?
+                            LIMIT 1
+                        """, (u.get("shift") or "A",))
+                        s_row = cur.fetchone()
+                        if s_row:
+                            s_dict = dict(s_row)
+                            supervisor = {
+                                "name": s_dict["full_name"],
+                                "title": s_dict.get("job_title") or "Supervisor",
+                                "matricule": s_dict.get("matricule") or "—",
+                                "shift": s_dict.get("shift") or u.get("shift") or "A"
+                            }
+                else:
+                    # Not in org_assignments, check shift supervisor
+                    cur.execute("""
+                        SELECT full_name, job_title, matricule, shift
+                        FROM org_assignments
+                        WHERE position_level = 'SUPERVISOR' AND shift = ?
+                        LIMIT 1
+                    """, (u.get("shift") or "A",))
+                    s_row = cur.fetchone()
+                    if s_row:
+                        s_dict = dict(s_row)
+                        supervisor = {
+                            "name": s_dict["full_name"],
+                            "title": s_dict.get("job_title") or "Supervisor",
+                            "matricule": s_dict.get("matricule") or "—",
+                            "shift": s_dict.get("shift") or u.get("shift") or "A"
+                        }
+            except Exception as e:
+                logger.warning(f"Could not resolve supervisor for user {user_id}: {e}")
+                
+            u["supervisor"] = supervisor
+            
+            # Fetch exam history
+            exams = []
+            try:
+                cur.execute("""
+                    SELECT ea.*, e.title as exam_title, e.number_of_questions, e.passing_score
+                    FROM exam_attempts ea
+                    JOIN exams e ON ea.exam_id = e.id
+                    WHERE ea.user_id = ?
+                    ORDER BY ea.submitted_at DESC, ea.started_at DESC
+                """, (user_id,))
+                for er in cur.fetchall():
+                    ed = dict(er)
+                    is_pass = (ed.get("status") == "passed")
+                    exams.append({
+                        "name": ed.get("exam_title") or f"Examen #{ed.get('exam_id')}",
+                        "type": "Validation" if is_pass else "Echec",
+                        "status": "RÉUSSI" if is_pass else "ÉCHOUÉ",
+                        "exam_level": u.get("technician_level") or "Level 1",
+                        "date": (ed.get("submitted_at") or ed.get("started_at") or "")[:10],
+                        "score": f"{ed.get('score', 0)}/{ed.get('number_of_questions', 0)}",
+                        "percentage": round(ed.get("percentage") or 0, 1),
+                        "notes": f"Score: {ed.get('score')}/{ed.get('number_of_questions')} ({round(ed.get('percentage') or 0, 1)}%)"
+                    })
+            except Exception as e:
+                logger.warning(f"Could not load exam attempts for user {user_id}: {e}")
+                
+            # Also check tech_db JSON file if extra exams or validation events exist
+            try:
+                safe_mat = str(u.get("matricule") or "").replace("/", "_").replace("\\", "_").strip()
+                p = os.path.join(self.data_dir, "Technicians", f"{safe_mat}.json")
+                if os.path.exists(p):
+                    with open(p, "r", encoding="utf-8") as f:
+                        j_data = json.load(f)
+                        for j_ex in j_data.get("exams", []):
+                            # Add if not duplicate
+                            if not any(e.get("name") == j_ex.get("name") and e.get("date") == j_ex.get("date") for e in exams):
+                                exams.append(j_ex)
+            except Exception:
+                pass
+                
+            u["exams"] = exams
+            
+            # Calculate progression percentage (Level 0 = 0%, Level 1 = 25%, Level 2 = 50%, Level 3 = 75%, Level 4 = 100%)
+            lvl_norm = self.normalize_level(u.get("technician_level"))
+            lvl_map = {"Level 0": 0, "Level 1": 25, "Level 2": 50, "Level 3": 75, "Level 4": 100}
+            u["progression_pct"] = lvl_map.get(lvl_norm, 0)
+            u["technician_level"] = lvl_norm
+            
+            return u
+
+    def update_technician_profile(
+        self,
+        user_id: int,
+        phone: str = '',
+        address: str = '',
+        education_level: str = '',
+        diploma: str = '',
+        hire_date: Optional[str] = None,
+        shift: Optional[str] = None,
+        name: Optional[str] = None,
+        matricule: Optional[str] = None,
+        technician_level: Optional[str] = None,
+        photo: Optional[str] = None
+    ) -> Tuple[bool, str, Optional[Dict[str, Any]]]:
+        """
+        Updates technician employee profile fields in users table and syncs
+        with org_assignments (if assigned) and tech_db JSON files.
+        Recalculates seniority automatically based on recruitment date.
+        """
+        with self._get_conn() as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT * FROM users WHERE id = ?", (user_id,))
+            target = cur.fetchone()
+            if not target:
+                return False, "Technicien introuvable.", None
+
+            target = dict(target)
+            new_name = (name.strip() if name else target.get("name")) or target.get("name")
+            new_mat = (matricule.strip() if matricule else target.get("matricule")) or target.get("matricule")
+            new_shift = (shift.strip() if shift else target.get("shift")) or target.get("shift") or "A"
+            new_level = self.normalize_level(technician_level) if technician_level else target.get("technician_level") or "Level 0"
+            new_photo = photo if photo is not None else target.get("photo")
+            new_hire_date = hire_date.strip() if hire_date else target.get("hire_date")
+
+            # Clean text fields
+            new_phone = str(phone or "").strip()
+            new_address = str(address or "").strip()
+            new_edu = str(education_level or "").strip()
+            new_diploma = str(diploma or "").strip()
+
+            cur.execute("""
+                UPDATE users
+                SET name = ?,
+                    matricule = ?,
+                    shift = ?,
+                    technician_level = ?,
+                    photo = ?,
+                    hire_date = ?,
+                    phone = ?,
+                    address = ?,
+                    education_level = ?,
+                    diploma = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            """, (
+                new_name,
+                new_mat,
+                new_shift,
+                new_level,
+                new_photo,
+                new_hire_date,
+                new_phone,
+                new_address,
+                new_edu,
+                new_diploma,
+                user_id
+            ))
+
+            # Also sync with org_assignments if assigned
+            cur.execute("""
+                UPDATE org_assignments
+                SET full_name = ?,
+                    matricule = ?,
+                    shift = ?,
+                    hire_date = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE user_id = ?
+            """, (new_name, new_mat, new_shift, new_hire_date, user_id))
+
+            conn.commit()
+
+            # Also sync with Technicians/{matricule}.json
+            try:
+                safe_mat = str(new_mat or "").replace("/", "_").replace("\\", "_").strip()
+                p = os.path.join(self.data_dir, "Technicians", f"{safe_mat}.json")
+                t_data = {}
+                if os.path.exists(p):
+                    with open(p, "r", encoding="utf-8") as f:
+                        t_data = json.load(f)
+                t_data.update({
+                    "name": new_name,
+                    "matricule": new_mat,
+                    "shift": new_shift,
+                    "technician_level": new_level,
+                    "hire_date": new_hire_date,
+                    "phone": new_phone,
+                    "address": new_address,
+                    "education_level": new_edu,
+                    "diploma": new_diploma
+                })
+                if "exams" not in t_data:
+                    t_data["exams"] = []
+                with open(p, "w", encoding="utf-8") as f:
+                    json.dump(t_data, f, indent=2, ensure_ascii=False)
+            except Exception as e:
+                logger.warning(f"Failed to sync tech_db JSON: {e}")
+
+            full_profile = self.get_technician_full_profile(user_id)
+            return True, f"Fiche de {new_name} mise à jour avec succès.", full_profile

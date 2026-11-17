@@ -215,10 +215,13 @@
                     </td>
                     <td style="text-align:right;">
                         <div style="display:flex; justify-content:flex-end; gap:6px; flex-wrap:wrap;">
+                            <a href="{{ url_for('technician_profile_view', user_id=t.id) }}" class="btn btn-primary btn-xs" title="Consulter la Fiche Complète Technicien">
+                                <i class="fa-solid fa-id-card-clip"></i> Fiche
+                            </a>
                             <button type="button" class="btn btn-xs" style="background:#059669; color:white; font-weight:700;" onclick="openExamModalForTech({{ t.id }}, '{{ t.name|escape }}', '{{ lvl|escape }}')" title="Passer un examen pour ce technicien">
                                 <i class="fa-solid fa-file-signature"></i> Passer Examen
                             </button>
-                            <a href="{{ url_for('tech_progression', user_id=t.id) }}" class="btn btn-primary btn-xs" title="Voir la progression">
+                            <a href="{{ url_for('tech_progression', user_id=t.id) }}" class="btn btn-glass btn-xs" title="Voir la progression">
                                 <i class="fa-solid fa-stairs"></i> Progression
                             </a>
                             <a href="{{ url_for('tech_card_view', user_id=t.id) }}" class="btn btn-glass btn-xs" title="Carte d'habilitation">

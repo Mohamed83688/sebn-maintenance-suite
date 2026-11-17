@@ -875,13 +875,114 @@ def training():
     return render_template('training.html', techs=techs, mvp=mvp, all_exams=all_exams)
 
 @app.route('/training/<matricule>')
-@admin_required
+@login_required
 def training_profile(matricule):
-    profile = tech_db.get_profile(matricule)
+    current_role = session.get('role', '')
+    profile = user_mgr.get_technician_full_profile(matricule)
+    if not profile:
+        legacy_p = tech_db.get_profile(matricule)
+        if not legacy_p:
+            flash("Technicien introuvable.", "danger")
+            return redirect(url_for('training') if current_role in ('OWNER', 'ADMIN', 'admin') else url_for('tech_my_exams'))
+        profile = legacy_p
+
+    # Permission check: Technician can only view their own profile
+    if current_role == 'TECHNICIAN':
+        current_u = user_mgr.get_user_by_username(session.get('username'))
+        if not current_u or str(profile.get('matricule', '')).strip().lower() != str(current_u.get('matricule', '')).strip().lower():
+            flash("Accès non autorisé : vous ne pouvez consulter que votre propre fiche.", "danger")
+            return redirect(url_for('tech_my_exams'))
+
+    is_admin_or_owner = current_role in ('OWNER', 'ADMIN', 'admin')
+    return render_template('training_profile.html', profile=profile, is_admin_or_owner=is_admin_or_owner)
+
+
+@app.route('/technician/profile/<int:user_id>')
+@app.route('/training/profile/<int:user_id>')
+@login_required
+def technician_profile_view(user_id: int):
+    current_role = session.get('role', '')
+    profile = user_mgr.get_technician_full_profile(user_id)
     if not profile:
         flash("Technicien introuvable.", "danger")
+        return redirect(url_for('training') if current_role in ('OWNER', 'ADMIN', 'admin') else url_for('tech_my_exams'))
+
+    # Permission check: Technician can only view their own profile
+    if current_role == 'TECHNICIAN':
+        current_u = user_mgr.get_user_by_username(session.get('username'))
+        if not current_u or current_u.get('id') != user_id:
+            flash("Accès non autorisé : vous ne pouvez consulter que votre propre fiche.", "danger")
+            return redirect(url_for('technician_my_profile'))
+
+    is_admin_or_owner = current_role in ('OWNER', 'ADMIN', 'admin')
+    return render_template('training_profile.html', profile=profile, is_admin_or_owner=is_admin_or_owner)
+
+
+@app.route('/technician/my-profile')
+@app.route('/my-profile')
+@login_required
+def technician_my_profile():
+    current_u = user_mgr.get_user_by_username(session.get('username'))
+    if not current_u:
+        flash("Compte utilisateur introuvable.", "danger")
+        return redirect(url_for('logout'))
+    return redirect(url_for('technician_profile_view', user_id=current_u['id']))
+
+
+@app.route('/technician/profile/<int:user_id>/update', methods=['POST'])
+@app.route('/training/<matricule>/update-profile', methods=['POST'])
+@admin_required
+def technician_profile_update(user_id: int = None, matricule: str = None):
+    # Resolve target user id
+    target_user_id = user_id
+    if target_user_id is None and matricule:
+        u = user_mgr.get_technician_full_profile(matricule)
+        if u:
+            target_user_id = u['id']
+
+    if not target_user_id:
+        flash("Utilisateur introuvable.", "danger")
         return redirect(url_for('training'))
-    return render_template('training_profile.html', profile=profile)
+
+    name = request.form.get('name', '').strip()
+    new_matricule = request.form.get('matricule', '').strip()
+    phone = request.form.get('phone', '').strip()
+    address = request.form.get('address', '').strip()
+    hire_date = request.form.get('hire_date', '').strip()
+    shift = request.form.get('shift', 'A').strip().upper()
+    technician_level = request.form.get('technician_level', 'Level 0').strip()
+    education_level = request.form.get('education_level', '').strip()
+    diploma = request.form.get('diploma', '').strip()
+
+    photo_filename = None
+    file = request.files.get('photo_file')
+    if file and file.filename:
+        ext = os.path.splitext(file.filename)[1].lower()
+        if ext in ('.png', '.jpg', '.jpeg'):
+            safe_mat = (new_matricule or f"user_{target_user_id}").replace("/", "_").replace("\\", "_").strip()
+            photo_dir = os.path.join(pma_config.active_base, "Technicians", "photos")
+            os.makedirs(photo_dir, exist_ok=True)
+            photo_filename = f"photo_{safe_mat}_{int(time.time())}{ext}"
+            photo_path = os.path.join(photo_dir, photo_filename)
+            file.save(photo_path)
+        else:
+            flash("Format photo non supporté (PNG, JPG uniquement).", "warning")
+
+    ok, msg, updated_p = user_mgr.update_technician_profile(
+        user_id=target_user_id,
+        phone=phone,
+        address=address,
+        education_level=education_level,
+        diploma=diploma,
+        hire_date=hire_date,
+        shift=shift,
+        name=name,
+        matricule=new_matricule,
+        technician_level=technician_level,
+        photo=photo_filename
+    )
+    flash(msg, "success" if ok else "danger")
+    return redirect(url_for('technician_profile_view', user_id=target_user_id))
 
 @app.route('/training/import', methods=['POST'])
 @admin_required
@@ -2190,7 +2291,7 @@ def admin():
         org_tree=org_mgr.get_org_tree(),
         org_assignments=org_mgr.get_all_assignments(),
         org_unassigned=org_mgr.get_unassigned_users(),
-        org_levels=org_mgr.get_position_levels(),
+        org_levels=POSITION_LEVELS,
         org_history=org_mgr.get_assignment_history(limit=50),
         org_groups_teams=org_mgr.get_groups_and_teams()
     )
@@ -2632,7 +2733,7 @@ def organigramme_view():
         unassigned=unassigned,
         history=history,
         groups_teams=groups_teams,
-        position_levels=org_mgr.get_position_levels()
+        position_levels=POSITION_LEVELS
     )
 
 
@@ -2875,21 +2976,6 @@ def api_org_remove():
     ok, msg = org_mgr.remove_from_org(asgn_id, changed_by=changed_by)
     if ok:
         flash(msg, "info")
-        return jsonify({'success': True, 'message': msg})
-    return jsonify({'success': False, 'message': msg}), 400
-
-
-@app.route('/api/org/levels/update', methods=['POST'])
-@admin_required
-def api_org_levels_update():
-    """
-    Updates custom labels for the 5 hierarchy levels (Manager, Group Leader, Team Leader, Supervisor, Technician).
-    Strictly restricted to Admin and Owner in backend.
-    """
-    data = request.get_json(silent=True) or request.form or {}
-    ok, msg = org_mgr.update_level_labels(data)
-    if ok:
-        flash(msg, "success")
         return jsonify({'success': True, 'message': msg})
     return jsonify({'success': False, 'message': msg}), 400
 

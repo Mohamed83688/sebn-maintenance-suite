@@ -247,6 +247,9 @@
                 </div>
 
                 <div style="display:flex; flex-direction:column; gap:8px;">
+                    <a href="{{ url_for('technician_my_profile') }}" class="btn btn-secondary" style="width:100%; justify-content:center;">
+                        <i class="fa-solid fa-id-card-clip"></i> Consulter ma Fiche Complète
+                    </a>
                     <a href="{{ url_for('tech_card_print', user_id=user.id) }}" target="_blank" class="btn btn-primary" style="width:100%; justify-content:center;">
                         <i class="fa-solid fa-print"></i> Imprimer ma carte
                     </a>

@@ -68,6 +68,8 @@ def calculate_seniority(hire_date_str: Optional[str], as_of_date: Optional[datet
     if not hire_date_str or not str(hire_date_str).strip():
         return {
             "text": "Non renseignée",
+            "text_fr": "Non renseignée",
+            "text_en": "Not specified",
             "short_text": "-",
             "years": 0,
             "months": 0,
@@ -85,6 +87,8 @@ def calculate_seniority(hire_date_str: Optional[str], as_of_date: Optional[datet
         else:
             return {
                 "text": "Date invalide",
+                "text_fr": "Date invalide",
+                "text_en": "Invalid date",
                 "short_text": "-",
                 "years": 0,
                 "months": 0,
@@ -96,6 +100,8 @@ def calculate_seniority(hire_date_str: Optional[str], as_of_date: Optional[datet
     except Exception:
         return {
             "text": "Date invalide",
+            "text_fr": "Date invalide",
+            "text_en": "Invalid date",
             "short_text": "-",
             "years": 0,
             "months": 0,
@@ -109,6 +115,8 @@ def calculate_seniority(hire_date_str: Optional[str], as_of_date: Optional[datet
     if h_date > now:
         return {
             "text": "À venir (embauche future)",
+            "text_fr": "À venir (embauche future)",
+            "text_en": "Future hire",
             "short_text": "À venir",
             "years": 0,
             "months": 0,
@@ -150,18 +158,38 @@ def calculate_seniority(hire_date_str: Optional[str], as_of_date: Optional[datet
     if months > 0:
         parts_fr.append(f"{months} mois")
 
-    if not parts_fr:
-        if days > 0:
-            text = f"{days} {'jour' if days == 1 else 'jours'}"
-        else:
-            text = "Aujourd'hui"
+    if years > 0 and months > 0:
+        text_fr = f"{years} {'an' if years == 1 else 'ans'} et {months} mois"
+    elif parts_fr:
+        text_fr = parts_fr[0]
+    elif days > 0:
+        text_fr = f"{days} {'jour' if days == 1 else 'jours'}"
     else:
-        text = " ".join(parts_fr)
+        text_fr = "Aujourd'hui"
 
+    # Format English representation (e.g. '1 year and 6 months', '5 years and 3 months', '8 years')
+    parts_en = []
+    if years > 0:
+        parts_en.append(f"{years} {'year' if years == 1 else 'years'}")
+    if months > 0:
+        parts_en.append(f"{months} {'month' if months == 1 else 'months'}")
+
+    if years > 0 and months > 0:
+        text_en = f"{years} {'year' if years == 1 else 'years'} and {months} {'month' if months == 1 else 'months'}"
+    elif parts_en:
+        text_en = parts_en[0]
+    elif days > 0:
+        text_en = f"{days} {'day' if days == 1 else 'days'}"
+    else:
+        text_en = "Today"
+
+    text = text_fr
     short_text = f"{years}a {months}m" if years > 0 else f"{months}m"
 
     return {
         "text": text,
+        "text_fr": text_fr,
+        "text_en": text_en,
         "short_text": short_text,
         "years": years,
         "months": months,

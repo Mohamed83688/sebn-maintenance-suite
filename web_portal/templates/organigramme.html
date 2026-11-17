@@ -1683,13 +1683,18 @@
                 </div>
             </div>
         </div>
-        <div class="modal-footer" style="display:flex; justify-content:space-between; align-items:center;">
+        <div class="modal-footer" style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
             <button type="button" class="btn btn-secondary" onclick="closeModal('modal-emp-details')">Fermer</button>
-            {% if is_admin_or_owner %}
-            <button type="button" class="btn btn-primary btn-sm" onclick="editFromDetails()">
-                <i class="fa-solid fa-pen"></i> Modifier cet Employé
-            </button>
-            {% endif %}
+            <div style="display:flex; gap:8px;">
+                <a id="d-fiche-btn" href="#" class="btn btn-glass btn-sm" style="display:none; color:var(--primary); border-color:var(--primary-light);">
+                    <i class="fa-solid fa-id-card-clip"></i> Fiche Complète
+                </a>
+                {% if is_admin_or_owner %}
+                <button type="button" class="btn btn-primary btn-sm" onclick="editFromDetails()">
+                    <i class="fa-solid fa-pen"></i> Modifier cet Employé
+                </button>
+                {% endif %}
+            </div>
         </div>
     </div>
 </div>
@@ -1997,8 +2002,16 @@ async function openEmpDetailsModal(assignmentId) {
     document.getElementById('d-level').textContent = emp.level_label;
     document.getElementById('d-shift').textContent = emp.shift === 'NOT_ASSIGNED' ? 'Direction' : 'Shift ' + emp.shift;
     document.getElementById('d-hire').textContent = emp.seniority ? emp.seniority.formatted_hire_date : '—';
-    document.getElementById('d-seniority').textContent = emp.seniority ? emp.seniority.text : '—';
+    document.getElementById('d-seniority').textContent = emp.seniority ? (emp.seniority.text_fr || emp.seniority.text) : '—';
     document.getElementById('d-parent').textContent = emp.parent_name ? (emp.parent_name + ' (' + (emp.parent_job_title || '') + ')') : 'Aucun (Direction)';
+
+    const ficheBtn = document.getElementById('d-fiche-btn');
+    if (ficheBtn && emp.user_id) {
+        ficheBtn.href = '/technician/profile/' + emp.user_id;
+        ficheBtn.style.display = 'inline-flex';
+    } else if (ficheBtn) {
+        ficheBtn.style.display = 'none';
+    }
 
     const timeline = document.getElementById('d-timeline');
     timeline.innerHTML = '<div style="font-size:12px; color:var(--text-dim);"><i class="fa-solid fa-spinner fa-spin"></i> Chargement de l\'historique...</div>';
