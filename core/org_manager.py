@@ -565,37 +565,87 @@ class OrgChartManager:
         for emp in emp_map.values():
             emp["children"] = []
 
-        # Group by shift specifically for the 3 shift pillars under supervisors/technicians
+        # Separate levels according to the exact 5-level SEBN-TN hierarchy:
+        # Level 1: Manager
+        # Level 2: Group Leader
+        # Level 3: Team Leader
+        # Level 4: Supervisor (Shift A, Shift B, Shift C)
+        # Level 5: Technician (under Supervisor in Shift A, Shift B, Shift C)
+
         shifts_data = {
-            "A": {"supervisors": [], "technicians": [], "total": 0},
-            "B": {"supervisors": [], "technicians": [], "total": 0},
-            "C": {"supervisors": [], "technicians": [], "total": 0},
-            "NOT_ASSIGNED": {"supervisors": [], "technicians": [], "total": 0}
+            "A": {"supervisors": [], "unassigned_techs": [], "total": 0},
+            "B": {"supervisors": [], "unassigned_techs": [], "total": 0},
+            "C": {"supervisors": [], "unassigned_techs": [], "total": 0},
+            "NOT_ASSIGNED": {"supervisors": [], "unassigned_techs": [], "total": 0}
         }
 
-        # Separate upper management (Manager, Group Leader, Team Leader) from Shift operations (Supervisor, Technician)
         managers = []
         group_leaders = []
         team_leaders = []
 
         for emp in all_employees:
             lvl = emp.get("position_level")
-            shift = emp.get("shift") or "NOT_ASSIGNED"
+            shift = (emp.get("shift") or "NOT_ASSIGNED").upper()
+            if shift not in shifts_data:
+                shift = "NOT_ASSIGNED"
 
             if lvl == "MANAGER":
+                emp["group_leaders"] = []
                 managers.append(emp)
             elif lvl == "GROUP_LEADER":
+                emp["team_leaders"] = []
                 group_leaders.append(emp)
             elif lvl == "TEAM_LEADER":
+                emp["supervisors"] = []
                 team_leaders.append(emp)
             elif lvl == "SUPERVISOR":
-                if shift in shifts_data:
-                    shifts_data[shift]["supervisors"].append(emp)
-                    shifts_data[shift]["total"] += 1
-            elif lvl == "TECHNICIAN":
-                if shift in shifts_data:
-                    shifts_data[shift]["technicians"].append(emp)
-                    shifts_data[shift]["total"] += 1
+                emp["technicians"] = []
+                shifts_data[shift]["supervisors"].append(emp)
+
+        # Link Group Leaders to Managers
+        for gl in group_leaders:
+            p_id = gl.get("parent_id")
+            mgr = next((m for m in managers if m["id"] == p_id), None)
+            if mgr:
+                mgr["group_leaders"].append(gl)
+
+        # Link Team Leaders to Group Leaders
+        for tl in team_leaders:
+            p_id = tl.get("parent_id")
+            gl = next((g for g in group_leaders if g["id"] == p_id), None)
+            if gl:
+                gl["team_leaders"].append(tl)
+
+        # Link Supervisors to Team Leaders
+        all_sups = []
+        for s_data in shifts_data.values():
+            all_sups.extend(s_data["supervisors"])
+
+        for sup in all_sups:
+            p_id = sup.get("parent_id")
+            tl = next((t for t in team_leaders if t["id"] == p_id), None)
+            if tl:
+                tl["supervisors"].append(sup)
+
+        # Link Technicians under their respective Supervisor
+        for emp in all_employees:
+            if emp.get("position_level") == "TECHNICIAN":
+                shift = (emp.get("shift") or "NOT_ASSIGNED").upper()
+                if shift not in shifts_data:
+                    shift = "NOT_ASSIGNED"
+                p_id = emp.get("parent_id")
+
+                target_sup = next((s for s in shifts_data[shift]["supervisors"] if s["id"] == p_id), None)
+                if not target_sup and p_id:
+                    target_sup = next((s for s in all_sups if s["id"] == p_id), None)
+
+                if target_sup:
+                    target_sup["technicians"].append(emp)
+                else:
+                    shifts_data[shift]["unassigned_techs"].append(emp)
+
+        for s_key, s_data in shifts_data.items():
+            s_data["total"] = len(s_data["supervisors"]) + sum(len(s["technicians"]) for s in s_data["supervisors"]) + len(s_data["unassigned_techs"])
 
         # Build recursive hierarchy tree (linking children to parent)
         roots = []
@@ -717,8 +767,8 @@ class OrgChartManager:
                 cur.execute("""
                     INSERT INTO org_assignment_history
                     (assignment_id, user_id, matricule, action_type, new_position_level, new_job_title, new_shift, new_parent_id, details, changed_by)
-                    VALUES (?, ?, ?, 'NOUVELLE_AFFECTATION', ?, ?, ?, ?, 'Ajout à l\'organigramme', ?)
-                """, (asgn_id, user_id, matricule, position_level, job_title, shift, parent_id, changed_by))
+                    VALUES (?, ?, ?, 'NOUVELLE_AFFECTATION', ?, ?, ?, ?, ?, ?)
+                """, (asgn_id, user_id, matricule, position_level, job_title, shift, parent_id, "Ajout à l'organigramme", changed_by))
 
             # Sync name, matricule, hire_date and shift into users table
             user_updates = ["name = ?", "matricule = ?"]
@@ -948,8 +998,8 @@ class OrgChartManager:
             cur.execute("""
                 INSERT INTO org_assignment_history
                 (assignment_id, user_id, matricule, action_type, old_position_level, old_job_title, old_shift, details, changed_by)
-                VALUES (?, ?, ?, 'RETRAIT_ORGANIGRAMME', ?, ?, ?, 'Retiré de l\'organigramme (compte utilisateur préservé)', ?)
-            """, (assignment_id, user_id, matricule, existing["position_level"], existing["job_title"], existing["shift"], changed_by))
+                VALUES (?, ?, ?, 'RETRAIT_ORGANIGRAMME', ?, ?, ?, ?, ?)
+            """, (assignment_id, user_id, matricule, existing["position_level"], existing["job_title"], existing["shift"], "Retiré de l'organigramme (compte utilisateur préservé)", changed_by))
 
             # Delete the assignment row from org_assignments
             cur.execute("DELETE FROM org_assignments WHERE id = ?", (assignment_id,))

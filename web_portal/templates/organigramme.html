@@ -417,6 +417,132 @@
     color: var(--primary);
 }
 
+.org-emp-hire-date {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--text-sec);
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.org-card-team-tag {
+    font-size: 11px;
+    color: var(--text-sec);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(0, 0, 0, 0.02);
+    padding: 3px 6px;
+    border-radius: 4px;
+    border: 1px solid rgba(0, 0, 0, 0.04);
+    margin-top: 2px;
+}
+
+.org-card-sup-tag {
+    font-size: 11px;
+    color: #4338CA;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: #EEF2FF;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+    margin-top: 2px;
+}
+
+.org-emp-mat-badge {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 700;
+    color: #475569;
+    background: #F1F5F9;
+    border: 1px solid #E2E8F0;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: auto;
+}
+
+.org-supervisor-branch {
+    background: #FFFFFF;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.org-tech-branch-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 11px;
+    font-weight: 700;
+    color: #4338CA;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--border);
+}
+
+.org-tech-count-badge {
+    background: #EEF2FF;
+    color: #4338CA;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 800;
+    padding: 1px 6px;
+}
+
+.org-tech-subgrid {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-left: 10px;
+    border-left: 2px solid #C7D2FE;
+    margin-left: 8px;
+}
+
+.org-no-techs-notice {
+    font-size: 11px;
+    color: var(--text-dim);
+    font-style: italic;
+    padding: 8px 10px;
+    background: var(--bg-page);
+    border-radius: 6px;
+    border: 1px dashed var(--border);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.org-no-sup-notice {
+    font-size: 12px;
+    color: var(--text-dim);
+    font-style: italic;
+    padding: 14px;
+    text-align: center;
+    background: #FFFFFF;
+    border-radius: 10px;
+    border: 1px dashed var(--border);
+}
+
+.org-empty-row-notice {
+    background: #FFFBEB;
+    border: 1px dashed #FDE68A;
+    color: #92400E;
+    padding: 12px 20px;
+    border-radius: 10px;
+    font-size: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+}
+
 .org-emp-mat {
     font-family: var(--font-mono);
     font-weight: 700;
@@ -789,7 +915,7 @@
      data-title="{{ emp.job_title|lower }}"
      onclick="openEmpDetailsModal({{ emp.id }})">
     <div class="org-emp-card-header">
-        <div class="org-emp-avatar {% if emp.shift == 'A' %}av-a{% elif emp.shift == 'B' %}av-b{% elif emp.shift == 'C' %}av-c{% endif %}">
+        <div class="org-emp-avatar {% if emp.shift == 'A' %}av-a{% elif emp.shift == 'B' %}av-b{% elif emp.shift == 'C' %}av-c{% elif emp.position_level == 'MANAGER' %}av-mgr{% else %}av-a{% endif %}">
             {% if emp.photo %}
                 <img src="{{ emp.photo }}" alt="{{ emp.full_name }}" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
                 <span style="display:none;">{{ emp.full_name[:2]|upper }}</span>
@@ -802,6 +928,23 @@
             <div class="org-emp-title" title="{{ emp.job_title }}">{{ emp.job_title }}</div>
         </div>
     </div>
+
+    <!-- Group & Team -->
+    {% if emp.group_name or emp.team_name %}
+    <div class="org-card-team-tag" title="Groupe &amp; Équipe">
+        <i class="fa-solid fa-people-roof" style="color:var(--primary); font-size:10px;"></i>
+        <span>{{ emp.group_name or 'Groupe' }}{% if emp.team_name %} · {{ emp.team_name }}{% endif %}</span>
+    </div>
+    {% endif %}
+
+    <!-- Direct Supervisor (if level is below Manager) -->
+    {% if emp.parent_name %}
+    <div class="org-card-sup-tag" title="Supérieur hiérarchique direct">
+        <i class="fa-solid fa-arrow-turn-up" style="font-size:10px;"></i>
+        <span>Resp: {{ emp.parent_name }}</span>
+    </div>
+    {% endif %}
+
     <div class="org-emp-badges">
         <span class="role-badge role-{{ emp.position_level|lower }}">
             <i class="{{ emp.level_icon }}"></i> {{ emp.level_label }}
@@ -809,14 +952,19 @@
         {% if emp.shift == 'A' %}<span class="shift-pill-a">Shift A</span>
         {% elif emp.shift == 'B' %}<span class="shift-pill-b">Shift B</span>
         {% elif emp.shift == 'C' %}<span class="shift-pill-c">Shift C</span>
-        {% else %}<span class="shift-pill-none">Direction</span>{% endif %}
+        {% else %}<span class="shift-pill-none">Général</span>{% endif %}
+        <span class="org-emp-mat-badge">{{ emp.matricule }}</span>
     </div>
+
     <div class="org-emp-meta-box">
-        <span class="org-emp-seniority" title="Date d'embauche : {{ emp.seniority.formatted_hire_date }}">
+        <span class="org-emp-hire-date" title="Date d'embauche">
+            <i class="fa-regular fa-calendar-check" style="color:var(--text-dim);"></i> {{ emp.seniority.formatted_hire_date }}
+        </span>
+        <span class="org-emp-seniority" title="Ancienneté automatique">
             <i class="fa-solid fa-hourglass-half"></i> {{ emp.seniority.text }}
         </span>
-        <span class="org-emp-mat">{{ emp.matricule }}</span>
     </div>
+
     {% if is_admin_or_owner %}
     <div class="org-emp-card-actions" onclick="event.stopPropagation()">
         <button class="org-card-btn" onclick="openEditModal({{ emp.id }})"><i class="fa-solid fa-pen"></i> Modifier</button>
@@ -935,42 +1083,9 @@
             <!-- LEVEL 1: MANAGERS -->
             <div class="org-tree-row" id="row-managers">
                 {% for mgr in tree.levels.managers %}
-                    <div class="org-emp-card lvl-manager"
-                         data-card-id="{{ mgr.id }}"
-                         data-shift="{{ mgr.shift }}"
-                         data-level="{{ mgr.position_level }}"
-                         data-name="{{ mgr.full_name|lower }}"
-                         data-mat="{{ mgr.matricule|lower }}"
-                         data-title="{{ mgr.job_title|lower }}"
-                         onclick="openEmpDetailsModal({{ mgr.id }})">
-                        <div class="org-emp-card-header">
-                            <div class="org-emp-avatar av-mgr">
-                                {% if mgr.photo %}<img src="{{ mgr.photo }}" alt="{{ mgr.full_name }}">{% else %}{{ mgr.full_name[:2]|upper }}{% endif %}
-                            </div>
-                            <div class="org-emp-info">
-                                <div class="org-emp-name" title="{{ mgr.full_name }}">{{ mgr.full_name }}</div>
-                                <div class="org-emp-title" title="{{ mgr.job_title }}">{{ mgr.job_title }}</div>
-                            </div>
-                        </div>
-                        <div class="org-emp-badges">
-                            <span class="role-badge role-manager"><i class="fa-solid fa-crown"></i> {{ mgr.level_label }}</span>
-                            <span class="shift-pill-none">Direction</span>
-                        </div>
-                        <div class="org-emp-meta-box">
-                            <span class="org-emp-seniority" title="Date d'embauche : {{ mgr.seniority.formatted_hire_date }}">
-                                <i class="fa-solid fa-hourglass-half"></i> {{ mgr.seniority.text }}
-                            </span>
-                            <span class="org-emp-mat">{{ mgr.matricule }}</span>
-                        </div>
-                        {% if is_admin_or_owner %}
-                        <div class="org-emp-card-actions" onclick="event.stopPropagation()">
-                            <button class="org-card-btn" onclick="openEditModal({{ mgr.id }})"><i class="fa-solid fa-pen"></i> Modifier</button>
-                            <button class="org-card-btn" onclick="openQuickMoveModal({{ mgr.id }}, '{{ mgr.shift }}', '{{ mgr.parent_id or '' }}')"><i class="fa-solid fa-arrow-right-arrow-left"></i> Shift</button>
-                        </div>
-                        {% endif %}
-                    </div>
+                    {{ render_tree_emp_card(mgr, is_admin_or_owner) }}
                 {% else %}
-                    <div style="font-size:12px; color:var(--text-dim);">Aucun manager défini.</div>
+                    <div class="org-empty-row-notice"><i class="fa-solid fa-circle-info"></i> Aucun Manager défini.</div>
                 {% endfor %}
             </div>
 
@@ -979,93 +1094,29 @@
             <!-- LEVEL 2: GROUP LEADERS -->
             <div class="org-tree-row" id="row-groupleaders">
                 {% for gl in tree.levels.group_leaders %}
-                    <div class="org-emp-card lvl-groupleader"
-                         data-card-id="{{ gl.id }}"
-                         data-shift="{{ gl.shift }}"
-                         data-level="{{ gl.position_level }}"
-                         data-name="{{ gl.full_name|lower }}"
-                         data-mat="{{ gl.matricule|lower }}"
-                         data-title="{{ gl.job_title|lower }}"
-                         onclick="openEmpDetailsModal({{ gl.id }})">
-                        <div class="org-emp-card-header">
-                            <div class="org-emp-avatar av-b">
-                                {% if gl.photo %}<img src="{{ gl.photo }}" alt="{{ gl.full_name }}">{% else %}{{ gl.full_name[:2]|upper }}{% endif %}
-                            </div>
-                            <div class="org-emp-info">
-                                <div class="org-emp-name" title="{{ gl.full_name }}">{{ gl.full_name }}</div>
-                                <div class="org-emp-title" title="{{ gl.job_title }}">{{ gl.job_title }}</div>
-                            </div>
-                        </div>
-                        <div class="org-emp-badges">
-                            <span class="role-badge role-groupleader"><i class="fa-solid fa-users-gear"></i> {{ gl.level_label }}</span>
-                            <span class="shift-pill-none">Coordination</span>
-                        </div>
-                        <div class="org-emp-meta-box">
-                            <span class="org-emp-seniority" title="Date d'embauche : {{ gl.seniority.formatted_hire_date }}">
-                                <i class="fa-solid fa-hourglass-half"></i> {{ gl.seniority.text }}
-                            </span>
-                            <span class="org-emp-mat">{{ gl.matricule }}</span>
-                        </div>
-                        {% if is_admin_or_owner %}
-                        <div class="org-emp-card-actions" onclick="event.stopPropagation()">
-                            <button class="org-card-btn" onclick="openEditModal({{ gl.id }})"><i class="fa-solid fa-pen"></i> Modifier</button>
-                            <button class="org-card-btn" onclick="openQuickMoveModal({{ gl.id }}, '{{ gl.shift }}', '{{ gl.parent_id or '' }}')"><i class="fa-solid fa-arrow-right-arrow-left"></i> Shift</button>
-                        </div>
-                        {% endif %}
-                    </div>
+                    {{ render_tree_emp_card(gl, is_admin_or_owner) }}
                 {% else %}
-                    <div style="font-size:12px; color:var(--text-dim); font-style:italic;">Aucun chef de groupe défini.</div>
+                    <div class="org-empty-row-notice"><i class="fa-solid fa-circle-info"></i> Aucun Chef de Groupe (Group Leader) assigné.</div>
                 {% endfor %}
             </div>
 
-            {% if tree.levels.team_leaders %}
             <div class="org-stem-v"></div>
+
             <!-- LEVEL 3: TEAM LEADERS -->
             <div class="org-tree-row" id="row-teamleaders">
                 {% for tl in tree.levels.team_leaders %}
-                    <div class="org-emp-card lvl-teamleader"
-                         data-card-id="{{ tl.id }}"
-                         data-shift="{{ tl.shift }}"
-                         data-level="{{ tl.position_level }}"
-                         data-name="{{ tl.full_name|lower }}"
-                         data-mat="{{ tl.matricule|lower }}"
-                         data-title="{{ tl.job_title|lower }}"
-                         onclick="openEmpDetailsModal({{ tl.id }})">
-                        <div class="org-emp-card-header">
-                            <div class="org-emp-avatar av-a">
-                                {% if tl.photo %}<img src="{{ tl.photo }}" alt="{{ tl.full_name }}">{% else %}{{ tl.full_name[:2]|upper }}{% endif %}
-                            </div>
-                            <div class="org-emp-info">
-                                <div class="org-emp-name" title="{{ tl.full_name }}">{{ tl.full_name }}</div>
-                                <div class="org-emp-title" title="{{ tl.job_title }}">{{ tl.job_title }}</div>
-                            </div>
-                        </div>
-                        <div class="org-emp-badges">
-                            <span class="role-badge role-teamleader"><i class="fa-solid fa-user-tie"></i> {{ tl.level_label }}</span>
-                            {% if tl.shift == 'A' %}<span class="shift-pill-a">Shift A</span>
-                            {% elif tl.shift == 'B' %}<span class="shift-pill-b">Shift B</span>
-                            {% elif tl.shift == 'C' %}<span class="shift-pill-c">Shift C</span>
-                            {% else %}<span class="shift-pill-none">Général</span>{% endif %}
-                        </div>
-                        <div class="org-emp-meta-box">
-                            <span class="org-emp-seniority"><i class="fa-solid fa-hourglass-half"></i> {{ tl.seniority.text }}</span>
-                            <span class="org-emp-mat">{{ tl.matricule }}</span>
-                        </div>
-                        {% if is_admin_or_owner %}
-                        <div class="org-emp-card-actions" onclick="event.stopPropagation()">
-                            <button class="org-card-btn" onclick="openEditModal({{ tl.id }})"><i class="fa-solid fa-pen"></i> Modifier</button>
-                            <button class="org-card-btn" onclick="openQuickMoveModal({{ tl.id }}, '{{ tl.shift }}', '{{ tl.parent_id or '' }}')"><i class="fa-solid fa-arrow-right-arrow-left"></i> Shift</button>
-                        </div>
-                        {% endif %}
-                    </div>
+                    {{ render_tree_emp_card(tl, is_admin_or_owner) }}
+                {% else %}
+                    <div class="org-empty-row-notice"><i class="fa-solid fa-circle-info"></i> Aucun Chef d'Équipe (Team Leader) assigné.</div>
                 {% endfor %}
             </div>
-            {% endif %}
+
+            <div class="org-stem-v"></div>
 
             <!-- LEVEL 4 & 5: SHIFT PILLARS SECTION (Shift A, Shift B, Shift C) -->
             <div class="org-shifts-wrapper">
                 <div class="org-shifts-section-title">
-                    <i class="fa-solid fa-layer-group" style="color:var(--primary);"></i> Répartition Opérationnelle par Shift
+                    <i class="fa-solid fa-layer-group" style="color:var(--primary);"></i> Répartition Opérationnelle par Shift (Superviseurs &amp; Techniciens)
                 </div>
 
                 <div class="org-pillars-grid">
@@ -1081,24 +1132,47 @@
                             </span>
                         </div>
 
-                        <!-- Supervisors -->
-                        <div class="org-group-label"><i class="fa-solid fa-user-check"></i> Superviseurs Shift A</div>
+                        <!-- Supervisors & Their Technicians -->
                         <div class="org-pillar-list">
                             {% for sup in tree.levels.shifts.A.supervisors %}
-                                {{ render_tree_emp_card(sup, is_admin_or_owner) }}
+                                <div class="org-supervisor-branch">
+                                    {{ render_tree_emp_card(sup, is_admin_or_owner) }}
+                                    
+                                    <div class="org-tech-branch-header">
+                                        <span><i class="fa-solid fa-wrench"></i> Techniciens Shift A</span>
+                                        <span class="org-tech-count-badge">{{ sup.technicians|length }}</span>
+                                    </div>
+                                    
+                                    <div class="org-tech-subgrid">
+                                        {% for tech in sup.technicians %}
+                                            {{ render_tree_emp_card(tech, is_admin_or_owner) }}
+                                        {% else %}
+                                            <div class="org-no-techs-notice">
+                                                <i class="fa-solid fa-circle-info"></i> Aucun technicien rattaché à ce superviseur
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
                             {% else %}
-                                <div style="font-size:11.5px; color:var(--text-dim); padding:6px; font-style:italic;">Aucun superviseur assigné</div>
+                                <div class="org-no-sup-notice">
+                                    <i class="fa-solid fa-user-xmark"></i> Aucun superviseur assigné au Shift A
+                                </div>
                             {% endfor %}
-                        </div>
 
-                        <!-- Technicians -->
-                        <div class="org-group-label" style="margin-top:14px;"><i class="fa-solid fa-wrench"></i> Techniciens Shift A</div>
-                        <div class="org-pillar-list">
-                            {% for tech in tree.levels.shifts.A.technicians %}
-                                {{ render_tree_emp_card(tech, is_admin_or_owner) }}
-                            {% else %}
-                                <div style="font-size:11.5px; color:var(--text-dim); padding:6px; font-style:italic;">Aucun technicien assigné</div>
-                            {% endfor %}
+                            <!-- Unassigned Technicians in Shift A if any -->
+                            {% if tree.levels.shifts.A.unassigned_techs %}
+                                <div class="org-supervisor-branch" style="background:#F8FAFC; border-style:dashed;">
+                                    <div class="org-tech-branch-header" style="border-top:none; padding-top:0; color:var(--text-sec);">
+                                        <span><i class="fa-solid fa-users"></i> Autres techniciens (Shift A)</span>
+                                        <span class="org-tech-count-badge" style="background:#E2E8F0; color:#475569;">{{ tree.levels.shifts.A.unassigned_techs|length }}</span>
+                                    </div>
+                                    <div class="org-tech-subgrid" style="border-left-color:#CBD5E1;">
+                                        {% for tech in tree.levels.shifts.A.unassigned_techs %}
+                                            {{ render_tree_emp_card(tech, is_admin_or_owner) }}
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            {% endif %}
                         </div>
                     </div>
 
@@ -1113,24 +1187,47 @@
                             </span>
                         </div>
 
-                        <!-- Supervisors -->
-                        <div class="org-group-label"><i class="fa-solid fa-user-check"></i> Superviseurs Shift B</div>
+                        <!-- Supervisors & Their Technicians -->
                         <div class="org-pillar-list">
                             {% for sup in tree.levels.shifts.B.supervisors %}
-                                {{ render_tree_emp_card(sup, is_admin_or_owner) }}
+                                <div class="org-supervisor-branch">
+                                    {{ render_tree_emp_card(sup, is_admin_or_owner) }}
+                                    
+                                    <div class="org-tech-branch-header">
+                                        <span><i class="fa-solid fa-wrench"></i> Techniciens Shift B</span>
+                                        <span class="org-tech-count-badge">{{ sup.technicians|length }}</span>
+                                    </div>
+                                    
+                                    <div class="org-tech-subgrid">
+                                        {% for tech in sup.technicians %}
+                                            {{ render_tree_emp_card(tech, is_admin_or_owner) }}
+                                        {% else %}
+                                            <div class="org-no-techs-notice">
+                                                <i class="fa-solid fa-circle-info"></i> Aucun technicien rattaché à ce superviseur
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
                             {% else %}
-                                <div style="font-size:11.5px; color:var(--text-dim); padding:6px; font-style:italic;">Aucun superviseur assigné</div>
+                                <div class="org-no-sup-notice">
+                                    <i class="fa-solid fa-user-xmark"></i> Aucun superviseur assigné au Shift B
+                                </div>
                             {% endfor %}
-                        </div>
 
-                        <!-- Technicians -->
-                        <div class="org-group-label" style="margin-top:14px;"><i class="fa-solid fa-wrench"></i> Techniciens Shift B</div>
-                        <div class="org-pillar-list">
-                            {% for tech in tree.levels.shifts.B.technicians %}
-                                {{ render_tree_emp_card(tech, is_admin_or_owner) }}
-                            {% else %}
-                                <div style="font-size:11.5px; color:var(--text-dim); padding:6px; font-style:italic;">Aucun technicien assigné</div>
-                            {% endfor %}
+                            <!-- Unassigned Technicians in Shift B if any -->
+                            {% if tree.levels.shifts.B.unassigned_techs %}
+                                <div class="org-supervisor-branch" style="background:#F8FAFC; border-style:dashed;">
+                                    <div class="org-tech-branch-header" style="border-top:none; padding-top:0; color:var(--text-sec);">
+                                        <span><i class="fa-solid fa-users"></i> Autres techniciens (Shift B)</span>
+                                        <span class="org-tech-count-badge" style="background:#E2E8F0; color:#475569;">{{ tree.levels.shifts.B.unassigned_techs|length }}</span>
+                                    </div>
+                                    <div class="org-tech-subgrid" style="border-left-color:#CBD5E1;">
+                                        {% for tech in tree.levels.shifts.B.unassigned_techs %}
+                                            {{ render_tree_emp_card(tech, is_admin_or_owner) }}
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            {% endif %}
                         </div>
                     </div>
 
@@ -1145,24 +1242,47 @@
                             </span>
                         </div>
 
-                        <!-- Supervisors -->
-                        <div class="org-group-label"><i class="fa-solid fa-user-check"></i> Superviseurs Shift C</div>
+                        <!-- Supervisors & Their Technicians -->
                         <div class="org-pillar-list">
                             {% for sup in tree.levels.shifts.C.supervisors %}
-                                {{ render_tree_emp_card(sup, is_admin_or_owner) }}
+                                <div class="org-supervisor-branch">
+                                    {{ render_tree_emp_card(sup, is_admin_or_owner) }}
+                                    
+                                    <div class="org-tech-branch-header">
+                                        <span><i class="fa-solid fa-wrench"></i> Techniciens Shift C</span>
+                                        <span class="org-tech-count-badge">{{ sup.technicians|length }}</span>
+                                    </div>
+                                    
+                                    <div class="org-tech-subgrid">
+                                        {% for tech in sup.technicians %}
+                                            {{ render_tree_emp_card(tech, is_admin_or_owner) }}
+                                        {% else %}
+                                            <div class="org-no-techs-notice">
+                                                <i class="fa-solid fa-circle-info"></i> Aucun technicien rattaché à ce superviseur
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
                             {% else %}
-                                <div style="font-size:11.5px; color:var(--text-dim); padding:6px; font-style:italic;">Aucun superviseur assigné</div>
+                                <div class="org-no-sup-notice">
+                                    <i class="fa-solid fa-user-xmark"></i> Aucun superviseur assigné au Shift C
+                                </div>
                             {% endfor %}
-                        </div>
 
-                        <!-- Technicians -->
-                        <div class="org-group-label" style="margin-top:14px;"><i class="fa-solid fa-wrench"></i> Techniciens Shift C</div>
-                        <div class="org-pillar-list">
-                            {% for tech in tree.levels.shifts.C.technicians %}
-                                {{ render_tree_emp_card(tech, is_admin_or_owner) }}
-                            {% else %}
-                                <div style="font-size:11.5px; color:var(--text-dim); padding:6px; font-style:italic;">Aucun technicien assigné</div>
-                            {% endfor %}
+                            <!-- Unassigned Technicians in Shift C if any -->
+                            {% if tree.levels.shifts.C.unassigned_techs %}
+                                <div class="org-supervisor-branch" style="background:#F8FAFC; border-style:dashed;">
+                                    <div class="org-tech-branch-header" style="border-top:none; padding-top:0; color:var(--text-sec);">
+                                        <span><i class="fa-solid fa-users"></i> Autres techniciens (Shift C)</span>
+                                        <span class="org-tech-count-badge" style="background:#E2E8F0; color:#475569;">{{ tree.levels.shifts.C.unassigned_techs|length }}</span>
+                                    </div>
+                                    <div class="org-tech-subgrid" style="border-left-color:#CBD5E1;">
+                                        {% for tech in tree.levels.shifts.C.unassigned_techs %}
+                                            {{ render_tree_emp_card(tech, is_admin_or_owner) }}
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            {% endif %}
                         </div>
                     </div>
 
