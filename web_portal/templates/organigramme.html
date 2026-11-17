@@ -1272,24 +1272,35 @@
 <div class="modal-overlay" id="modal-assign">
     <div class="modal-box">
         <div class="modal-header">
-            <div class="modal-title"><i class="fa-solid fa-user-plus" style="color:var(--primary);"></i> Affecter un Employé à l'Organigramme</div>
+            <div class="modal-title"><i class="fa-solid fa-user-plus" style="color:var(--primary);"></i> Affecter / Ajouter un Employé</div>
             <div class="modal-close" onclick="closeModal('modal-assign')"><i class="fa-solid fa-xmark"></i></div>
         </div>
         <form id="form-assign-emp" onsubmit="submitAssign(event)">
             <div class="modal-body">
                 <div class="form-group">
-                    <label class="form-label" style="font-weight:700;">Sélectionner un Compte Existant <span style="color:var(--danger);">*</span></label>
-                    <select class="form-control" name="user_id" id="assign-user-id" required onchange="onAssignUserPick()">
-                        <option value="">-- Choisir un utilisateur / technicien --</option>
+                    <label class="form-label" style="font-weight:700;">Compte Existant ou Saisie Directe</label>
+                    <select class="form-control" name="user_id" id="assign-user-id" onchange="onAssignUserPick()">
+                        <option value="">-- Choisir un compte OU saisir manuellement ci-dessous --</option>
                         {% for u in unassigned %}
-                            <option value="{{ u.id }}" data-shift="{{ u.shift or 'A' }}" data-mat="{{ u.matricule }}" data-hire="{{ u.hire_date or '' }}">
+                            <option value="{{ u.id }}" data-name="{{ u.name }}" data-shift="{{ u.shift or 'A' }}" data-mat="{{ u.matricule }}" data-hire="{{ u.hire_date or '' }}">
                                 {{ u.name }} ({{ u.matricule }}) — Rôle: {{ u.role }}
                             </option>
                         {% endfor %}
                     </select>
                     <small style="color:var(--text-sec); font-size:11.5px; display:block; margin-top:4px;">
-                        Synchronisé en direct avec la table des techniciens. Aucun compte en double.
+                        Vous pouvez lier un compte ou ajouter un collaborateur directement sans compte web préalable.
                     </small>
+                </div>
+
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label class="form-label" style="font-weight:700;">Nom &amp; Prénom de l'Employé <span style="color:var(--danger);">*</span></label>
+                        <input type="text" class="form-control" name="full_name" id="assign-full-name" required placeholder="Ex: Mohamed Ben Ali">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" style="font-weight:700;">Matricule <span style="color:var(--danger);">*</span></label>
+                        <input type="text" class="form-control" name="matricule" id="assign-matricule" required placeholder="Ex: T0452">
+                    </div>
                 </div>
 
                 <div class="grid-2">
@@ -1365,16 +1376,23 @@
 <div class="modal-overlay" id="modal-edit">
     <div class="modal-box">
         <div class="modal-header">
-            <div class="modal-title"><i class="fa-solid fa-pen-to-square" style="color:var(--primary);"></i> Modifier l'Affectation</div>
+            <div class="modal-title"><i class="fa-solid fa-pen-to-square" style="color:var(--primary);"></i> Modifier l'Employé &amp; l'Affectation</div>
             <div class="modal-close" onclick="closeModal('modal-edit')"><i class="fa-solid fa-xmark"></i></div>
         </div>
         <form id="form-edit-emp" onsubmit="submitEdit(event)">
             <input type="hidden" name="assignment_id" id="edit-asgn-id">
             <div class="modal-body">
-                <div style="background:var(--bg-page); border:1px solid var(--border); border-radius:10px; padding:12px 14px;">
-                    <div style="font-size:11px; text-transform:uppercase; color:var(--text-dim); font-weight:700;">Employé sélectionné</div>
-                    <div style="font-family:var(--font-display); font-size:15px; font-weight:800; color:var(--text);" id="edit-emp-name">—</div>
-                    <div style="font-size:12px; color:var(--primary); font-family:var(--font-mono); font-weight:700;" id="edit-emp-mat">—</div>
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label class="form-label" style="font-weight:700;">Nom &amp; Prénom de l'Employé <span style="color:var(--danger);">*</span></label>
+                        <input type="text" class="form-control" name="full_name" id="edit-full-name" required placeholder="Ex: Mohamed Ben Ali">
+                        <small style="color:var(--text-sec); font-size:11px;">Modifiable librement sans impacter les pouvoirs de connexion web.</small>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" style="font-weight:700;">Matricule <span style="color:var(--danger);">*</span></label>
+                        <input type="text" class="form-control" name="matricule" id="edit-matricule" required placeholder="Ex: T0452">
+                        <small style="color:var(--text-sec); font-size:11px;">Matricule officiel de l'employé.</small>
+                    </div>
                 </div>
 
                 <div class="grid-2">
@@ -1545,8 +1563,13 @@
                 </div>
             </div>
         </div>
-        <div class="modal-footer">
+        <div class="modal-footer" style="display:flex; justify-content:space-between; align-items:center;">
             <button type="button" class="btn btn-secondary" onclick="closeModal('modal-emp-details')">Fermer</button>
+            {% if is_admin_or_owner %}
+            <button type="button" class="btn btn-primary btn-sm" onclick="editFromDetails()">
+                <i class="fa-solid fa-pen"></i> Modifier cet Employé
+            </button>
+            {% endif %}
         </div>
     </div>
 </div>
@@ -1678,8 +1701,12 @@ function onAssignUserPick() {
     const sel = document.getElementById('assign-user-id');
     const opt = sel.options[sel.selectedIndex];
     if (opt && opt.value) {
+        const name = opt.getAttribute('data-name');
+        const mat = opt.getAttribute('data-mat');
         const s = opt.getAttribute('data-shift') || 'A';
         const h = opt.getAttribute('data-hire') || '';
+        if (name) document.getElementById('assign-full-name').value = name;
+        if (mat) document.getElementById('assign-matricule').value = mat;
         document.getElementById('assign-shift').value = (['A','B','C'].includes(s)) ? s : 'NOT_ASSIGNED';
         if (h) {
             document.getElementById('assign-hire').value = h;
@@ -1727,8 +1754,11 @@ function openEditModal(assignmentId) {
     if (!emp) return;
 
     document.getElementById('edit-asgn-id').value = emp.id;
-    document.getElementById('edit-emp-name').textContent = emp.full_name;
-    document.getElementById('edit-emp-mat').textContent = emp.matricule;
+    const nameInput = document.getElementById('edit-full-name');
+    if (nameInput) nameInput.value = emp.full_name || '';
+    const matInput = document.getElementById('edit-matricule');
+    if (matInput) matInput.value = emp.matricule || '';
+
     document.getElementById('edit-level').value = emp.position_level;
     document.getElementById('edit-shift').value = emp.shift || 'NOT_ASSIGNED';
     document.getElementById('edit-title').value = emp.job_title;
@@ -1833,7 +1863,10 @@ async function confirmDeleteEmp(assignmentId, name) {
     }
 }
 
+let currentDetailsEmpId = null;
+
 async function openEmpDetailsModal(assignmentId) {
+    currentDetailsEmpId = assignmentId;
     const emp = ALL_ASSIGNMENTS.find(a => a.id === assignmentId);
     if (!emp) return;
 
@@ -1868,6 +1901,13 @@ async function openEmpDetailsModal(assignmentId) {
     } catch (err) {
         timeline.innerHTML = '<div style="font-size:12px; color:var(--text-dim);">Impossible de charger l\'historique.</div>';
     }
+}
+
+function editFromDetails() {
+    if (!currentDetailsEmpId) return;
+    const empId = currentDetailsEmpId;
+    closeModal('modal-emp-details');
+    openEditModal(empId);
 }
 </script>
 {% endblock %}

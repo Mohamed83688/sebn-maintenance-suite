@@ -620,7 +620,7 @@ class OrgChartManager:
 
     def assign_employee(
         self,
-        user_id: int,
+        user_id: Optional[int],
         position_level: str,
         job_title: str,
         shift: str = "NOT_ASSIGNED",
@@ -629,12 +629,14 @@ class OrgChartManager:
         team_name: str = "",
         hire_date: str = "",
         notes: str = "",
+        full_name: Optional[str] = None,
+        matricule: Optional[str] = None,
         changed_by: str = "Admin"
     ) -> Tuple[bool, str, Optional[int]]:
         """
-        Assigns an existing user to the organizational chart.
-        If already assigned, updates their position and logs the change.
-        Synchronizes `hire_date` and `shift` to the `users` table.
+        Assigns an employee to the organizational chart.
+        Supports selecting an existing user account OR creating/assigning an employee directly.
+        Permits custom name and matricule editing independent of web authentication privileges.
         """
         position_level = position_level.upper().strip()
         if position_level not in POSITION_LEVELS:
@@ -647,19 +649,32 @@ class OrgChartManager:
         with self._get_conn() as conn:
             cur = conn.cursor()
 
-            # Get user info
-            cur.execute("SELECT id, name, matricule, role, shift, hire_date FROM users WHERE id = ?", (user_id,))
-            u = cur.fetchone()
-            if not u:
-                return False, f"Utilisateur introuvable (ID: {user_id})", None
+            # Handle direct employee creation (without prior user account)
+            if not user_id or int(user_id) <= 0:
+                if not full_name or not full_name.strip():
+                    return False, "Le nom et prénom de l'employé sont obligatoires.", None
+                full_name = full_name.strip()
+                import time, uuid
+                matricule = matricule.strip() if matricule and matricule.strip() else f"EMP-{int(time.time()) % 100000}"
+                unique_uname = f"emp_{matricule.lower().replace(' ', '_').replace('-', '_')}_{uuid.uuid4().hex[:4]}"
+                cur.execute("""
+                    INSERT INTO users (name, matricule, username, password_hash, role, shift, is_active, hire_date)
+                    VALUES (?, ?, ?, 'INACTIVE_ORG_ONLY', 'TECHNICIAN', ?, 1, ?)
+                """, (full_name, matricule, unique_uname, shift if shift in ('A','B','C') else 'A', hire_date))
+                user_id = cur.lastrowid
+            else:
+                # Existing user
+                cur.execute("SELECT id, name, matricule, role, shift, hire_date FROM users WHERE id = ?", (user_id,))
+                u = cur.fetchone()
+                if not u:
+                    return False, f"Utilisateur introuvable (ID: {user_id})", None
 
-            user_data = dict(u)
-            full_name = user_data["name"]
-            matricule = user_data["matricule"] or f"USER-{user_id}"
+                user_data = dict(u)
+                full_name = full_name.strip() if full_name and full_name.strip() else user_data["name"]
+                matricule = matricule.strip() if matricule and matricule.strip() else (user_data["matricule"] or f"USER-{user_id}")
 
-            # If hire_date not given, fallback to existing user hire_date
-            if not hire_date:
-                hire_date = user_data.get("hire_date") or ""
+                if not hire_date:
+                    hire_date = user_data.get("hire_date") or ""
 
             # Check if user already has an assignment
             cur.execute("SELECT * FROM org_assignments WHERE user_id = ?", (user_id,))
@@ -705,9 +720,9 @@ class OrgChartManager:
                     VALUES (?, ?, ?, 'NOUVELLE_AFFECTATION', ?, ?, ?, ?, 'Ajout à l\'organigramme', ?)
                 """, (asgn_id, user_id, matricule, position_level, job_title, shift, parent_id, changed_by))
 
-            # Sync hire_date and shift into users table
-            user_updates = []
-            user_params = []
+            # Sync name, matricule, hire_date and shift into users table
+            user_updates = ["name = ?", "matricule = ?"]
+            user_params = [full_name, matricule]
             if hire_date:
                 user_updates.append("hire_date = ?")
                 user_params.append(hire_date)
@@ -715,14 +730,13 @@ class OrgChartManager:
                 user_updates.append("shift = ?")
                 user_params.append(shift)
 
-            if user_updates:
-                user_params.append(user_id)
-                cur.execute(f"UPDATE users SET {', '.join(user_updates)} WHERE id = ?", user_params)
+            user_params.append(user_id)
+            cur.execute(f"UPDATE users SET {', '.join(user_updates)} WHERE id = ?", user_params)
 
             conn.commit()
 
         # Also sync technician JSON file if exists
-        self._sync_technician_file(matricule, shift, hire_date)
+        self._sync_technician_file(matricule, shift, hire_date, name=full_name)
 
         return True, f"Employé '{full_name}' affecté avec succès au poste '{job_title}'.", asgn_id
 
@@ -737,10 +751,13 @@ class OrgChartManager:
         team_name: str = "",
         hire_date: str = "",
         notes: str = "",
+        full_name: Optional[str] = None,
+        matricule: Optional[str] = None,
         changed_by: str = "Admin"
     ) -> Tuple[bool, str]:
         """
-        Updates an existing employee's organizational assignment, position, shift, superior, or hire date.
+        Updates an existing employee's organizational assignment, position, shift, superior, hire date,
+        and allows updating their full name and matricule directly.
         """
         position_level = position_level.upper().strip()
         if position_level not in POSITION_LEVELS:
@@ -762,17 +779,27 @@ class OrgChartManager:
                 return False, "Affectation introuvable."
 
             user_id = existing["user_id"]
-            matricule = existing["matricule"]
-            full_name = existing["full_name"]
+            old_mat = existing["matricule"]
+            old_name = existing["full_name"]
             old_lvl = existing["position_level"]
             old_shift = existing["shift"]
             old_parent = existing["parent_id"]
             old_title = existing["job_title"]
             old_hire_date = existing["hire_date"]
 
+            # Use new name/matricule if provided and valid, otherwise keep existing
+            new_name = full_name.strip() if full_name and full_name.strip() else old_name
+            new_mat = matricule.strip() if matricule and matricule.strip() else old_mat
+
             # Detect primary action type for audit history
             details_list = []
             action_type = "MODIFICATION"
+
+            if old_name != new_name:
+                details_list.append(f"Nom: '{old_name}' -> '{new_name}'")
+
+            if old_mat != new_mat:
+                details_list.append(f"Matricule: '{old_mat}' -> '{new_mat}'")
 
             if old_lvl != position_level:
                 old_rank = POSITION_LEVELS.get(old_lvl, {}).get("rank", 99)
@@ -793,10 +820,10 @@ class OrgChartManager:
 
             cur.execute("""
                 UPDATE org_assignments
-                SET position_level = ?, job_title = ?, shift = ?, group_name = ?,
+                SET full_name = ?, matricule = ?, position_level = ?, job_title = ?, shift = ?, group_name = ?,
                     team_name = ?, parent_id = ?, hire_date = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
-            """, (position_level, job_title, shift, group_name, team_name, parent_id, hire_date, notes, assignment_id))
+            """, (new_name, new_mat, position_level, job_title, shift, group_name, team_name, parent_id, hire_date, notes, assignment_id))
 
             # Audit History
             cur.execute("""
@@ -804,12 +831,18 @@ class OrgChartManager:
                 (assignment_id, user_id, matricule, action_type, old_position_level, new_position_level,
                  old_job_title, new_job_title, old_shift, new_shift, old_parent_id, new_parent_id, details, changed_by)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (assignment_id, user_id, matricule, action_type, old_lvl, position_level, old_title, job_title,
+            """, (assignment_id, user_id, new_mat, action_type, old_lvl, position_level, old_title, job_title,
                   old_shift, shift, old_parent, parent_id, "; ".join(details_list) or "Mise à jour des informations", changed_by))
 
-            # Sync hire_date and shift to users table
+            # Sync name, matricule, hire_date and shift to users table (without altering authentication power)
             user_updates = []
             user_params = []
+            if old_name != new_name:
+                user_updates.append("name = ?")
+                user_params.append(new_name)
+            if old_mat != new_mat:
+                user_updates.append("matricule = ?")
+                user_params.append(new_mat)
             if hire_date:
                 user_updates.append("hire_date = ?")
                 user_params.append(hire_date)
@@ -817,15 +850,18 @@ class OrgChartManager:
                 user_updates.append("shift = ?")
                 user_params.append(shift)
 
-            if user_updates:
+            if user_updates and user_id:
                 user_params.append(user_id)
-                cur.execute(f"UPDATE users SET {', '.join(user_updates)} WHERE id = ?", user_params)
+                try:
+                    cur.execute(f"UPDATE users SET {', '.join(user_updates)} WHERE id = ?", user_params)
+                except Exception as ue:
+                    logger.warning(f"Could not update users table for user_id={user_id}: {ue}")
 
             conn.commit()
 
-        self._sync_technician_file(matricule, shift, hire_date)
+        self._sync_technician_file(new_mat, shift, hire_date, name=new_name, old_matricule=old_mat)
 
-        return True, f"Modifications enregistrées avec succès pour '{full_name}'."
+        return True, f"Modifications enregistrées avec succès pour '{new_name}'."
 
     def move_employee(
         self,
@@ -991,19 +1027,29 @@ class OrgChartManager:
 
         return {"groups": groups, "teams": teams}
 
-    def _sync_technician_file(self, matricule: str, shift: Optional[str], hire_date: Optional[str]):
-        """Helper to sync shift and hire_date into active_base/Technicians/{matricule}.json if it exists."""
+    def _sync_technician_file(self, matricule: str, shift: Optional[str], hire_date: Optional[str], name: Optional[str] = None, old_matricule: Optional[str] = None):
+        """Helper to sync name, matricule, shift and hire_date into active_base/Technicians/{matricule}.json."""
         if not self.data_dir or not matricule:
             return
         try:
             import os
             import json
-            safe_mat = str(matricule).replace("/", "_").replace("\\", "_").strip()
-            path = os.path.join(self.data_dir, "Technicians", f"{safe_mat}.json")
-            if os.path.exists(path):
-                with open(path, "r", encoding="utf-8") as f:
+            safe_new = str(matricule).replace("/", "_").replace("\\", "_").strip()
+            safe_old = str(old_matricule).replace("/", "_").replace("\\", "_").strip() if old_matricule else safe_new
+            old_path = os.path.join(self.data_dir, "Technicians", f"{safe_old}.json")
+            new_path = os.path.join(self.data_dir, "Technicians", f"{safe_new}.json")
+
+            target_path = old_path if os.path.exists(old_path) else (new_path if os.path.exists(new_path) else None)
+            if target_path:
+                with open(target_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
                 updated = False
+                if name and name.strip():
+                    data["name"] = name.strip()
+                    updated = True
+                if matricule and data.get("matricule") != matricule:
+                    data["matricule"] = matricule
+                    updated = True
                 if shift and shift in ("A", "B", "C"):
                     data["shift"] = shift
                     updated = True
@@ -1011,7 +1057,12 @@ class OrgChartManager:
                     data["hire_date"] = hire_date
                     updated = True
                 if updated:
-                    with open(path, "w", encoding="utf-8") as f:
+                    with open(new_path, "w", encoding="utf-8") as f:
                         json.dump(data, f, indent=4, ensure_ascii=False)
+                    if safe_old != safe_new and os.path.exists(old_path) and old_path != new_path:
+                        try:
+                            os.remove(old_path)
+                        except Exception:
+                            pass
         except Exception as e:
             logger.warning(f"Could not sync technician JSON file for {matricule}: {e}")

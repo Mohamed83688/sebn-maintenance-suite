@@ -2690,15 +2690,18 @@ def api_org_unassigned():
 @admin_required
 def api_org_assign():
     """
-    Assigns an existing user to the organizational structure.
+    Assigns an existing user or creates a new employee assignment in the organizational structure.
     Strictly restricted to Admin and Owner in backend.
     """
     data = request.get_json(silent=True) or request.form
     try:
-        user_id = int(data.get('user_id')) if data.get('user_id') else None
+        raw_uid = data.get('user_id')
+        user_id = int(raw_uid) if raw_uid and str(raw_uid).isdigit() and int(raw_uid) > 0 else None
     except Exception:
         user_id = None
 
+    full_name = str(data.get('full_name', '')).strip()
+    matricule = str(data.get('matricule', '')).strip()
     pos_level = str(data.get('position_level', '')).strip().upper()
     job_title = str(data.get('job_title', '')).strip()
     shift = str(data.get('shift', 'NOT_ASSIGNED')).strip().upper()
@@ -2719,8 +2722,8 @@ def api_org_assign():
     notes = str(data.get('notes', '')).strip()
     changed_by = session.get('user', 'Admin')
 
-    if not user_id:
-        return jsonify({'success': False, 'message': 'Veuillez sélectionner un employé.'}), 400
+    if not user_id and not full_name:
+        return jsonify({'success': False, 'message': 'Veuillez sélectionner un compte ou renseigner le nom de l\'employé.'}), 400
     if not pos_level or pos_level not in POSITION_LEVELS:
         return jsonify({'success': False, 'message': 'Niveau hiérarchique invalide.'}), 400
     if not job_title:
@@ -2736,6 +2739,8 @@ def api_org_assign():
         team_name=team_name,
         hire_date=hire_date,
         notes=notes,
+        full_name=full_name,
+        matricule=matricule,
         changed_by=changed_by
     )
 
@@ -2749,7 +2754,7 @@ def api_org_assign():
 @admin_required
 def api_org_update():
     """
-    Updates an employee's position, shift, superior, group, or hiring date.
+    Updates an employee's name, matricule, position, shift, superior, group, or hiring date.
     Strictly restricted to Admin and Owner in backend.
     """
     data = request.get_json(silent=True) or request.form
@@ -2758,6 +2763,8 @@ def api_org_update():
     except Exception:
         asgn_id = None
 
+    full_name = str(data.get('full_name', '')).strip()
+    matricule = str(data.get('matricule', '')).strip()
     pos_level = str(data.get('position_level', '')).strip().upper()
     job_title = str(data.get('job_title', '')).strip()
     shift = str(data.get('shift', 'NOT_ASSIGNED')).strip().upper()
@@ -2795,6 +2802,8 @@ def api_org_update():
         team_name=team_name,
         hire_date=hire_date,
         notes=notes,
+        full_name=full_name,
+        matricule=matricule,
         changed_by=changed_by
     )
 
