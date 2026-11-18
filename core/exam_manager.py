@@ -1786,7 +1786,12 @@ class ExamManager:
     def get_technician_card_details(self, user_id: int):
         with self._get_conn() as conn:
             cur = conn.cursor()
-            cur.execute("SELECT id, name, matricule, shift, technician_level, photo, phone, hire_date FROM users WHERE id = ?", (user_id,))
+            cur.execute("""
+                SELECT id, name, matricule, username, shift, technician_level, photo, 
+                       phone, hire_date, address, education_level, diploma 
+                FROM users 
+                WHERE id = ?
+            """, (user_id,))
             user_row = cur.fetchone()
             if not user_row:
                 return None
@@ -1795,6 +1800,9 @@ class ExamManager:
             tech['technician_level'] = self.normalize_level(tech.get('technician_level'))
             tech['shift'] = tech.get('shift') or 'A'
             tech['phone'] = tech.get('phone') or ''
+            tech['address'] = tech.get('address') or ''
+            tech['education_level'] = tech.get('education_level') or ''
+            tech['diploma'] = tech.get('diploma') or ''
 
             raw_hire = str(tech.get('hire_date') or '').strip()
             if raw_hire and len(raw_hire) >= 10:
@@ -1808,6 +1816,33 @@ class ExamManager:
                     tech['formatted_hire_date'] = raw_hire
             else:
                 tech['formatted_hire_date'] = raw_hire or '—'
+
+            # Calculate seniority automatically
+            if raw_hire and len(raw_hire) >= 10:
+                try:
+                    from datetime import datetime
+                    d = datetime.strptime(raw_hire[:10], "%Y-%m-%d")
+                    now = datetime.now()
+                    total_months = (now.year - d.year) * 12 + (now.month - d.month)
+                    if now.day < d.day:
+                        total_months -= 1
+                    if total_months < 0:
+                        seniority_str = "0 mois"
+                    else:
+                        years = total_months // 12
+                        months = total_months % 12
+                        if years == 0:
+                            seniority_str = f"{months} mois" if months > 0 else "< 1 mois"
+                        elif months == 0:
+                            seniority_str = f"{years} an" if years == 1 else f"{years} ans"
+                        else:
+                            yr_str = f"{years} an" if years == 1 else f"{years} ans"
+                            seniority_str = f"{yr_str} et {months} mois"
+                except Exception:
+                    seniority_str = "—"
+            else:
+                seniority_str = "—"
+            tech['seniority'] = seniority_str
             
             cur.execute("""
                 SELECT ea.*, e.title as exam_title, e.number_of_questions

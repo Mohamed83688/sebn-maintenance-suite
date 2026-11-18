@@ -1267,6 +1267,43 @@ def tech_card_upload_photo(user_id: int):
     return redirect(url_for('tech_card_view', user_id=user_id))
 
 
+@app.route('/training/card/update-info/<int:user_id>', methods=['POST'])
+@admin_required
+def tech_card_update_info(user_id: int):
+    """Admin / Owner: update personal & professional technician profile information."""
+    phone = request.form.get('phone', '').strip()
+    hire_date = request.form.get('hire_date', '').strip()
+    address = request.form.get('address', '').strip()
+    education_level = request.form.get('education_level', '').strip()
+    diploma = request.form.get('diploma', '').strip()
+    shift = request.form.get('shift', '').strip()
+
+    u = user_mgr.get_user_by_id(user_id)
+    if not u:
+        flash("Technicien introuvable.", "danger")
+        return redirect(url_for('training_cards'))
+
+    ok, msg = user_mgr.update_user(
+        user_id=user_id,
+        name=u['name'],
+        username=u['username'],
+        role=u['role'],
+        matricule=u.get('matricule') or '',
+        shift=shift or u.get('shift') or 'A',
+        technician_level=u.get('technician_level'),
+        hire_date=hire_date if hire_date else None,
+        phone=phone,
+        address=address,
+        education_level=education_level,
+        diploma=diploma
+    )
+    if ok:
+        flash("Fiche technicien mise à jour avec succès.", "success")
+    else:
+        flash(f"Erreur : {msg}", "danger")
+    return redirect(url_for('tech_card_view', user_id=user_id))
+
+
 @app.route('/training/static-photo/<filename>')
 @login_required
 def static_photo_download(filename):
@@ -3712,6 +3749,7 @@ def pma_dashboard():
     # Default to current week if no week filter is provided
     week   = request.args.get('week', current_iso_w_label)
     search = request.args.get('search', '').lower().strip()
+    val_status = request.args.get('validation_status', request.args.get('val_status', '')).strip().upper()
     # Track if user explicitly cleared week filter
     no_week = 'week' in request.args and request.args.get('week', '') == ''
     if no_week:
@@ -3818,38 +3856,64 @@ def pma_dashboard():
                 manual_docs_count += len(matching)
                 latest = matching[0]
                 t['latest_doc'] = latest
-                t['doc_status'] = latest.get('validation_status')
-                if latest.get('validation_status') == 'PENDING':
+                # Check validation status across all attached documents
+                has_validated = any(d.get('validation_status') == 'VALIDATED' for d in matching)
+                has_pending = any(d.get('validation_status') == 'PENDING' for d in matching)
+                if has_validated:
+                    t['doc_status'] = 'VALIDATED'
+                    t['status'] = 'COMPLÉTÉ'
+                elif has_pending:
+                    t['doc_status'] = 'PENDING'
                     pending_validations_count += 1
+                else:
+                    t['doc_status'] = latest.get('validation_status')
             else:
                 t['latest_doc'] = None
                 t['doc_status'] = None
 
-        # Always sort: pending validations first, active tasks second, completed tasks last
+            # Compute standardized validation status for UI and filtering
+            is_done = (str(t.get('status', '')).upper().strip() in ('COMPLÉTÉ', 'COMPLETE', 'DONE', 'OK', 'TERMINÉ')) or (t.get('doc_status') == 'VALIDATED')
+            is_prog = (str(t.get('status', '')).upper().strip() in ('EN COURS', 'IN PROGRESS', 'EN_COURS')) or (t.get('doc_status') == 'PENDING')
+            t['is_done'] = is_done
+            t['is_in_progress'] = is_prog and not is_done
+            t['val_status'] = 'VALIDATED' if is_done else ('IN_PROGRESS' if is_prog else 'NOT_VALIDATED')
+
+        # Compute accurate stats BEFORE filtering by validation status
+        t_total = len(tasks)
+        t_done = sum(1 for t in tasks if t['is_done'])
+        t_in_progress = sum(1 for t in tasks if t['is_in_progress'])
+        t_pending = t_total - t_done - t_in_progress
+        t_rate = round((t_done / t_total) * 100) if t_total > 0 else 0
+
+        # Filter by validation status if requested
+        if val_status and val_status != 'ALL':
+            if val_status in ('VALIDATED', 'DONE', 'COMPLETED'):
+                tasks = [t for t in tasks if t['val_status'] == 'VALIDATED']
+            elif val_status in ('NOT_VALIDATED', 'TODO', 'PENDING'):
+                tasks = [t for t in tasks if t['val_status'] == 'NOT_VALIDATED']
+            elif val_status in ('IN_PROGRESS', 'PROGRESS'):
+                tasks = [t for t in tasks if t['val_status'] == 'IN_PROGRESS']
+
+        # Always sort: active/in-progress first, pending action second, completed tasks last
         def sort_key(t):
-            is_done = str(t.get('status', '')).upper().strip() in ('COMPLÉTÉ', 'COMPLETE', 'DONE', 'OK', 'TERMINÉ')
-            has_pending_doc = t.get('doc_status') == 'PENDING'
+            priority = 0 if t['is_in_progress'] else (2 if t['is_done'] else 1)
             w_str   = str(t.get('week', ''))
             digits  = "".join(filter(str.isdigit, w_str))
             w_num   = int(digits) if digits else 999
-            priority = 0 if has_pending_doc else (2 if is_done else 1)
             return (priority, w_num)
 
         tasks.sort(key=sort_key)
 
-    is_filtered = bool(month or sheet or week or search)
-    if tasks:
-        t_total = len(tasks)
-        t_done = sum(1 for t in tasks if str(t.get('status', '')).upper().strip() in ('COMPLÉTÉ', 'COMPLETE', 'DONE', 'OK', 'TERMINÉ'))
-        t_pending = t_total - t_done
-        t_rate = round((t_done / t_total) * 100) if t_total > 0 else 0
+    is_filtered = bool(month or sheet or week or search or (val_status and val_status != 'ALL'))
+    if tasks or (df is not None and not df.empty):
         stats = {
-            'total': t_total,
-            'done': t_done,
-            'pending': t_pending,
-            'rate': t_rate,
-            'manual_docs_count': manual_docs_count,
-            'pending_validations': pending_validations_count,
+            'total': t_total if 't_total' in locals() else len(tasks),
+            'done': t_done if 't_done' in locals() else 0,
+            'in_progress': t_in_progress if 't_in_progress' in locals() else 0,
+            'pending': t_pending if 't_pending' in locals() else 0,
+            'rate': t_rate if 't_rate' in locals() else 0,
+            'manual_docs_count': manual_docs_count if 'manual_docs_count' in locals() else 0,
+            'pending_validations': pending_validations_count if 'pending_validations_count' in locals() else 0,
             'is_filtered': is_filtered
         }
     else:
@@ -3857,6 +3921,7 @@ def pma_dashboard():
         stats = {
             'total': raw_stats.get('total', 0) if not is_filtered else 0,
             'done': raw_stats.get('done', 0) if not is_filtered else 0,
+            'in_progress': 0,
             'pending': raw_stats.get('pending', 0) if not is_filtered else 0,
             'rate': raw_stats.get('rate', 0) if not is_filtered else 0,
             'manual_docs_count': 0,
@@ -3892,6 +3957,7 @@ def pma_dashboard():
                            months=months, sheets=sheets, weeks=weeks,
                            current_month=month, current_sheet=sheet,
                            current_week=week, current_search=search,
+                           current_val_status=val_status,
                            current_iso_w_label=current_iso_w_label,
                            email_config=email_cfg)
 
@@ -3991,13 +4057,11 @@ def pma_document_upload():
     completion_date = request.form.get('completion_date', '').strip() or datetime.date.today().strftime('%Y-%m-%d')
     comments = request.form.get('comments', '').strip()
 
-    immediate_validate = (
-        request.form.get('immediate_validate') in ('true', '1', 'on') and 
-        session.get('role') in ('OWNER', 'ADMIN', 'admin')
-    )
-    initial_status = "VALIDATED" if immediate_validate else "PENDING"
+    # Rule: Automatic Validation When Uploading a File
+    # Every successful upload automatically validates and completes the preventive task
+    initial_status = "VALIDATED"
 
-    tech_name = session.get('name') or session.get('username') or 'Inconnu'
+    tech_name = session.get('name') or session.get('username') or 'Technicien'
     tech_mat = session.get('matricule') or ''
     tech_id = session.get('user_id')
     shift = session.get('shift') or 'A'
@@ -4026,18 +4090,43 @@ def pma_document_upload():
         flash(msg, "danger")
         return redirect(url_for('pma_dashboard', week=week, sheet=sheet))
 
-    # If immediately validated by admin, complete task in PMA engine
-    if immediate_validate and doc:
+    # Automatic task completion in PMA Engine and Excel signature
+    if doc:
         try:
-            prev_doc_mgr.validate_document(doc['id'], validated_by=session.get('username', 'admin'))
+            prev_doc_mgr.validate_document(doc['id'], validated_by=tech_name)
             eng = get_pma_engine()
-            eng.complete_task(sheet, raw_index, task_type, tech_name, shift)
-            invalidate_pma_cache()
-            logger.info(f"[PMA-DOC] Task auto-completed via immediate validation: {equipment} / {sheet}")
-        except Exception as e:
-            logger.error(f"[PMA-DOC] Error auto-completing task in engine: {e}")
+            completed = eng.complete_task(sheet, raw_index, task_type, tech_name, shift)
+            if not completed and eng.current_df is not None and not eng.current_df.empty:
+                # Fallback locator: find row by equipment and sheet/week
+                df = eng.current_df
+                mask = (df['Equipment'].astype(str).str.strip().str.lower() == equipment.lower())
+                if sheet:
+                    mask &= (df['Sheet'].astype(str).str.strip().str.lower() == sheet.lower())
+                if week:
+                    week_digits = re.sub(r'\D', '', str(week))
+                    if week_digits and 'Week' in df.columns:
+                        mask &= (df['Week'].astype(str).str.replace(r'\D', '', regex=True) == week_digits)
+                matched_rows = df[mask]
+                if not matched_rows.empty:
+                    found_idx = matched_rows.iloc[0].get('Raw_Index')
+                    found_sheet = matched_rows.iloc[0].get('Sheet') or sheet
+                    if found_idx:
+                        eng.complete_task(found_sheet, found_idx, task_type, tech_name, shift)
 
-    success_msg = "Tableau préventif importé et validé avec succès !" if immediate_validate else "Fiche préventive envoyée avec succès pour validation."
+            pma_file = pma_config.get_last_excel_path()
+            if pma_file and os.path.exists(pma_file):
+                eng.add_excel_signature(
+                    pma_file,
+                    tech_name,
+                    session.get('role', 'Technician'),
+                    matricule=tech_mat
+                )
+            invalidate_pma_cache()
+            logger.info(f"[PMA-DOC] Task auto-completed via upload validation: {equipment} / {sheet} / raw_index={raw_index}")
+        except Exception as e:
+            logger.error(f"[PMA-DOC] Error auto-completing task in engine on upload: {e}")
+
+    success_msg = f"Tableau préventif pour {equipment} enregistré et validé avec succès !"
 
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json:
         return jsonify({

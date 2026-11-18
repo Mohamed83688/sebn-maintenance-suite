@@ -133,6 +133,7 @@ def generate_technician_card_pdf(tech_details: dict) -> str:
         
     hire_str = str(tech_details.get('formatted_hire_date') or tech_details.get('hire_date') or '—')
     phone_str = str(tech_details.get('phone') or '—')
+    seniority_str = str(tech_details.get('seniority') or '—')
 
     # User info side flowables
     info_data = [
@@ -145,7 +146,9 @@ def generate_technician_card_pdf(tech_details: dict) -> str:
         [Paragraph("TÉLÉPHONE :", label_style)],
         [Paragraph(phone_str, val_style)],
         [Paragraph("DATE D'EMBAUCHE :", label_style)],
-        [Paragraph(hire_str, val_style)]
+        [Paragraph(hire_str, val_style)],
+        [Paragraph("ANCIENNETÉ :", label_style)],
+        [Paragraph(seniority_str, val_style)]
     ]
     info_table = Table(info_data, colWidths=[150])
     info_table.setStyle(TableStyle([

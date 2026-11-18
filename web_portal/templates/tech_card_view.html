@@ -172,6 +172,17 @@
                         <span style="color:#94A3B8; font-style:italic; font-weight:500;">Non renseignée</span>
                         {% endif %}
                     </div>
+
+                    <div class="info-lbl">Ancienneté</div>
+                    <div class="info-val">
+                        {% if card.seniority and card.seniority != '—' %}
+                        <span style="color:#2E008B; font-weight:800; display:inline-flex; align-items:center; gap:5px;">
+                            <i class="fa-solid fa-clock-rotate-left" style="font-size:9.5px; color:#2E008B;"></i>{{ card.seniority }}
+                        </span>
+                        {% else %}
+                        <span style="color:#94A3B8; font-style:italic; font-weight:500;">—</span>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
 
@@ -227,6 +238,196 @@
             {% endif %}
         </div>
 
+        <!-- Fiche Technicien Complète -->
+        <div class="card" style="padding:22px; margin-top:20px; border-radius:12px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; border-bottom:1px solid var(--border); padding-bottom:12px;">
+                <h3 style="font-size:16px; font-weight:800; color:#2E008B; margin:0; display:flex; align-items:center; gap:8px;">
+                    <i class="fa-solid fa-id-card-clip"></i> Fiche Complète Technicien
+                </h3>
+                {% if session.get('role') in ['OWNER', 'ADMIN', 'admin'] %}
+                <button type="button" class="btn btn-sm btn-outline-primary" id="btn-toggle-edit" onclick="toggleEditProfile()" style="font-size:12px; font-weight:700; border-radius:6px;">
+                    <i class="fa-solid fa-pen-to-square"></i> Modifier les informations
+                </button>
+                {% endif %}
+            </div>
+
+            <!-- View Mode -->
+            <div id="profile-view-mode">
+                <!-- Section 1: Informations Personnelles -->
+                <div style="margin-bottom:18px;">
+                    <div style="font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.8px; color:var(--primary); margin-bottom:8px; display:flex; align-items:center; gap:6px;">
+                        <i class="fa-solid fa-user"></i> Informations Personnelles
+                    </div>
+                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; background:#F8FAFC; border:1px solid #E2E8F0; padding:12px 14px; border-radius:8px; font-size:12.5px;">
+                        <div>
+                            <span style="color:#64748B; font-size:11px; display:block;">Nom Complet</span>
+                            <strong>{{ card.name }}</strong>
+                        </div>
+                        <div>
+                            <span style="color:#64748B; font-size:11px; display:block;">Matricule</span>
+                            <code>{{ card.matricule }}</code>
+                        </div>
+                        <div>
+                            <span style="color:#64748B; font-size:11px; display:block;">Téléphone</span>
+                            <strong>{{ card.phone or '—' }}</strong>
+                        </div>
+                        <div>
+                            <span style="color:#64748B; font-size:11px; display:block;">Adresse / Lieu de Résidence</span>
+                            <strong>{{ card.address or '—' }}</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 2: Informations Professionnelles -->
+                <div style="margin-bottom:18px;">
+                    <div style="font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.8px; color:var(--primary); margin-bottom:8px; display:flex; align-items:center; gap:6px;">
+                        <i class="fa-solid fa-briefcase"></i> Informations Professionnelles
+                    </div>
+                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; background:#F8FAFC; border:1px solid #E2E8F0; padding:12px 14px; border-radius:8px; font-size:12.5px;">
+                        <div>
+                            <span style="color:#64748B; font-size:11px; display:block;">Poste / Niveau</span>
+                            <span class="badge" style="background:#2E008B; color:#fff; font-weight:700;">{{ card.technician_level or 'Level 0' }}</span>
+                        </div>
+                        <div>
+                            <span style="color:#64748B; font-size:11px; display:block;">Équipe (Shift)</span>
+                            <strong>Shift {{ card.shift }}</strong>
+                        </div>
+                        <div>
+                            <span style="color:#64748B; font-size:11px; display:block;">Date de Recrutement</span>
+                            <strong>{{ card.formatted_hire_date or card.hire_date or '—' }}</strong>
+                        </div>
+                        <div>
+                            <span style="color:#64748B; font-size:11px; display:block;">Ancienneté (Auto)</span>
+                            <strong style="color:#2E008B;"><i class="fa-solid fa-clock-rotate-left"></i> {{ card.seniority or '—' }}</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 3: Formation & Diplômes -->
+                <div>
+                    <div style="font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.8px; color:var(--primary); margin-bottom:8px; display:flex; align-items:center; gap:6px;">
+                        <i class="fa-solid fa-graduation-cap"></i> Formation &amp; Diplômes
+                    </div>
+                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; background:#F8FAFC; border:1px solid #E2E8F0; padding:12px 14px; border-radius:8px; font-size:12.5px;">
+                        <div>
+                            <span style="color:#64748B; font-size:11px; display:block;">Niveau Scolaire</span>
+                            <strong>{{ card.education_level or '—' }}</strong>
+                        </div>
+                        <div>
+                            <span style="color:#64748B; font-size:11px; display:block;">Diplôme / Qualification</span>
+                            <strong>{{ card.diploma or '—' }}</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Edit Mode (Admin / Owner Only) -->
+            {% if session.get('role') in ['OWNER', 'ADMIN', 'admin'] %}
+            <form id="profile-edit-mode" method="POST" action="{{ url_for('tech_card_update_info', user_id=card.id) }}" style="display:none;">
+                <div style="background:#EEF2FF; border:1px solid #C7D2FE; padding:12px 16px; border-radius:8px; margin-bottom:16px; font-size:12px; color:#1E1B4B;">
+                    <i class="fa-solid fa-circle-info" style="color:var(--primary);"></i> 
+                    Modifier les informations de la fiche technicien. L'ancienneté est recalculée automatiquement selon la date de recrutement.
+                </div>
+
+                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:14px; margin-bottom:16px;">
+                    <div>
+                        <label class="form-label" style="font-weight:700; font-size:12px;">Numéro de Téléphone</label>
+                        <input type="text" name="phone" value="{{ card.phone or '' }}" placeholder="+216 -- --- ---" class="form-control" style="font-size:12px;">
+                    </div>
+                    <div>
+                        <label class="form-label" style="font-weight:700; font-size:12px;">Date de Recrutement</label>
+                        <input type="date" id="input_hire_date" name="hire_date" value="{{ card.hire_date or '' }}" class="form-control" style="font-size:12px;" onchange="updateSeniorityCalc(this.value)">
+                    </div>
+                    <div>
+                        <label class="form-label" style="font-weight:700; font-size:12px;">Ancienneté Calculée</label>
+                        <div id="calc-seniority-preview" style="background:#E2E8F0; padding:7px 12px; border-radius:6px; font-weight:800; color:#2E008B; font-size:12px; min-height:34px; display:flex; align-items:center;">
+                            {{ card.seniority or '—' }}
+                        </div>
+                    </div>
+                    <div>
+                        <label class="form-label" style="font-weight:700; font-size:12px;">Équipe (Shift)</label>
+                        <select name="shift" class="form-select" style="font-size:12px;">
+                            <option value="A" {% if card.shift == 'A' %}selected{% endif %}>Shift A</option>
+                            <option value="B" {% if card.shift == 'B' %}selected{% endif %}>Shift B</option>
+                            <option value="C" {% if card.shift == 'C' %}selected{% endif %}>Shift C</option>
+                            <option value="ALL" {% if card.shift == 'ALL' %}selected{% endif %}>Shift ALL (Journée)</option>
+                        </select>
+                    </div>
+                    <div style="grid-column: 1 / -1;">
+                        <label class="form-label" style="font-weight:700; font-size:12px;">Adresse / Lieu de Résidence</label>
+                        <input type="text" name="address" value="{{ card.address or '' }}" placeholder="Ex: Ben Arous, Tunis" class="form-control" style="font-size:12px;">
+                    </div>
+                    <div>
+                        <label class="form-label" style="font-weight:700; font-size:12px;">Niveau Scolaire</label>
+                        <input type="text" name="education_level" value="{{ card.education_level or '' }}" placeholder="Ex: Bac +3, BTS, Licence" class="form-control" style="font-size:12px;">
+                    </div>
+                    <div>
+                        <label class="form-label" style="font-weight:700; font-size:12px;">Diplôme Obtenu</label>
+                        <input type="text" name="diploma" value="{{ card.diploma or '' }}" placeholder="Ex: Licence Électromécanique, BTP Maintenance" class="form-control" style="font-size:12px;">
+                    </div>
+                </div>
+
+                <div style="display:flex; justify-content:flex-end; gap:8px;">
+                    <button type="button" class="btn btn-sm btn-secondary" onclick="toggleEditProfile()" style="font-size:12px;">Annuler</button>
+                    <button type="submit" class="btn btn-sm btn-primary" style="font-size:12px; font-weight:700;">
+                        <i class="fa-solid fa-floppy-disk"></i> Enregistrer les modifications
+                    </button>
+                </div>
+            </form>
+            {% endif %}
+        </div>
+
     </div>
 </div>
+
+<script>
+function toggleEditProfile() {
+    const v = document.getElementById('profile-view-mode');
+    const e = document.getElementById('profile-edit-mode');
+    const btn = document.getElementById('btn-toggle-edit');
+    if (!v || !e) return;
+    if (e.style.display === 'none') {
+        v.style.display = 'none';
+        e.style.display = 'block';
+        if (btn) btn.innerHTML = '<i class="fa-solid fa-eye"></i> Mode Affichage';
+        const d = document.getElementById('input_hire_date');
+        if (d) updateSeniorityCalc(d.value);
+    } else {
+        v.style.display = 'block';
+        e.style.display = 'none';
+        if (btn) btn.innerHTML = '<i class="fa-solid fa-pen-to-square"></i> Modifier les informations';
+    }
+}
+
+function updateSeniorityCalc(dateStr) {
+    const el = document.getElementById('calc-seniority-preview');
+    if (!el) return;
+    if (!dateStr) {
+        el.textContent = '—';
+        return;
+    }
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) {
+        el.textContent = '—';
+        return;
+    }
+    const now = new Date();
+    let months = (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth());
+    if (now.getDate() < d.getDate()) months--;
+    if (months < 0) {
+        el.textContent = '0 mois';
+        return;
+    }
+    const years = Math.floor(months / 12);
+    const remMonths = months % 12;
+    if (years === 0) {
+        el.textContent = remMonths > 0 ? `${remMonths} mois` : '< 1 mois';
+    } else if (remMonths === 0) {
+        el.textContent = years === 1 ? '1 an' : `${years} ans`;
+    } else {
+        const yrText = years === 1 ? '1 an' : `${years} ans`;
+        el.textContent = `${yrText} et ${remMonths} mois`;
+    }
+}
+</script>
 {% endblock %}

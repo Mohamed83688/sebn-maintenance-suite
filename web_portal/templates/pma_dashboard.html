@@ -253,21 +253,21 @@
             Suivi des ordres de travail préventifs — mise à jour en temps réel
         </div>
         <div class="hero-counters stagger">
-            <div class="hero-counter">
+            <div class="hero-counter" onclick="selectValStatusFilter('')" style="cursor:pointer;" title="Afficher toutes les machines">
                 <div class="hero-counter-val" style="color:var(--primary);" data-count="{{ stats.total }}">{{ stats.total }}</div>
                 <div class="hero-counter-lbl">Total Tâches</div>
             </div>
-            <div class="hero-counter">
+            <div class="hero-counter" onclick="selectValStatusFilter('VALIDATED')" style="cursor:pointer;" title="Filtrer : Machines validées / complétées">
                 <div class="hero-counter-val" style="color:var(--success);" data-count="{{ stats.done }}">{{ stats.done }}</div>
-                <div class="hero-counter-lbl">Complétées</div>
+                <div class="hero-counter-lbl">Validées / Faites</div>
             </div>
-            <div class="hero-counter">
+            <div class="hero-counter" onclick="selectValStatusFilter('NOT_VALIDATED')" style="cursor:pointer;" title="Filtrer : Machines non validées">
                 <div class="hero-counter-val" style="color:var(--warning);" data-count="{{ stats.pending }}">{{ stats.pending }}</div>
-                <div class="hero-counter-lbl">En Attente</div>
+                <div class="hero-counter-lbl">Non Validées</div>
             </div>
-            <div class="hero-counter">
-                <div class="hero-counter-val" style="color:#7C3AED;" data-count="{{ stats.manual_docs_count|default(0) }}">{{ stats.manual_docs_count|default(0) }}</div>
-                <div class="hero-counter-lbl">Fiches Papier</div>
+            <div class="hero-counter" onclick="selectValStatusFilter('IN_PROGRESS')" style="cursor:pointer;" title="Filtrer : Machines en cours">
+                <div class="hero-counter-val" style="color:#7C3AED;" data-count="{{ stats.in_progress|default(0) }}">{{ stats.in_progress|default(0) }}</div>
+                <div class="hero-counter-lbl">En Cours</div>
             </div>
         </div>
 
@@ -292,6 +292,22 @@
                        style="background:none; border:none; outline:none; color:var(--text); font-size:13px; font-family:inherit; flex:1; min-width:100px;">
             </div>
 
+            <!-- Filter Machines by Validation Status -->
+            <select name="validation_status" id="val-status-select" class="filter-select" onchange="applyValStatusFilter(this.value)" style="font-weight:700; border-color:#818CF8;">
+                <option value="" {% if not current_val_status or current_val_status == 'ALL' %}selected{% endif %}>
+                    📋 Statut : Toutes les machines (All Machines)
+                </option>
+                <option value="VALIDATED" {% if current_val_status in ['VALIDATED', 'DONE', 'COMPLETED'] %}selected{% endif %} style="color:var(--success); font-weight:700;">
+                    ✅ Validées / Complétées (Validated / Done)
+                </option>
+                <option value="NOT_VALIDATED" {% if current_val_status in ['NOT_VALIDATED', 'TODO'] %}selected{% endif %} style="color:var(--warning); font-weight:700;">
+                    ⏳ Non Validées (Not Validated)
+                </option>
+                <option value="IN_PROGRESS" {% if current_val_status in ['IN_PROGRESS', 'PROGRESS'] %}selected{% endif %} style="color:#7C3AED; font-weight:700;">
+                    ⚙️ En cours (In Progress)
+                </option>
+            </select>
+
             <select name="month" class="filter-select">
                 <option value="">Tous les mois</option>
                 {% for m in months %}<option value="{{ m }}" {% if current_month==m %}selected{% endif %}>{{ m }}</option>{% endfor %}
@@ -308,7 +324,7 @@
             <button type="submit" class="btn btn-primary btn-sm">
                 <i class="fa-solid fa-filter"></i> Filtrer
             </button>
-            {% if current_search or current_month or current_sheet or current_week %}
+            {% if current_search or current_month or current_sheet or current_week or (current_val_status and current_val_status != 'ALL') %}
             <a href="{{ url_for('pma_dashboard', week='') }}" class="btn btn-secondary btn-sm">
                 <i class="fa-solid fa-xmark"></i> Réinitialiser
             </a>
@@ -316,7 +332,7 @@
         </form>
 
         {% if tasks %}
-        <span class="row-count-pill">
+        <span class="row-count-pill" id="pma-row-count-display">
             <i class="fa-solid fa-list-ol"></i>
             {{ tasks|length }} tâche{% if tasks|length != 1 %}s{% endif %}
         </span>
@@ -341,11 +357,15 @@
             </thead>
             <tbody>
                 {% for t in tasks %}
-                {% set is_done = (t.status|string|upper|trim == 'COMPLÉTÉ') %}
-                <tr class="{% if is_done %}task-status-done{% endif %}">
+                {% set is_done = t.is_done %}
+                {% set is_prog = t.is_in_progress %}
+                <tr class="pma-task-row {% if is_done %}task-status-done{% endif %}"
+                    data-val-status="{{ t.val_status }}"
+                    data-equip="{{ t.equipment|lower }}"
+                    data-machine="{{ t.machine_name|lower }}">
                     <td>
                         <div style="display:flex; align-items:center; gap:8px;">
-                            <span style="width:7px; height:7px; border-radius:50%; background:{% if is_done %}var(--success){% else %}var(--warning){% endif %}; flex-shrink:0;"></span>
+                            <span style="width:7px; height:7px; border-radius:50%; background:{% if is_done %}var(--success){% elif is_prog %}#7C3AED{% else %}var(--warning){% endif %}; flex-shrink:0;"></span>
                             <div>
                                 <div style="font-weight:700; font-size:13px; color:var(--text); font-family:monospace;">{{ t.equipment }}</div>
                                 {% if t.machine_name and t.machine_name != t.equipment %}
@@ -372,25 +392,21 @@
                     <td style="font-size:12px; color:var(--text-sec); font-weight:700;">{{ t.week }}</td>
                     <td style="font-size:12px; color:var(--text-sec);">{{ t.month }}</td>
                     <td>
-                        {% if t.doc_status == 'VALIDATED' %}
-                        <span class="badge badge-success" title="Tableau validé sur document">
-                            <i class="fa-solid fa-file-circle-check"></i> Fiche Validée
+                        {% if is_done %}
+                        <span class="badge badge-success" title="Tâche préventive validée et complétée">
+                            <i class="fa-solid fa-circle-check"></i> Validé / Complété
                         </span>
-                        {% elif t.doc_status == 'PENDING' %}
-                        <span class="badge" style="background:#FEF3C7; color:#92400E; border:1px solid #FCD34D;" title="Fiche papier déposée — En attente de validation">
-                            <i class="fa-solid fa-clock-rotate-left"></i> En attente
+                        {% elif is_prog %}
+                        <span class="badge" style="background:#FEF3C7; color:#92400E; border:1px solid #FCD34D;" title="Fiche en cours">
+                            <i class="fa-solid fa-clock-rotate-left"></i> En cours
                         </span>
                         {% elif t.doc_status == 'REJECTED' %}
                         <span class="badge badge-danger" title="Fiche rejetée par l'administration">
                             <i class="fa-solid fa-triangle-exclamation"></i> Rejeté
                         </span>
-                        {% elif is_done %}
-                        <span class="badge badge-success">
-                            <i class="fa-solid fa-check-circle"></i> Complété
-                        </span>
                         {% else %}
-                        <span class="badge badge-warning">
-                            <i class="fa-solid fa-clock"></i> À faire
+                        <span class="badge badge-warning" title="Tâche non validée — à réaliser">
+                            <i class="fa-solid fa-clock"></i> Non Validé
                         </span>
                         {% endif %}
                     </td>
@@ -400,8 +416,8 @@
                                 data-task-title="{{ t.equipment }} ({{ t.type }})"
                                 data-task-sub="{{ t.sheet }} — Semaine {{ t.week }}"
                                 data-docs="{{ t.documents|tojson|forceescape }}"
-                                title="Voir le document enregistré (Checklist Web / Scan)">
-                            <i class="fa-solid fa-file-lines"></i> Voir le fichier
+                                title="Voir le document enregistré (Photo / Scan / Checklist Web)">
+                            <i class="fa-solid fa-file-lines"></i> Voir le document
                             {% if t.doc_count > 1 %}<span class="badge" style="background:rgba(255,255,255,0.3); font-size:9.5px; padding:1px 5px; margin-left:3px;">{{ t.doc_count }}</span>{% endif %}
                         </button>
                         {% else %}
@@ -413,8 +429,8 @@
                     <td>
                         <div class="action-cell">
                             {% if is_done %}
-                            <button class="btn btn-complete done btn-xs" disabled>
-                                <i class="fa-solid fa-check"></i> Complété
+                            <button class="btn btn-complete done btn-xs" disabled style="opacity:0.9;">
+                                <i class="fa-solid fa-check"></i> Validé
                             </button>
                             <button type="button" class="btn btn-secondary btn-xs" onclick="openUploadDocModal(this)"
                                     data-sheet="{{ t.sheet }}"
@@ -442,7 +458,7 @@
                                     data-week="{{ t.week }}"
                                     data-month="{{ t.month }}"
                                     style="font-weight:600; display:inline-flex; align-items:center; gap:5px; background:#FFFFFF; border:1px solid #CBD5E1; color:var(--primary);"
-                                    title="Valider manuellement en important une photo ou scan">
+                                    title="Valider automatiquement en important une photo ou un scan">
                                 <i class="fa-solid fa-file-arrow-up" style="color:var(--primary);"></i> Importer Papier
                             </button>
                             {% if session.get('role') in ['OWNER', 'ADMIN', 'admin'] %}
@@ -615,21 +631,19 @@
                 <textarea name="comments" id="upload-doc-comments" class="form-control" rows="2" placeholder="Ex: Travail exécuté sur poste de travail papier, pièces conformes, aucune anomalie..." style="padding:8px 10px; font-size:12.5px; resize:vertical;"></textarea>
             </div>
 
-            <!-- Admin Immediate Validation Checkbox -->
-            {% if session.get('role') in ['OWNER', 'ADMIN', 'admin'] %}
-            <div style="background:#EEF2FF; border:1px solid #C7D2FE; border-radius:8px; padding:10px 14px; margin-bottom:18px;">
-                <label style="display:flex; align-items:center; gap:9px; cursor:pointer; margin:0; font-size:12.5px; font-weight:700; color:#312E81;">
-                    <input type="checkbox" name="immediate_validate" value="true" checked style="width:16px; height:16px; accent-color:var(--primary);">
-                    <span>Valider et clôturer immédiatement la tâche dans le planning préventif</span>
-                </label>
+            <!-- Automatic Validation Notice -->
+            <div style="background:#ECFDF5; border:1px solid #A7F3D0; border-radius:8px; padding:12px 14px; margin-bottom:18px; display:flex; align-items:center; gap:10px;">
+                <i class="fa-solid fa-circle-check" style="color:var(--success); font-size:20px; flex-shrink:0;"></i>
+                <div style="font-size:12.5px; color:#065F46; font-weight:600; line-height:1.4;">
+                    <strong>Validation Automatique :</strong> Dès que vous enregistrez le document, cette machine passe automatiquement au statut <span style="text-decoration:underline;">Validé / Complété</span> dans le planning préventif.
+                </div>
             </div>
-            {% endif %}
 
             <!-- Actions -->
             <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
                 <button type="button" class="btn btn-secondary" onclick="closeDocUploadModal()">Annuler</button>
                 <button type="submit" id="btn-submit-upload-doc" class="btn btn-primary" style="display:inline-flex; align-items:center; gap:6px;">
-                    <i class="fa-solid fa-check"></i> Enregistrer et Envoyer
+                    <i class="fa-solid fa-cloud-arrow-up"></i> Enregistrer &amp; Valider Automatiquement
                 </button>
             </div>
         </form>
@@ -909,6 +923,84 @@ async function sendPmaExcelToTeamLeader(btn) {
         alert("❌ Erreur réseau : " + e);
     }
 }
+
+/* ============================================================== */
+/* PREVENTIVE VALIDATION STATUS FILTER (CLIENT-SIDE & URL SYNC)   */
+/* ============================================================== */
+
+function applyValStatusFilter(selectedVal) {
+    const val = (selectedVal || '').toUpperCase().trim();
+    const rows = document.querySelectorAll('.pma-task-row');
+    let visibleCount = 0;
+
+    rows.forEach(row => {
+        const rowStatus = (row.getAttribute('data-val-status') || '').toUpperCase().trim();
+        let show = false;
+
+        if (!val || val === 'ALL') {
+            show = true;
+        } else if (val === 'VALIDATED' || val === 'DONE' || val === 'COMPLETED') {
+            show = (rowStatus === 'VALIDATED');
+        } else if (val === 'NOT_VALIDATED' || val === 'TODO') {
+            show = (rowStatus === 'NOT_VALIDATED');
+        } else if (val === 'IN_PROGRESS' || val === 'PROGRESS') {
+            show = (rowStatus === 'IN_PROGRESS');
+        }
+
+        row.style.display = show ? '' : 'none';
+        if (show) visibleCount++;
+    });
+
+    const countDisplay = document.getElementById('pma-row-count-display');
+    if (countDisplay) {
+        countDisplay.innerHTML = `<i class="fa-solid fa-list-ol"></i> ${visibleCount} tâche${visibleCount > 1 ? 's' : ''}`;
+    }
+
+    const selectEl = document.getElementById('val-status-select');
+    if (selectEl && selectEl.value !== (val === 'ALL' ? '' : val)) {
+        selectEl.value = (val === 'ALL' ? '' : val);
+    }
+
+    // Keep active visual indicator on hero counters
+    document.querySelectorAll('.hero-counter').forEach(c => c.style.outline = 'none');
+    if (val === 'VALIDATED') {
+        const c = document.querySelector('.hero-counter:nth-child(2)');
+        if (c) c.style.outline = '2px solid var(--success)';
+    } else if (val === 'NOT_VALIDATED') {
+        const c = document.querySelector('.hero-counter:nth-child(3)');
+        if (c) c.style.outline = '2px solid var(--warning)';
+    } else if (val === 'IN_PROGRESS') {
+        const c = document.querySelector('.hero-counter:nth-child(4)');
+        if (c) c.style.outline = '2px solid #7C3AED';
+    }
+
+    // Sync URL without triggering a full page reload
+    try {
+        const url = new URL(window.location);
+        if (val && val !== 'ALL') {
+            url.searchParams.set('validation_status', val);
+        } else {
+            url.searchParams.delete('validation_status');
+        }
+        window.history.replaceState({}, '', url);
+    } catch (e) {}
+}
+
+function selectValStatusFilter(val) {
+    const selectEl = document.getElementById('val-status-select');
+    if (selectEl) {
+        selectEl.value = val;
+    }
+    applyValStatusFilter(val);
+}
+
+// On page load, if validation_status is present, apply filter immediately
+document.addEventListener('DOMContentLoaded', function() {
+    const selectEl = document.getElementById('val-status-select');
+    if (selectEl && selectEl.value) {
+        applyValStatusFilter(selectEl.value);
+    }
+});
 
 /* ============================================================== */
 /* PREVENTIVE MANUAL DOCUMENT UPLOAD & VIEWER LOGIC               */

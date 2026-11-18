@@ -138,7 +138,7 @@ class PreventiveDocManager:
         timestamp = int(time.time())
         unique_token = hashlib.md5(f"{orig_filename}_{timestamp}".encode()).hexdigest()[:8]
         stored_filename = f"prev_table_{safe_equip}_{safe_week}_{timestamp}_{unique_token}{ext}"
-        stored_path = os.path.join(self.storage_dir, stored_filename)
+        stored_path = os.path.normpath(os.path.abspath(os.path.join(self.storage_dir, stored_filename)))
 
         try:
             file_obj.save(stored_path)

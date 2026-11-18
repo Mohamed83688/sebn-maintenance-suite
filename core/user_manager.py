@@ -266,7 +266,7 @@ class UserManager:
         with self._get_conn() as conn:
             cur = conn.cursor()
             cur.execute("""
-                SELECT id, name, matricule, username, role, shift, is_active, created_at, updated_at, last_login, technician_level, photo, hire_date 
+                SELECT id, name, matricule, username, role, shift, is_active, created_at, updated_at, last_login, technician_level, photo, hire_date, phone, address, education_level, diploma 
                 FROM users 
                 ORDER BY 
                     CASE role 
@@ -411,7 +411,11 @@ class UserManager:
         is_active: bool = True,
         technician_level: str = None,
         photo: str = None,
-        hire_date: str = None
+        hire_date: str = None,
+        phone: str = None,
+        address: str = None,
+        education_level: str = None,
+        diploma: str = None
     ) -> Tuple[bool, str]:
         """Updates user profile information."""
         name = name.strip()
@@ -431,10 +435,12 @@ class UserManager:
 
         with self._get_conn() as conn:
             cur = conn.cursor()
-            cur.execute("SELECT id, role FROM users WHERE id = ?", (user_id,))
+            cur.execute("SELECT id, role, phone, address, education_level, diploma, hire_date, photo FROM users WHERE id = ?", (user_id,))
             target = cur.fetchone()
             if not target:
                 return False, "Utilisateur introuvable."
+
+            target_dict = dict(target) if hasattr(target, 'keys') else {}
 
             # Check duplicate username
             cur.execute("SELECT id FROM users WHERE LOWER(username) = LOWER(?) AND id != ?", (username, user_id))
@@ -448,44 +454,36 @@ class UserManager:
 
             # If photo is not provided, preserve the existing photo
             if photo is None:
-                cur.execute("SELECT photo FROM users WHERE id = ?", (user_id,))
-                exist_photo = cur.fetchone()
-                if exist_photo:
-                    photo = exist_photo["photo"]
+                photo = target_dict.get("photo")
 
-            if hire_date is not None:
-                cur.execute("""
-                    UPDATE users 
-                    SET name = ?, username = ?, matricule = ?, role = ?, shift = ?, is_active = ?, technician_level = ?, photo = ?, hire_date = ?, updated_at = CURRENT_TIMESTAMP
-                    WHERE id = ?
-                """, (
-                    name,
-                    username,
-                    matricule or None,
-                    role,
-                    shift or 'A',
-                    1 if is_active else 0,
-                    technician_level,
-                    photo,
-                    hire_date,
-                    user_id
-                ))
-            else:
-                cur.execute("""
-                    UPDATE users 
-                    SET name = ?, username = ?, matricule = ?, role = ?, shift = ?, is_active = ?, technician_level = ?, photo = ?, updated_at = CURRENT_TIMESTAMP
-                    WHERE id = ?
-                """, (
-                    name,
-                    username,
-                    matricule or None,
-                    role,
-                    shift or 'A',
-                    1 if is_active else 0,
-                    technician_level,
-                    photo,
-                    user_id
-                ))
+            final_hire_date = hire_date if hire_date is not None else target_dict.get("hire_date")
+            final_phone = phone if phone is not None else target_dict.get("phone", "")
+            final_address = address if address is not None else target_dict.get("address", "")
+            final_edu = education_level if education_level is not None else target_dict.get("education_level", "")
+            final_diploma = diploma if diploma is not None else target_dict.get("diploma", "")
+
+            cur.execute("""
+                UPDATE users 
+                SET name = ?, username = ?, matricule = ?, role = ?, shift = ?, is_active = ?, 
+                    technician_level = ?, photo = ?, hire_date = ?, phone = ?, address = ?, 
+                    education_level = ?, diploma = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            """, (
+                name,
+                username,
+                matricule or None,
+                role,
+                shift or 'A',
+                1 if is_active else 0,
+                technician_level,
+                photo,
+                final_hire_date,
+                final_phone,
+                final_address,
+                final_edu,
+                final_diploma,
+                user_id
+            ))
             conn.commit()
 
             # Sync to JSON profile if technician
