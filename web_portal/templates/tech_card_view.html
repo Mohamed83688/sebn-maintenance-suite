@@ -7,7 +7,7 @@
 {% block extra_css %}
 <style>
 .badge-container {
-    max-width: 420px;
+    max-width: 450px;
     margin: 20px auto;
 }
 
@@ -31,23 +31,23 @@
 .badge-body {
     display: flex;
     padding: 20px;
-    gap: 20px;
-    align-items: start;
+    gap: 18px;
+    align-items: center;
 }
 
 .badge-photo-wrap {
     flex-shrink: 0;
 }
 .badge-photo {
-    width: 110px;
-    height: 130px;
+    width: 115px;
+    height: 145px;
     border-radius: 8px;
     border: 1px solid #CBD5E1;
     object-fit: cover;
 }
 .badge-photo-placeholder {
-    width: 110px;
-    height: 130px;
+    width: 115px;
+    height: 145px;
     border-radius: 8px;
     background: #F1F5F9;
     border: 2px dashed #94A3B8;
@@ -62,16 +62,21 @@
 
 .badge-info-table {
     font-size: 13px;
-    line-height: 1.5;
+    line-height: 1.4;
     color: var(--text);
+    flex: 1;
+    min-width: 0;
 }
 .info-lbl {
     color: var(--text-sec);
-    font-size: 10px;
+    font-size: 9.5px;
     font-weight: 800;
     text-transform: uppercase;
-    letter-spacing: 1px;
-    margin-top: 6px;
+    letter-spacing: 0.8px;
+    margin-top: 5px;
+}
+.info-lbl:first-child {
+    margin-top: 0;
 }
 .info-val {
     font-weight: 700;
@@ -135,12 +140,38 @@
                 <div class="badge-info-table">
                     <div class="info-lbl">Nom &amp; Prénom</div>
                     <div class="info-val" style="font-size:14px; text-transform:uppercase;">{{ card.name }}</div>
-                    
+
                     <div class="info-lbl">Matricule</div>
-                    <div class="info-val">{{ card.matricule }}</div>
-                    
+                    <div class="info-val"><code>{{ card.matricule }}</code></div>
+
                     <div class="info-lbl">Équipe (Shift)</div>
                     <div class="info-val">Shift {{ card.shift }}</div>
+
+                    <div class="info-lbl">Numéro de Téléphone</div>
+                    <div class="info-val">
+                        {% if card.phone %}
+                        <a href="tel:{{ card.phone }}" style="color:var(--text); text-decoration:none; display:inline-flex; align-items:center; gap:5px;">
+                            <i class="fa-solid fa-phone" style="font-size:9.5px; color:var(--primary);"></i>{{ card.phone }}
+                        </a>
+                        {% else %}
+                        <span style="color:#94A3B8; font-style:italic; font-weight:500;">Non renseigné</span>
+                        {% endif %}
+                    </div>
+
+                    <div class="info-lbl">Date d'Embauche</div>
+                    <div class="info-val">
+                        {% if card.formatted_hire_date and card.formatted_hire_date != '—' and card.formatted_hire_date != '-' %}
+                        <span style="display:inline-flex; align-items:center; gap:5px;">
+                            <i class="fa-solid fa-calendar-day" style="font-size:9.5px; color:var(--primary);"></i>{{ card.formatted_hire_date }}
+                        </span>
+                        {% elif card.hire_date %}
+                        <span style="display:inline-flex; align-items:center; gap:5px;">
+                            <i class="fa-solid fa-calendar-day" style="font-size:9.5px; color:var(--primary);"></i>{{ card.hire_date }}
+                        </span>
+                        {% else %}
+                        <span style="color:#94A3B8; font-style:italic; font-weight:500;">Non renseignée</span>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
 

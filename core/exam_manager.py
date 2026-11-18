@@ -1786,14 +1786,28 @@ class ExamManager:
     def get_technician_card_details(self, user_id: int):
         with self._get_conn() as conn:
             cur = conn.cursor()
-            cur.execute("SELECT id, name, matricule, shift, technician_level, photo FROM users WHERE id = ?", (user_id,))
+            cur.execute("SELECT id, name, matricule, shift, technician_level, photo, phone, hire_date FROM users WHERE id = ?", (user_id,))
             user_row = cur.fetchone()
             if not user_row:
                 return None
-                
+
             tech = dict(user_row)
             tech['technician_level'] = self.normalize_level(tech.get('technician_level'))
             tech['shift'] = tech.get('shift') or 'A'
+            tech['phone'] = tech.get('phone') or ''
+
+            raw_hire = str(tech.get('hire_date') or '').strip()
+            if raw_hire and len(raw_hire) >= 10:
+                try:
+                    parts = raw_hire[:10].split('-')
+                    if len(parts) == 3:
+                        tech['formatted_hire_date'] = f"{parts[2]}/{parts[1]}/{parts[0]}"
+                    else:
+                        tech['formatted_hire_date'] = raw_hire
+                except Exception:
+                    tech['formatted_hire_date'] = raw_hire
+            else:
+                tech['formatted_hire_date'] = raw_hire or '—'
             
             cur.execute("""
                 SELECT ea.*, e.title as exam_title, e.number_of_questions

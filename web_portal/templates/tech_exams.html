@@ -217,12 +217,16 @@
                             <span>PHOTO</span>
                         </div>
                         <div style="font-size:11px; line-height:1.4; color:var(--text);">
-                            <div style="color:var(--text-sec); font-size:9px; font-weight:700;">NOM & PRÉNOM :</div>
+                            <div style="color:var(--text-sec); font-size:9px; font-weight:700;">NOM &amp; PRÉNOM :</div>
                             <div style="font-weight:700; margin-bottom:4px;">{{ card.name.upper() }}</div>
                             <div style="color:var(--text-sec); font-size:9px; font-weight:700;">MATRICULE :</div>
                             <div style="font-weight:700; margin-bottom:4px;">{{ card.matricule }}</div>
                             <div style="color:var(--text-sec); font-size:9px; font-weight:700;">ÉQUIPE (SHIFT) :</div>
-                            <div style="font-weight:700;">{{ card.shift }}</div>
+                            <div style="font-weight:700; margin-bottom:4px;">Shift {{ card.shift }}</div>
+                            <div style="color:var(--text-sec); font-size:9px; font-weight:700;">TÉLÉPHONE :</div>
+                            <div style="font-weight:700; margin-bottom:4px;">{{ card.phone or '—' }}</div>
+                            <div style="color:var(--text-sec); font-size:9px; font-weight:700;">DATE D'EMBAUCHE :</div>
+                            <div style="font-weight:700;">{{ card.formatted_hire_date or card.hire_date or '—' }}</div>
                         </div>
                     </div>
 

@@ -131,14 +131,21 @@ def generate_technician_card_pdf(tech_details: dict) -> str:
         # Load and scale the image flowable
         photo_table = Image(photo_path, width=90, height=100)
         
+    hire_str = str(tech_details.get('formatted_hire_date') or tech_details.get('hire_date') or '—')
+    phone_str = str(tech_details.get('phone') or '—')
+
     # User info side flowables
     info_data = [
-        [Paragraph("NOM & PRÉNOM :", label_style)],
+        [Paragraph("NOM &amp; PRÉNOM :", label_style)],
         [Paragraph(tech_details.get('name', 'N/A').upper(), val_style)],
         [Paragraph("MATRICULE :", label_style)],
         [Paragraph(tech_details.get('matricule', 'N/A'), val_style)],
         [Paragraph("ÉQUIPE (SHIFT) :", label_style)],
-        [Paragraph(tech_details.get('shift', 'A'), val_style)]
+        [Paragraph(f"Shift {tech_details.get('shift', 'A')}", val_style)],
+        [Paragraph("TÉLÉPHONE :", label_style)],
+        [Paragraph(phone_str, val_style)],
+        [Paragraph("DATE D'EMBAUCHE :", label_style)],
+        [Paragraph(hire_str, val_style)]
     ]
     info_table = Table(info_data, colWidths=[150])
     info_table.setStyle(TableStyle([
