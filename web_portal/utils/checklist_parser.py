@@ -252,6 +252,7 @@ def _detect_result_obs_columns(ws, week_str: str = ""):
             if col_target:
                 break
 
+    month_grid_cols = None
     # ── S2: Contiguous 1-12 monthly grid (EXACT matching) ──────────────────────
     if not col_target:
         for r in range(1, 30):
@@ -264,6 +265,7 @@ def _detect_result_obs_columns(ws, week_str: str = ""):
                         break
                 if vals == list(range(1, 13)):
                     col_target = c + (current_month - 1)
+                    month_grid_cols = (c, c + 11)
                     break
             if col_target:
                 break
@@ -300,7 +302,26 @@ def _detect_result_obs_columns(ws, week_str: str = ""):
     if not col_target:
         col_target = 8
 
-    col_obs = col_target + 1
+    # Look for an explicit observation / remarks column header
+    col_obs = None
+    obs_kw = ["OBSERVATION", "OBSERVATIONS", "REMARQUE", "REMARQUES", "COMMENTAIRE", "COMMENTAIRES"]
+    for r in range(1, 30):
+        for c_scan in range(1, max_col):
+            val = str(ws.cell(row=r, column=c_scan).value or "").strip().upper()
+            if any(k in val for k in obs_kw):
+                col_obs = c_scan
+                break
+        if col_obs:
+            break
+
+    # If no explicit observation header found:
+    if not col_obs:
+        # If we are in a 12-month grid, col_obs must NEVER fall inside the 12-month range
+        if month_grid_cols and month_grid_cols[0] <= (col_target + 1) <= month_grid_cols[1]:
+            col_obs = None
+        else:
+            col_obs = col_target + 1
+
     return col_target, col_obs
 
 
@@ -660,8 +681,10 @@ def save_filled_checklist(
     # ── Step 3: Detect which column receives Result and Observation ────────────
     week_str = metadata.get('week', '')
     col_target, col_obs = _detect_result_obs_columns(ws, week_str)
-    print(f"[EXCEL] Result column: {col_target} ({openpyxl.utils.get_column_letter(col_target)}), "
-          f"Observation column: {col_obs} ({openpyxl.utils.get_column_letter(col_obs)})")
+    col_target_letter = openpyxl.utils.get_column_letter(col_target) if col_target else 'None'
+    col_obs_letter = openpyxl.utils.get_column_letter(col_obs) if col_obs else 'None'
+    print(f"[EXCEL] Result column: {col_target} ({col_target_letter}), "
+          f"Observation column: {col_obs} ({col_obs_letter})")
 
     color_ok  = "008000"   # green  → +
     color_nok = "FF0000"   # red    → -
@@ -694,31 +717,56 @@ def save_filled_checklist(
             ''
         )
 
-        if symbol:
+        # ── Step 4a: Write Result into Current Month / Target Column ──────────
+        # All options (Valeur, +, -, NA) write to the exact same current month column (col_target).
+        # When 'Valeur' is entered, display the entered value in the current month column.
+        # Otherwise, display the status symbol (+, -, N/A).
+        cell_val = None
+        font_color = "000000"
+
+        if val:
+            # Clean and parse numeric values if applicable
+            val_clean = val.replace(',', '.').strip()
+            try:
+                if '.' in val_clean:
+                    cell_val = float(val_clean)
+                else:
+                    cell_val = int(val_clean)
+            except (ValueError, TypeError):
+                cell_val = val
+
+            if symbol == '-':
+                font_color = color_nok
+            elif symbol == '+':
+                font_color = color_ok
+            elif symbol in ('N/A', 'NA'):
+                font_color = color_na
+            else:
+                font_color = "002060"  # Professional dark navy for measured values
+        elif symbol:
+            cell_val = symbol
+            font_color = color_ok if symbol == '+' else (color_nok if symbol == '-' else color_na)
+
+        if cell_val is not None:
             cell = ws.cell(row=row_num, column=col_target)
             dest = _get_writeable_cell(ws, cell)
             if dest:
-                dest.value = symbol
-                color = color_ok if symbol == '+' else (color_nok if symbol == '-' else color_na)
+                dest.value = cell_val
                 try:
-                    dest.font = Font(bold=True, color=color, name="Calibri", size=11)
+                    dest.font = Font(bold=True, color=font_color, name="Calibri", size=11)
+                    dest.alignment = Alignment(horizontal="center", vertical="center")
                 except Exception:
-                    dest.font = Font(bold=True, color=color)
+                    dest.font = Font(bold=True, color=font_color)
                 written += 1
 
-        # Observation / value → adjacent observation cell
-        obs_parts = []
-        if val:
-            obs_parts.append(val)
-        if obs:
-            obs_parts.append(obs)
-        full_obs = " | ".join(obs_parts)
-
-        if full_obs:
+        # ── Step 4b: Write Observation Remark into col_obs ────────────────────
+        # Only text observations (obs) go to the observation column — NEVER 'val'!
+        # And ensure col_obs is valid and does not collide with col_target
+        if obs and col_obs and col_obs != col_target:
             obs_cell = ws.cell(row=row_num, column=col_obs)
             obs_dest = _get_writeable_cell(ws, obs_cell)
             if obs_dest:
-                obs_dest.value = full_obs
+                obs_dest.value = obs
                 try:
                     obs_dest.font = Font(
                         color=color_nok if symbol == '-' else "000000",
