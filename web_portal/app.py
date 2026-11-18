@@ -6,6 +6,7 @@ import uuid
 import socket
 import logging
 import secrets
+from typing import Optional, List, Dict, Any
 from functools import wraps
 import pandas as pd
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_file, make_response
@@ -4065,20 +4066,85 @@ def pma_document_task_docs():
     return jsonify({'success': True, 'documents': docs, 'count': len(docs)})
 
 
+def _resolve_safe_doc_path(file_path: str) -> Optional[str]:
+    """
+    Safely resolves any document path (relative or absolute) to a verified
+    absolute file path on disk, preventing Flask send_file from prepending root_path.
+    """
+    if not file_path:
+        return None
+    file_path_str = str(file_path).strip()
+
+    # 1. If already absolute and exists
+    if os.path.isabs(file_path_str) and os.path.isfile(file_path_str):
+        return os.path.abspath(file_path_str)
+
+    # 2. Check relative to current working directory (workspace root)
+    cand_cwd = os.path.abspath(file_path_str)
+    if os.path.isfile(cand_cwd):
+        return cand_cwd
+
+    # 3. Check inside active_base/documents/preventive_uploads by basename
+    base_name = os.path.basename(file_path_str)
+    cand_uploads = os.path.abspath(os.path.join(pma_config.active_base, "documents", "preventive_uploads", base_name))
+    if os.path.isfile(cand_uploads):
+        return cand_uploads
+
+    # 4. Check relative to active_base
+    cand_base = os.path.abspath(os.path.join(pma_config.active_base, file_path_str))
+    if os.path.isfile(cand_base):
+        return cand_base
+
+    # 5. Check relative to web_portal directory parent
+    cand_parent = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", file_path_str))
+    if os.path.isfile(cand_parent):
+        return cand_parent
+
+    return None
+
+
 @app.route('/pma/document/file/<int:doc_id>')
 @login_required
 def pma_document_view_file(doc_id: int):
-    """Serve the original uploaded document for inline browser viewing."""
+    """Serve the original uploaded document for inline browser viewing with auto-resolution and healing."""
     doc = prev_doc_mgr.get_document_by_id(doc_id)
     if not doc:
         return "Document introuvable.", 404
 
-    file_path = doc.get('file_path')
-    if not file_path or not os.path.exists(file_path):
+    raw_path = doc.get('file_path') or ''
+    file_path = _resolve_safe_doc_path(raw_path)
+
+    # Auto-healing: if file is not found on disk, but it is a checklist execution PDF, regenerate it
+    if not file_path:
+        stored_fn = doc.get('stored_filename') or os.path.basename(raw_path)
+        match = re.search(r'exec(\d+)', stored_fn or raw_path)
+        if match:
+            exec_id = int(match.group(1))
+            exec_record = checklist_mgr.get_execution_by_id(exec_id)
+            if exec_record:
+                version_id = exec_record.get('version_id')
+                tasks = checklist_mgr.get_items_for_version(version_id) if version_id else []
+                regen_dir = os.path.join(pma_config.active_base, "documents", "preventive_uploads")
+                os.makedirs(regen_dir, exist_ok=True)
+                regen_path = os.path.abspath(os.path.join(regen_dir, stored_fn or f"checklist_web_exec{exec_id}.pdf"))
+                try:
+                    from core.checklist_pdf_generator import generate_completed_checklist_pdf
+                    if generate_completed_checklist_pdf(exec_record, tasks, regen_path) and os.path.isfile(regen_path):
+                        file_path = regen_path
+                        with prev_doc_mgr._get_conn() as conn:
+                            conn.cursor().execute("UPDATE preventive_documents SET file_path = ? WHERE id = ?", (regen_path, doc_id))
+                            conn.commit()
+                        logger.info(f"[PMA-DOC] Auto-healed and regenerated PDF for doc #{doc_id}: {regen_path}")
+                except Exception as _e_reg:
+                    logger.error(f"[PMA-DOC] Error regenerating missing doc PDF: {_e_reg}")
+
+    if not file_path or not os.path.isfile(file_path):
         return "Fichier physique introuvable sur le disque.", 404
 
+    # ALWAYS pass an absolute path to send_file so Flask does not prepend root_path
+    abs_file_path = os.path.abspath(file_path)
     mimetype = doc.get('mime_type') or ('application/pdf' if doc.get('file_type') == 'pdf' else 'image/jpeg')
-    return send_file(file_path, mimetype=mimetype, as_attachment=False)
+    return send_file(abs_file_path, mimetype=mimetype, as_attachment=False)
 
 
 @app.route('/pma/document/download/<int:doc_id>')
@@ -4089,14 +4155,16 @@ def pma_document_download(doc_id: int):
     if not doc:
         return "Document introuvable.", 404
 
-    file_path = doc.get('file_path')
-    if not file_path or not os.path.exists(file_path):
+    raw_path = doc.get('file_path') or ''
+    file_path = _resolve_safe_doc_path(raw_path)
+    if not file_path or not os.path.isfile(file_path):
         return "Fichier physique introuvable sur le disque.", 404
 
+    abs_file_path = os.path.abspath(file_path)
     return send_file(
-        file_path,
+        abs_file_path,
         as_attachment=True,
-        download_name=doc.get('original_filename') or os.path.basename(file_path)
+        download_name=doc.get('original_filename') or os.path.basename(abs_file_path)
     )
 
 
