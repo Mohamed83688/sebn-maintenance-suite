@@ -129,6 +129,56 @@
     background: var(--bg-page); border: 1px solid var(--border);
     color: var(--text-sec); margin-left: auto;
 }
+
+/* Manual Preventive Document Upload & Viewer Styles */
+.pma-dropzone {
+    border: 2px dashed #CBD5E1;
+    border-radius: 12px;
+    padding: 24px 16px;
+    text-align: center;
+    background: #F8FAFC;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.pma-dropzone:hover, .pma-dropzone.drag-over {
+    border-color: var(--primary);
+    background: rgba(46,0,139,0.03);
+}
+
+.badge-doc-pending {
+    background: #FEF3C7;
+    color: #92400E;
+    border: 1px solid #FCD34D;
+}
+
+.badge-doc-validated {
+    background: #ECFDF5;
+    color: #065F46;
+    border: 1px solid #A7F3D0;
+}
+
+.badge-doc-rejected {
+    background: #FEF2F2;
+    color: #991B1B;
+    border: 1px solid #FECACA;
+}
+
+.doc-tab-btn {
+    padding: 5px 12px;
+    border-radius: 6px;
+    font-size: 11.5px;
+    font-weight: 700;
+    cursor: pointer;
+    border: 1px solid #CBD5E1;
+    background: #FFFFFF;
+    color: var(--text);
+    transition: all 0.15s ease;
+}
+.doc-tab-btn.active {
+    background: var(--primary);
+    color: #FFFFFF;
+    border-color: var(--primary);
+}
 </style>
 {% endblock %}
 
@@ -168,7 +218,18 @@
                 <div class="hero-counter-val" style="color:var(--warning);" data-count="{{ stats.pending }}">{{ stats.pending }}</div>
                 <div class="hero-counter-lbl">En Attente</div>
             </div>
+            <div class="hero-counter">
+                <div class="hero-counter-val" style="color:#7C3AED;" data-count="{{ stats.manual_docs_count|default(0) }}">{{ stats.manual_docs_count|default(0) }}</div>
+                <div class="hero-counter-lbl">Fiches Papier</div>
+            </div>
         </div>
+
+        {% if stats.pending_validations and stats.pending_validations > 0 %}
+        <div style="margin-top:14px; background:#FEF3C7; border:1px solid #FCD34D; border-radius:10px; padding:10px 16px; display:inline-flex; align-items:center; gap:10px; font-size:12.5px; color:#92400E; font-weight:700;">
+            <i class="fa-solid fa-triangle-exclamation" style="color:#D97706; font-size:15px;"></i>
+            <span>{{ stats.pending_validations }} fiche(s) manuelle(s) en attente de validation par la hiérarchie.</span>
+        </div>
+        {% endif %}
     </div>
 </div>
 
@@ -263,27 +324,96 @@
                     <td style="font-size:12px; color:var(--text-sec); font-weight:700;">{{ t.week }}</td>
                     <td style="font-size:12px; color:var(--text-sec);">{{ t.month }}</td>
                     <td>
-                        <span class="badge {% if is_done %}badge-success{% else %}badge-warning{% endif %}">
-                            <i class="fa-solid {% if is_done %}fa-check-circle{% else %}fa-clock{% endif %}"></i>
-                            {{ 'COMPLÉTÉ' if is_done else 'EN ATTENTE' }}
+                        {% if t.doc_status == 'VALIDATED' %}
+                        <span class="badge badge-success" title="Tableau validé sur document papier">
+                            <i class="fa-solid fa-file-circle-check"></i> Fiche Validée
                         </span>
+                        {% elif t.doc_status == 'PENDING' %}
+                        <span class="badge" style="background:#FEF3C7; color:#92400E; border:1px solid #FCD34D;" title="Fiche papier déposée — En attente de validation">
+                            <i class="fa-solid fa-clock-rotate-left"></i> En attente
+                        </span>
+                        {% elif t.doc_status == 'REJECTED' %}
+                        <span class="badge badge-danger" title="Fiche rejetée par l'administration">
+                            <i class="fa-solid fa-triangle-exclamation"></i> Rejeté
+                        </span>
+                        {% elif is_done %}
+                        <span class="badge badge-success">
+                            <i class="fa-solid fa-check-circle"></i> Complété
+                        </span>
+                        {% else %}
+                        <span class="badge badge-warning">
+                            <i class="fa-solid fa-clock"></i> À faire
+                        </span>
+                        {% endif %}
                     </td>
                     <td>
                         <div class="action-cell">
+                            {% if t.has_documents %}
+                            <button type="button" class="btn btn-primary btn-xs" onclick="openDocViewer(this)"
+                                    data-task-title="{{ t.equipment }} ({{ t.type }})"
+                                    data-task-sub="{{ t.sheet }} — Semaine {{ t.week }}"
+                                    data-docs="{{ t.documents|tojson|forceescape }}"
+                                    title="Voir le tableau / document validé">
+                                <i class="fa-solid fa-file-lines"></i> Voir le tableau
+                                {% if t.doc_count > 1 %}<span class="badge" style="background:rgba(255,255,255,0.25); font-size:9.5px; padding:1px 5px; margin-left:3px;">{{ t.doc_count }}</span>{% endif %}
+                            </button>
+                            <button type="button" class="btn btn-secondary btn-xs" onclick="openUploadDocModal(this)"
+                                    data-sheet="{{ t.sheet }}"
+                                    data-raw-index="{{ t.raw_index }}"
+                                    data-equip="{{ t.equipment }}"
+                                    data-machine="{{ t.machine_name }}"
+                                    data-type="{{ t.type }}"
+                                    data-week="{{ t.week }}"
+                                    data-month="{{ t.month }}"
+                                    title="Ajouter un document / page supplémentaire">
+                                <i class="fa-solid fa-paperclip"></i>
+                            </button>
+                            {% endif %}
+
                             {% if is_done %}
-                            <button class="btn btn-complete done btn-xs" disabled>
-                                <i class="fa-solid fa-check"></i> Complété
-                            </button>
+                                {% if not t.has_documents %}
+                                <button class="btn btn-complete done btn-xs" disabled>
+                                    <i class="fa-solid fa-check"></i> Complété
+                                </button>
+                                <button type="button" class="btn btn-secondary btn-xs" onclick="openUploadDocModal(this)"
+                                        data-sheet="{{ t.sheet }}"
+                                        data-raw-index="{{ t.raw_index }}"
+                                        data-equip="{{ t.equipment }}"
+                                        data-machine="{{ t.machine_name }}"
+                                        data-type="{{ t.type }}"
+                                        data-week="{{ t.week }}"
+                                        data-month="{{ t.month }}"
+                                        style="font-weight:600; display:inline-flex; align-items:center; gap:4px; font-size:11px;"
+                                        title="Joindre la fiche papier à cette tâche terminée">
+                                    <i class="fa-solid fa-file-arrow-up" style="color:var(--primary);"></i> Joindre fichier
+                                </button>
+                                {% endif %}
                             {% else %}
-                            <a href="{{ url_for('checklist', sheet=t.sheet, idx=t.raw_index, type=t.type, equip=t.equipment, week=t.week) }}"
-                               class="btn btn-primary btn-xs" title="Exécuter la checklist préventive">
-                                <i class="fa-solid fa-clipboard-check"></i> Checklist
-                            </a>
-                            <button class="btn btn-success btn-xs btn-complete"
-                                    onclick="completeTask(this,'{{ t.sheet|replace("'","\\'") }}',{{ t.raw_index }},'{{ t.type }}')"
-                                    title="Valider la tâche">
-                                <i class="fa-solid fa-check"></i>
-                            </button>
+                                {% if not t.has_documents %}
+                                <button type="button" class="btn btn-secondary btn-xs" onclick="openUploadDocModal(this)"
+                                        data-sheet="{{ t.sheet }}"
+                                        data-raw-index="{{ t.raw_index }}"
+                                        data-equip="{{ t.equipment }}"
+                                        data-machine="{{ t.machine_name }}"
+                                        data-type="{{ t.type }}"
+                                        data-week="{{ t.week }}"
+                                        data-month="{{ t.month }}"
+                                        style="font-weight:600; display:inline-flex; align-items:center; gap:5px; background:#FFFFFF; border:1px solid #CBD5E1; color:var(--primary);"
+                                        title="Valider le tableau manuellement par scan ou photo">
+                                    <i class="fa-solid fa-file-arrow-up" style="color:var(--primary);"></i> Valider le tableau
+                                </button>
+                                {% endif %}
+                                <a href="{{ url_for('checklist', sheet=t.sheet, idx=t.raw_index, type=t.type, equip=t.equipment, week=t.week) }}"
+                                   class="btn btn-primary btn-xs" title="Exécuter la checklist préventive">
+                                    <i class="fa-solid fa-clipboard-check"></i> Checklist
+                                </a>
+                                {% if session.get('role') in ['OWNER', 'ADMIN', 'admin'] %}
+                                <button class="btn btn-success btn-xs btn-complete"
+                                        onclick="completeTask(this,'{{ t.sheet|replace("'","\\'") }}',{{ t.raw_index }},'{{ t.type }}')"
+                                        title="Validation rapide administrateur">
+                                    <i class="fa-solid fa-check"></i>
+                                </button>
+                                {% endif %}
                             {% endif %}
                         </div>
                     </td>
@@ -334,6 +464,226 @@
     </div>
 </div>
 {% endif %}
+
+<!-- ============================================================== -->
+<!-- MANUAL PREVENTIVE VALIDATION & UPLOAD MODAL                    -->
+<!-- ============================================================== -->
+<div class="modal-overlay" id="pma-doc-upload-modal">
+    <div class="modal-box" style="max-width: 620px; width:92%; max-height:92vh; overflow-y:auto; border-radius:14px;">
+        <div class="modal-close" onclick="closeDocUploadModal()">
+            <i class="fa-solid fa-xmark"></i>
+        </div>
+        
+        <div style="display:flex; align-items:center; gap:12px; margin-bottom:18px;">
+            <div style="width:42px; height:42px; border-radius:10px; background:linear-gradient(135deg, #2E008B 0%, #4A00E0 100%); display:flex; align-items:center; justify-content:center; font-size:18px; color:#FFFFFF; flex-shrink:0;">
+                <i class="fa-solid fa-file-arrow-up"></i>
+            </div>
+            <div>
+                <h3 style="font-size:16px; font-weight:800; color:var(--text); margin:0;">Valider le Tableau Préventif</h3>
+                <p style="font-size:12px; color:var(--text-sec); margin:2px 0 0 0;">Importer la photo ou le scan du tableau papier pour validation</p>
+            </div>
+        </div>
+
+        <!-- Task Info Banner -->
+        <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; padding:12px 16px; margin-bottom:18px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                <div>
+                    <span style="font-size:10.5px; text-transform:uppercase; font-weight:700; color:var(--text-sec); letter-spacing:0.5px;">Équipement</span>
+                    <div style="font-family:monospace; font-weight:800; font-size:14px; color:var(--text);" id="upload-doc-equip">—</div>
+                </div>
+                <div>
+                    <span style="font-size:10.5px; text-transform:uppercase; font-weight:700; color:var(--text-sec); letter-spacing:0.5px;">Zone / Groupe</span>
+                    <div style="font-weight:700; font-size:13px; color:var(--text);" id="upload-doc-sheet">—</div>
+                </div>
+                <div>
+                    <span style="font-size:10.5px; text-transform:uppercase; font-weight:700; color:var(--text-sec); letter-spacing:0.5px;">Semaine &amp; Type</span>
+                    <div style="font-weight:700; font-size:13px; color:var(--primary);" id="upload-doc-week-type">—</div>
+                </div>
+            </div>
+        </div>
+
+        <form id="pma-doc-upload-form" onsubmit="submitDocUpload(event)" enctype="multipart/form-data">
+            <input type="hidden" name="sheet" id="upload-input-sheet">
+            <input type="hidden" name="raw_index" id="upload-input-raw-index">
+            <input type="hidden" name="equipment" id="upload-input-equip">
+            <input type="hidden" name="machine_name" id="upload-input-machine">
+            <input type="hidden" name="task_type" id="upload-input-type">
+            <input type="hidden" name="week" id="upload-input-week">
+            <input type="hidden" name="month" id="upload-input-month">
+
+            <!-- STEP 1: Upload Dropzone & Camera -->
+            <div class="form-group" style="margin-bottom:16px;">
+                <label class="form-label" style="font-weight:700; display:flex; justify-content:space-between;">
+                    <span>Fichier du Tableau Papier (Photo ou Scan PDF) <span style="color:var(--danger);">*</span></span>
+                    <span style="font-size:11px; font-weight:500; color:var(--text-sec);">JPG, PNG, PDF (max 25 Mo)</span>
+                </label>
+                
+                <div class="pma-dropzone" id="pma-dropzone-box" onclick="document.getElementById('pma-doc-file-input').click()">
+                    <i class="fa-solid fa-cloud-arrow-up" style="font-size:32px; color:var(--primary); margin-bottom:8px;"></i>
+                    <div style="font-weight:700; font-size:13px; color:var(--text);">Cliquez ou glissez-déposez votre photo / document ici</div>
+                    <div style="font-size:11.5px; color:var(--text-sec); margin-top:4px;">
+                        <i class="fa-solid fa-camera" style="margin-right:4px;"></i> Vous pouvez prendre une photo directement depuis un smartphone ou tablette
+                    </div>
+                </div>
+                <input type="file" id="pma-doc-file-input" name="file" accept="image/png,image/jpeg,image/jpg,image/webp,application/pdf" capture="environment" style="display:none;" onchange="handleDocFileSelect(this)">
+            </div>
+
+            <!-- STEP 2: Live Preview Box (Appears after file selection) -->
+            <div id="pma-doc-preview-wrapper" style="display:none; margin-bottom:18px; background:#F8FAFC; border:1px solid #CBD5E1; border-radius:10px; padding:12px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                    <div style="font-size:12px; font-weight:700; color:var(--text); display:flex; align-items:center; gap:6px;">
+                        <i class="fa-solid fa-eye" style="color:var(--primary);"></i> Aperçu du fichier sélectionné
+                    </div>
+                    <button type="button" class="btn btn-glass btn-xs" onclick="clearSelectedDocFile()" style="color:var(--danger); font-size:11px;">
+                        <i class="fa-solid fa-trash"></i> Retirer le fichier
+                    </button>
+                </div>
+
+                <!-- Image preview -->
+                <div id="pma-preview-img-container" style="display:none; text-align:center;">
+                    <img id="pma-preview-img" src="" alt="Aperçu document" style="max-height:220px; max-width:100%; border-radius:6px; border:1px solid #E2E8F0; object-fit:contain; box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+                </div>
+
+                <!-- PDF preview -->
+                <div id="pma-preview-pdf-container" style="display:none; padding:14px; background:#FFFFFF; border-radius:8px; border:1px solid #E2E8F0; display:flex; align-items:center; gap:12px;">
+                    <i class="fa-solid fa-file-pdf" style="font-size:36px; color:#EF4444;"></i>
+                    <div style="flex:1; min-width:0;">
+                        <div id="pma-preview-pdf-name" style="font-weight:700; font-size:13px; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">document.pdf</div>
+                        <div id="pma-preview-pdf-size" style="font-size:11px; color:var(--text-sec);">0 Ko</div>
+                    </div>
+                    <span class="badge badge-info" style="font-size:10px;">PDF Prêt</span>
+                </div>
+
+                <div id="pma-preview-meta" style="margin-top:8px; font-size:11px; color:var(--text-sec); display:flex; justify-content:space-between;">
+                    <span id="pma-preview-filename">—</span>
+                    <span id="pma-preview-filesize">—</span>
+                </div>
+            </div>
+
+            <!-- STEP 3: Details & Comments -->
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:14px;">
+                <div class="form-group">
+                    <label class="form-label" style="font-weight:700;">Date de réalisation <span style="color:var(--danger);">*</span></label>
+                    <input type="date" name="completion_date" id="upload-doc-date" class="form-control" required style="padding:8px 10px; font-size:13px;">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" style="font-weight:700;">Technicien déclarant</label>
+                    <input type="text" class="form-control" value="{{ session.get('name') or session.get('username') }} (Shift {{ session.get('shift', 'A') }})" disabled style="background:#F1F5F9; color:var(--text-sec); padding:8px 10px; font-size:13px;">
+                </div>
+            </div>
+
+            <div class="form-group" style="margin-bottom:16px;">
+                <label class="form-label" style="font-weight:700;">Observations / Commentaire (optionnel)</label>
+                <textarea name="comments" id="upload-doc-comments" class="form-control" rows="2" placeholder="Ex: Travail exécuté sur poste de travail papier, pièces conformes, aucune anomalie..." style="padding:8px 10px; font-size:12.5px; resize:vertical;"></textarea>
+            </div>
+
+            <!-- Admin Immediate Validation Checkbox -->
+            {% if session.get('role') in ['OWNER', 'ADMIN', 'admin'] %}
+            <div style="background:#EEF2FF; border:1px solid #C7D2FE; border-radius:8px; padding:10px 14px; margin-bottom:18px;">
+                <label style="display:flex; align-items:center; gap:9px; cursor:pointer; margin:0; font-size:12.5px; font-weight:700; color:#312E81;">
+                    <input type="checkbox" name="immediate_validate" value="true" checked style="width:16px; height:16px; accent-color:var(--primary);">
+                    <span>Valider et clôturer immédiatement la tâche dans le planning préventif</span>
+                </label>
+            </div>
+            {% endif %}
+
+            <!-- Actions -->
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+                <button type="button" class="btn btn-secondary" onclick="closeDocUploadModal()">Annuler</button>
+                <button type="submit" id="btn-submit-upload-doc" class="btn btn-primary" style="display:inline-flex; align-items:center; gap:6px;">
+                    <i class="fa-solid fa-check"></i> Enregistrer et Envoyer
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ============================================================== -->
+<!-- MANUAL PREVENTIVE DOCUMENT VIEWER MODAL                        -->
+<!-- ============================================================== -->
+<div class="modal-overlay" id="pma-doc-viewer-modal">
+    <div class="modal-box" id="pma-doc-viewer-box" style="max-width: 980px; width:95%; height:90vh; display:flex; flex-direction:column; padding:0; overflow:hidden; border-radius:14px;">
+        
+        <!-- Viewer Header -->
+        <div style="background:#FFFFFF; border-bottom:1px solid #E2E8F0; padding:14px 20px; display:flex; align-items:center; justify-content:space-between; flex-shrink:0;">
+            <div style="display:flex; align-items:center; gap:12px;">
+                <div style="width:38px; height:38px; border-radius:8px; background:var(--primary-light); display:flex; align-items:center; justify-content:center; color:var(--primary); font-size:17px;">
+                    <i class="fa-solid fa-file-lines"></i>
+                </div>
+                <div>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <h3 style="font-size:15px; font-weight:800; color:var(--text); margin:0;" id="viewer-title">Tableau Préventif</h3>
+                        <span id="viewer-status-badge" class="badge badge-success">Validé</span>
+                    </div>
+                    <div style="font-size:11.5px; color:var(--text-sec); margin-top:2px;" id="viewer-sub">—</div>
+                </div>
+            </div>
+
+            <!-- Close & Fullscreen controls -->
+            <div style="display:flex; align-items:center; gap:8px;">
+                <button type="button" class="btn btn-glass btn-sm" onclick="toggleViewerFullscreen()" title="Plein écran">
+                    <i class="fa-solid fa-expand" id="viewer-fs-icon"></i>
+                </button>
+                <button type="button" class="btn btn-glass btn-sm" onclick="closeDocViewerModal()" style="font-size:15px; color:var(--text-sec);">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Toolbar & Document Tabs -->
+        <div style="background:#F8FAFC; border-bottom:1px solid #E2E8F0; padding:8px 16px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; flex-shrink:0;">
+            <!-- Document tabs if multiple pages -->
+            <div id="viewer-doc-tabs" style="display:flex; gap:6px; overflow-x:auto;">
+                <!-- Filled dynamically -->
+            </div>
+
+            <!-- Viewer controls (zoom, rotate, download, print) -->
+            <div style="display:flex; align-items:center; gap:6px; margin-left:auto;">
+                <div id="viewer-img-controls" style="display:inline-flex; align-items:center; gap:4px; background:#FFFFFF; border:1px solid #CBD5E1; border-radius:6px; padding:2px 4px;">
+                    <button type="button" class="btn btn-glass btn-xs" onclick="zoomDocViewer(-0.15)" title="Zoom Arrière"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
+                    <span id="viewer-zoom-level" style="font-size:11px; font-weight:700; min-width:42px; text-align:center;">100%</span>
+                    <button type="button" class="btn btn-glass btn-xs" onclick="zoomDocViewer(0.15)" title="Zoom Avant"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
+                    <button type="button" class="btn btn-glass btn-xs" onclick="resetDocZoom()" title="Taille Réelle (100%)"><i class="fa-solid fa-arrows-rotate"></i></button>
+                    <div style="width:1px; height:16px; background:#CBD5E1; margin:0 2px;"></div>
+                    <button type="button" class="btn btn-glass btn-xs" onclick="rotateDocViewer()" title="Faire pivoter de 90°"><i class="fa-solid fa-rotate-right"></i></button>
+                </div>
+
+                <a id="viewer-download-link" href="#" class="btn btn-secondary btn-xs" title="Télécharger le fichier original">
+                    <i class="fa-solid fa-download"></i> Télécharger
+                </a>
+                <button type="button" class="btn btn-secondary btn-xs" onclick="printDocViewer()" title="Imprimer le document">
+                    <i class="fa-solid fa-print"></i> Imprimer
+                </button>
+            </div>
+        </div>
+
+        <!-- Viewport Stage -->
+        <div id="viewer-stage" style="flex:1; background:#0F172A; overflow:auto; position:relative; display:flex; align-items:center; justify-content:center; padding:16px; min-height:350px;">
+            <!-- Image viewport -->
+            <div id="viewer-img-wrapper" style="display:none; transition:transform 0.15s ease-out; text-align:center; max-width:100%; max-height:100%;">
+                <img id="viewer-current-img" src="" alt="Tableau Préventif Papier" style="max-width:100%; max-height:72vh; border-radius:6px; box-shadow:0 8px 30px rgba(0,0,0,0.5); object-fit:contain; user-select:none;">
+            </div>
+
+            <!-- PDF viewport -->
+            <iframe id="viewer-pdf-frame" src="" style="display:none; width:100%; height:100%; border:none; border-radius:6px; background:#FFFFFF;"></iframe>
+        </div>
+
+        <!-- Details & Admin Validation Footer -->
+        <div style="background:#FFFFFF; border-top:1px solid #E2E8F0; padding:12px 20px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; flex-shrink:0;">
+            <div style="font-size:12px; color:var(--text-sec); display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
+                <span><i class="fa-solid fa-user-check" style="color:var(--primary); margin-right:4px;"></i> Technicien : <strong id="viewer-tech-name" style="color:var(--text);">—</strong></span>
+                <span><i class="fa-solid fa-calendar" style="color:var(--primary); margin-right:4px;"></i> Réalisé le : <strong id="viewer-comp-date" style="color:var(--text);">—</strong></span>
+                <span><i class="fa-solid fa-file" style="color:var(--primary); margin-right:4px;"></i> Fichier : <span id="viewer-filename" style="font-family:monospace;">—</span> (<span id="viewer-filesize">—</span>)</span>
+            </div>
+
+            <!-- Approval actions for Admin/Owner -->
+            <div id="viewer-admin-actions" style="display:flex; align-items:center; gap:8px;">
+                <!-- Injected via JS based on status and role -->
+            </div>
+        </div>
+
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -518,6 +868,483 @@ async function sendPmaExcelToTeamLeader(btn) {
     } catch (e) {
         btn.disabled = false;
         btn.innerHTML = origHtml;
+        alert("❌ Erreur réseau : " + e);
+    }
+}
+
+/* ============================================================== */
+/* PREVENTIVE MANUAL DOCUMENT UPLOAD & VIEWER LOGIC               */
+/* ============================================================== */
+
+function openUploadDocModal(btn) {
+    const sheet = btn.getAttribute('data-sheet') || '';
+    const rawIndex = btn.getAttribute('data-raw-index') || '';
+    const equip = btn.getAttribute('data-equip') || '';
+    const machine = btn.getAttribute('data-machine') || equip;
+    const type = btn.getAttribute('data-type') || '';
+    const week = btn.getAttribute('data-week') || '';
+    const month = btn.getAttribute('data-month') || '';
+
+    document.getElementById('upload-input-sheet').value = sheet;
+    document.getElementById('upload-input-raw-index').value = rawIndex;
+    document.getElementById('upload-input-equip').value = equip;
+    document.getElementById('upload-input-machine').value = machine;
+    document.getElementById('upload-input-type').value = type;
+    document.getElementById('upload-input-week').value = week;
+    document.getElementById('upload-input-month').value = month;
+
+    document.getElementById('upload-doc-equip').textContent = equip + (machine && machine !== equip ? ' (' + machine + ')' : '');
+    document.getElementById('upload-doc-sheet').textContent = sheet || 'Général';
+    document.getElementById('upload-doc-week-type').textContent = (week ? week + ' — ' : '') + type;
+
+    // Default completion date to today
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('upload-doc-date').value = today;
+
+    clearSelectedDocFile();
+    document.getElementById('pma-doc-upload-modal').classList.add('open');
+}
+
+function closeDocUploadModal() {
+    document.getElementById('pma-doc-upload-modal').classList.remove('open');
+    clearSelectedDocFile();
+}
+
+function handleDocFileSelect(input) {
+    if (!input.files || !input.files[0]) return;
+    const file = input.files[0];
+    const previewWrapper = document.getElementById('pma-doc-preview-wrapper');
+    const imgContainer = document.getElementById('pma-preview-img-container');
+    const pdfContainer = document.getElementById('pma-preview-pdf-container');
+    const previewImg = document.getElementById('pma-preview-img');
+    const metaFilename = document.getElementById('pma-preview-filename');
+    const metaFilesize = document.getElementById('pma-preview-filesize');
+
+    // Format size
+    const sizeStr = file.size > 1048576 
+        ? (file.size / 1048576).toFixed(2) + ' Mo' 
+        : (file.size / 1024).toFixed(1) + ' Ko';
+
+    metaFilename.textContent = file.name;
+    metaFilesize.textContent = sizeStr;
+
+    if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            previewImg.src = e.target.result;
+            imgContainer.style.display = 'block';
+            pdfContainer.style.display = 'none';
+            previewWrapper.style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+    } else if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+        document.getElementById('pma-preview-pdf-name').textContent = file.name;
+        document.getElementById('pma-preview-pdf-size').textContent = sizeStr;
+        imgContainer.style.display = 'none';
+        pdfContainer.style.display = 'flex';
+        previewWrapper.style.display = 'block';
+    } else {
+        alert("Veuillez sélectionner une image (JPG, PNG) ou un fichier PDF.");
+        input.value = '';
+        previewWrapper.style.display = 'none';
+    }
+}
+
+function clearSelectedDocFile() {
+    const input = document.getElementById('pma-doc-file-input');
+    if (input) input.value = '';
+    const wrapper = document.getElementById('pma-doc-preview-wrapper');
+    if (wrapper) wrapper.style.display = 'none';
+    const previewImg = document.getElementById('pma-preview-img');
+    if (previewImg) previewImg.src = '';
+}
+
+// Drag & drop support for dropzone
+(function() {
+    const dropzone = document.getElementById('pma-dropzone-box');
+    if (!dropzone) return;
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropzone.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropzone.classList.add('drag-over');
+        }, false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropzone.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropzone.classList.remove('drag-over');
+        }, false);
+    });
+
+    dropzone.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        if (files && files.length) {
+            const input = document.getElementById('pma-doc-file-input');
+            input.files = files;
+            handleDocFileSelect(input);
+        }
+    }, false);
+})();
+
+async function submitDocUpload(e) {
+    e.preventDefault();
+    const form = document.getElementById('pma-doc-upload-form');
+    const fileInput = document.getElementById('pma-doc-file-input');
+    if (!fileInput.files || !fileInput.files[0]) {
+        alert("Veuillez sélectionner ou prendre en photo le tableau à valider.");
+        return;
+    }
+
+    const btn = document.getElementById('btn-submit-upload-doc');
+    const origHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Envoi en cours...';
+
+    const formData = new FormData(form);
+
+    try {
+        const res = await fetch('/pma/document/upload', {
+            method: 'POST',
+            body: formData,
+            headers: {'X-Requested-With': 'XMLHttpRequest'}
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+            btn.innerHTML = '<i class="fa-solid fa-check"></i> ' + (data.message || 'Enregistré !');
+            btn.style.background = 'var(--success)';
+            setTimeout(() => {
+                window.location.reload();
+            }, 800);
+        } else {
+            btn.disabled = false;
+            btn.innerHTML = origHtml;
+            alert("❌ Erreur : " + (data.message || "Impossible d'importer le fichier"));
+        }
+    } catch (err) {
+        btn.disabled = false;
+        btn.innerHTML = origHtml;
+        alert("❌ Erreur de connexion réseau : " + err);
+    }
+}
+
+/* ── DOCUMENT VIEWER STATE & CONTROLS ── */
+let currentViewerDocs = [];
+let currentViewerDocIdx = 0;
+let currentZoom = 1.0;
+let currentRotation = 0;
+
+function openDocViewer(btn) {
+    const rawDocs = btn.getAttribute('data-docs');
+    const taskTitle = btn.getAttribute('data-task-title') || 'Tableau Préventif';
+    const taskSub = btn.getAttribute('data-task-sub') || '';
+
+    try {
+        currentViewerDocs = JSON.parse(rawDocs);
+    } catch (e) {
+        currentViewerDocs = [];
+    }
+
+    if (!currentViewerDocs || currentViewerDocs.length === 0) {
+        alert("Aucun document trouvé pour cette tâche.");
+        return;
+    }
+
+    currentViewerDocIdx = 0;
+    currentZoom = 1.0;
+    currentRotation = 0;
+
+    document.getElementById('viewer-title').textContent = taskTitle;
+    document.getElementById('viewer-sub').textContent = taskSub;
+
+    renderViewerTabs();
+    renderViewerCurrentDoc();
+    document.getElementById('pma-doc-viewer-modal').classList.add('open');
+}
+
+function closeDocViewerModal() {
+    document.getElementById('pma-doc-viewer-modal').classList.remove('open');
+    const frame = document.getElementById('viewer-pdf-frame');
+    if (frame) frame.src = '';
+    const img = document.getElementById('viewer-current-img');
+    if (img) img.src = '';
+}
+
+function renderViewerTabs() {
+    const tabsContainer = document.getElementById('viewer-doc-tabs');
+    tabsContainer.innerHTML = '';
+    if (currentViewerDocs.length <= 1) return;
+
+    currentViewerDocs.forEach((doc, idx) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'doc-tab-btn ' + (idx === currentViewerDocIdx ? 'active' : '');
+        btn.innerHTML = '<i class="fa-solid ' + (doc.file_type === 'pdf' ? 'fa-file-pdf' : 'fa-file-image') + '"></i> Page ' + (idx + 1);
+        btn.onclick = () => switchViewerDoc(idx);
+        tabsContainer.appendChild(btn);
+    });
+}
+
+function switchViewerDoc(idx) {
+    if (idx < 0 || idx >= currentViewerDocs.length) return;
+    currentViewerDocIdx = idx;
+    currentZoom = 1.0;
+    currentRotation = 0;
+    renderViewerTabs();
+    renderViewerCurrentDoc();
+}
+
+function renderViewerCurrentDoc() {
+    const doc = currentViewerDocs[currentViewerDocIdx];
+    if (!doc) return;
+
+    // Status badge
+    const badge = document.getElementById('viewer-status-badge');
+    if (doc.validation_status === 'VALIDATED') {
+        badge.className = 'badge badge-success';
+        badge.innerHTML = '<i class="fa-solid fa-file-circle-check"></i> Validé';
+    } else if (doc.validation_status === 'REJECTED') {
+        badge.className = 'badge badge-danger';
+        badge.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Rejeté';
+    } else {
+        badge.className = 'badge';
+        badge.style.background = '#FEF3C7';
+        badge.style.color = '#92400E';
+        badge.style.border = '1px solid #FCD34D';
+        badge.innerHTML = '<i class="fa-solid fa-clock-rotate-left"></i> En attente de validation';
+    }
+
+    // Metadata
+    document.getElementById('viewer-tech-name').textContent = doc.technician_name + (doc.shift ? ' (Shift ' + doc.shift + ')' : '');
+    document.getElementById('viewer-comp-date').textContent = doc.completion_date || doc.created_at || '—';
+    document.getElementById('viewer-filename').textContent = doc.original_filename || 'document';
+    document.getElementById('viewer-filesize').textContent = doc.file_size_formatted || '';
+
+    // Download link
+    const dlLink = document.getElementById('viewer-download-link');
+    dlLink.href = '/pma/document/download/' + doc.id;
+
+    // Viewport: Image or PDF
+    const imgWrapper = document.getElementById('viewer-img-wrapper');
+    const currentImg = document.getElementById('viewer-current-img');
+    const pdfFrame = document.getElementById('viewer-pdf-frame');
+    const imgControls = document.getElementById('viewer-img-controls');
+
+    if (doc.file_type === 'pdf') {
+        imgWrapper.style.display = 'none';
+        currentImg.src = '';
+        imgControls.style.display = 'none';
+
+        pdfFrame.style.display = 'block';
+        pdfFrame.src = '/pma/document/file/' + doc.id;
+    } else {
+        pdfFrame.style.display = 'none';
+        pdfFrame.src = '';
+        imgControls.style.display = 'inline-flex';
+
+        imgWrapper.style.display = 'block';
+        currentImg.src = '/pma/document/file/' + doc.id;
+        applyDocTransform();
+    }
+
+    // Admin validation controls
+    renderViewerAdminActions(doc);
+}
+
+function applyDocTransform() {
+    const wrapper = document.getElementById('viewer-img-wrapper');
+    const zoomText = document.getElementById('viewer-zoom-level');
+    if (wrapper) {
+        wrapper.style.transform = `scale(${currentZoom}) rotate(${currentRotation}deg)`;
+    }
+    if (zoomText) {
+        zoomText.textContent = Math.round(currentZoom * 100) + '%';
+    }
+}
+
+function zoomDocViewer(delta) {
+    currentZoom = Math.max(0.25, Math.min(4.0, currentZoom + delta));
+    applyDocTransform();
+}
+
+function resetDocZoom() {
+    currentZoom = 1.0;
+    currentRotation = 0;
+    applyDocTransform();
+}
+
+function rotateDocViewer() {
+    currentRotation = (currentRotation + 90) % 360;
+    applyDocTransform();
+}
+
+let isViewerFullscreen = false;
+function toggleViewerFullscreen() {
+    const box = document.getElementById('pma-doc-viewer-box');
+    const icon = document.getElementById('viewer-fs-icon');
+    if (!box) return;
+
+    isViewerFullscreen = !isViewerFullscreen;
+    if (isViewerFullscreen) {
+        box.style.maxWidth = '100vw';
+        box.style.width = '100vw';
+        box.style.height = '100vh';
+        box.style.borderRadius = '0';
+        if (icon) icon.className = 'fa-solid fa-compress';
+    } else {
+        box.style.maxWidth = '980px';
+        box.style.width = '95%';
+        box.style.height = '90vh';
+        box.style.borderRadius = '14px';
+        if (icon) icon.className = 'fa-solid fa-expand';
+    }
+}
+
+function printDocViewer() {
+    const doc = currentViewerDocs[currentViewerDocIdx];
+    if (!doc) return;
+
+    if (doc.file_type === 'pdf') {
+        const frame = document.getElementById('viewer-pdf-frame');
+        if (frame && frame.contentWindow) {
+            frame.contentWindow.focus();
+            frame.contentWindow.print();
+            return;
+        }
+    }
+
+    // For images or fallback
+    const printWindow = window.open('/pma/document/file/' + doc.id, '_blank');
+    if (printWindow) {
+        printWindow.onload = function() {
+            printWindow.focus();
+            printWindow.print();
+        };
+    }
+}
+
+function renderViewerAdminActions(doc) {
+    const container = document.getElementById('viewer-admin-actions');
+    container.innerHTML = '';
+
+    {% if session.get('role') in ['OWNER', 'ADMIN', 'admin'] %}
+    if (doc.validation_status === 'PENDING') {
+        const valBtn = document.createElement('button');
+        valBtn.type = 'button';
+        valBtn.className = 'btn btn-success btn-sm';
+        valBtn.innerHTML = '<i class="fa-solid fa-check"></i> Valider la Fiche &amp; Clôturer Tâche';
+        valBtn.onclick = () => adminValidateDoc(doc.id);
+        container.appendChild(valBtn);
+
+        const rejBtn = document.createElement('button');
+        rejBtn.type = 'button';
+        rejBtn.className = 'btn btn-danger btn-sm';
+        rejBtn.innerHTML = '<i class="fa-solid fa-xmark"></i> Rejeter';
+        rejBtn.onclick = () => adminRejectDoc(doc.id);
+        container.appendChild(rejBtn);
+    } else if (doc.validation_status === 'VALIDATED') {
+        const okPill = document.createElement('span');
+        okPill.className = 'badge badge-success';
+        okPill.style.padding = '6px 12px';
+        okPill.style.fontSize = '12px';
+        okPill.innerHTML = '<i class="fa-solid fa-shield-check"></i> Validé par ' + (doc.validated_by || 'Admin') + (doc.validated_at ? ' le ' + doc.validated_at : '');
+        container.appendChild(okPill);
+    } else if (doc.validation_status === 'REJECTED') {
+        const rejPill = document.createElement('span');
+        rejPill.className = 'badge badge-danger';
+        rejPill.style.padding = '6px 12px';
+        rejPill.style.fontSize = '12px';
+        rejPill.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Rejeté : ' + (doc.rejection_reason || 'Document non conforme');
+        container.appendChild(rejPill);
+
+        const reValBtn = document.createElement('button');
+        reValBtn.type = 'button';
+        reValBtn.className = 'btn btn-success btn-sm';
+        reValBtn.innerHTML = '<i class="fa-solid fa-check"></i> Ré-approuver';
+        reValBtn.onclick = () => adminValidateDoc(doc.id);
+        container.appendChild(reValBtn);
+    }
+
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'btn btn-glass btn-sm';
+    delBtn.style.color = 'var(--danger)';
+    delBtn.title = 'Supprimer ce document';
+    delBtn.innerHTML = '<i class="fa-solid fa-trash"></i>';
+    delBtn.onclick = () => adminDeleteDoc(doc.id);
+    container.appendChild(delBtn);
+    {% else %}
+    if (doc.validation_status === 'PENDING') {
+        const info = document.createElement('span');
+        info.className = 'badge badge-warning';
+        info.style.padding = '6px 12px';
+        info.innerHTML = '<i class="fa-solid fa-clock"></i> En cours d\'examen par l\'administrateur';
+        container.appendChild(info);
+    }
+    {% endif %}
+}
+
+async function adminValidateDoc(docId) {
+    if (!confirm("Confirmer la validation de ce tableau préventif ?\nLa tâche sera marquée complétée dans le planning.")) return;
+    try {
+        const res = await fetch('/pma/document/validate/' + docId, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'}
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+            alert("✅ " + data.message);
+            window.location.reload();
+        } else {
+            alert("❌ Erreur : " + (data.message || "Impossible de valider"));
+        }
+    } catch (e) {
+        alert("❌ Erreur réseau : " + e);
+    }
+}
+
+async function adminRejectDoc(docId) {
+    const reason = prompt("Motif de rejet du document (ex: photo illisible, tableau incomplet...) :", "Document illisible ou incomplet");
+    if (reason === null) return;
+
+    try {
+        const res = await fetch('/pma/document/reject/' + docId, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({reason: reason.trim()})
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+            alert("✅ " + data.message);
+            window.location.reload();
+        } else {
+            alert("❌ Erreur : " + (data.message || "Impossible de rejeter"));
+        }
+    } catch (e) {
+        alert("❌ Erreur réseau : " + e);
+    }
+}
+
+async function adminDeleteDoc(docId) {
+    if (!confirm("Supprimer définitivement ce document et son fichier sur le disque ?\nCette action est irréversible.")) return;
+
+    try {
+        const res = await fetch('/pma/document/delete/' + docId, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'}
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+            alert("✅ " + data.message);
+            window.location.reload();
+        } else {
+            alert("❌ Erreur : " + (data.message || "Impossible de supprimer"));
+        }
+    } catch (e) {
         alert("❌ Erreur réseau : " + e);
     }
 }

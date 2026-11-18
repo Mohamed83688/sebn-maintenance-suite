@@ -93,6 +93,13 @@ attendance_mgr = AttendanceManager(db_path=IMA_DB_PATH, data_dir=pma_config.acti
 # Organizational Chart & Structure Manager (SQLite)
 org_mgr = OrgChartManager(db_path=IMA_DB_PATH, data_dir=pma_config.active_base)
 
+# Manual Preventive Documents Manager (Scans, Photos, PDFs & Validations)
+from core.preventive_doc_manager import PreventiveDocManager
+prev_doc_mgr = PreventiveDocManager(
+    db_path=IMA_DB_PATH,
+    storage_dir=os.path.join(pma_config.active_base, "documents", "preventive_uploads")
+)
+
 # Manager Action Plan workbook path
 MANAGER_PLAN_PATH = os.path.join(pma_config.active_base, "manager_plan_performance.xlsx")
 
@@ -3768,13 +3775,43 @@ def pma_dashboard():
                 "raw_index":    str(r.get(col_ri, ''))
             })
 
-        # Always sort: pending tasks first, completed tasks at bottom
+        # Map manual preventive documents
+        try:
+            doc_map = prev_doc_mgr.get_all_documents_map()
+        except Exception as _e_doc:
+            logger.error(f"[PMA] Error loading doc_map: {_e_doc}")
+            doc_map = {}
+
+        manual_docs_count = 0
+        pending_validations_count = 0
+
+        for t in tasks:
+            k_full = prev_doc_mgr.build_task_key(t['sheet'], t['raw_index'], t['equipment'], t['week'], t['type'])
+            k_simple = f"{t['sheet']}__{t['raw_index']}"
+            t_docs = doc_map.get(k_full) or doc_map.get(k_simple) or []
+            t['documents'] = t_docs
+            t['doc_count'] = len(t_docs)
+            t['has_documents'] = len(t_docs) > 0
+            if t_docs:
+                manual_docs_count += len(t_docs)
+                latest = t_docs[0]
+                t['latest_doc'] = latest
+                t['doc_status'] = latest.get('validation_status')
+                if latest.get('validation_status') == 'PENDING':
+                    pending_validations_count += 1
+            else:
+                t['latest_doc'] = None
+                t['doc_status'] = None
+
+        # Always sort: pending validations first, active tasks second, completed tasks last
         def sort_key(t):
             is_done = str(t.get('status', '')).upper().strip() in ('COMPLÉTÉ', 'COMPLETE', 'DONE', 'OK', 'TERMINÉ')
+            has_pending_doc = t.get('doc_status') == 'PENDING'
             w_str   = str(t.get('week', ''))
             digits  = "".join(filter(str.isdigit, w_str))
             w_num   = int(digits) if digits else 999
-            return (1 if is_done else 0, w_num)
+            priority = 0 if has_pending_doc else (2 if is_done else 1)
+            return (priority, w_num)
 
         tasks.sort(key=sort_key)
 
@@ -3789,6 +3826,8 @@ def pma_dashboard():
             'done': t_done,
             'pending': t_pending,
             'rate': t_rate,
+            'manual_docs_count': manual_docs_count,
+            'pending_validations': pending_validations_count,
             'is_filtered': is_filtered
         }
     else:
@@ -3798,6 +3837,8 @@ def pma_dashboard():
             'done': raw_stats.get('done', 0) if not is_filtered else 0,
             'pending': raw_stats.get('pending', 0) if not is_filtered else 0,
             'rate': raw_stats.get('rate', 0) if not is_filtered else 0,
+            'manual_docs_count': 0,
+            'pending_validations': 0,
             'is_filtered': is_filtered
         }
 
@@ -3901,6 +3942,203 @@ def reset_task():
     except Exception as e:
         logger.error(f"Reset task error: {e}")
     return jsonify({"status": "error", "message": "Impossible de réinitialiser la tâche."}), 400
+
+
+# =============================================================
+# PREVENTIVE MANUAL VALIDATION & DOCUMENT UPLOAD ROUTES
+# =============================================================
+
+@app.route('/pma/document/upload', methods=['POST'])
+@login_required
+def pma_document_upload():
+    """Upload a scanned or photographed manual preventive table."""
+    file = request.files.get('file')
+    if not file or not file.filename:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json:
+            return jsonify({'success': False, 'message': "Aucun fichier sélectionné."}), 400
+        flash("Aucun fichier sélectionné.", "danger")
+        return redirect(url_for('pma_dashboard'))
+
+    sheet = request.form.get('sheet', '').strip()
+    raw_index = request.form.get('raw_index', '').strip()
+    equipment = request.form.get('equipment', '').strip()
+    machine_name = request.form.get('machine_name', equipment).strip()
+    task_type = request.form.get('task_type', '').strip()
+    week = request.form.get('week', '').strip()
+    month = request.form.get('month', '').strip()
+    completion_date = request.form.get('completion_date', '').strip() or datetime.date.today().strftime('%Y-%m-%d')
+    comments = request.form.get('comments', '').strip()
+
+    immediate_validate = (
+        request.form.get('immediate_validate') in ('true', '1', 'on') and 
+        session.get('role') in ('OWNER', 'ADMIN', 'admin')
+    )
+    initial_status = "VALIDATED" if immediate_validate else "PENDING"
+
+    tech_name = session.get('name') or session.get('username') or 'Inconnu'
+    tech_mat = session.get('matricule') or ''
+    tech_id = session.get('user_id')
+    shift = session.get('shift') or 'A'
+
+    ok, msg, doc = prev_doc_mgr.save_uploaded_document(
+        file_obj=file,
+        equipment=equipment,
+        machine_name=machine_name,
+        sheet=sheet,
+        raw_index=raw_index,
+        task_type=task_type,
+        week=week,
+        month=month,
+        technician_name=tech_name,
+        technician_matricule=tech_mat,
+        technician_id=tech_id,
+        shift=shift,
+        completion_date=completion_date,
+        comments=comments,
+        initial_status=initial_status
+    )
+
+    if not ok:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json:
+            return jsonify({'success': False, 'message': msg}), 400
+        flash(msg, "danger")
+        return redirect(url_for('pma_dashboard', week=week, sheet=sheet))
+
+    # If immediately validated by admin, complete task in PMA engine
+    if immediate_validate and doc:
+        try:
+            prev_doc_mgr.validate_document(doc['id'], validated_by=session.get('username', 'admin'))
+            eng = get_pma_engine()
+            eng.complete_task(sheet, raw_index, task_type, tech_name, shift)
+            invalidate_pma_cache()
+            logger.info(f"[PMA-DOC] Task auto-completed via immediate validation: {equipment} / {sheet}")
+        except Exception as e:
+            logger.error(f"[PMA-DOC] Error auto-completing task in engine: {e}")
+
+    success_msg = "Tableau préventif importé et validé avec succès !" if immediate_validate else "Fiche préventive envoyée avec succès pour validation."
+
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json:
+        return jsonify({
+            'success': True,
+            'message': success_msg,
+            'document': doc
+        })
+
+    flash(success_msg, "success")
+    return redirect(url_for('pma_dashboard', week=week, sheet=sheet))
+
+
+@app.route('/pma/document/task-docs')
+@login_required
+def pma_document_task_docs():
+    """Returns JSON list of all documents attached to a specific task."""
+    sheet = request.args.get('sheet', '')
+    raw_index = request.args.get('raw_index', '')
+    equipment = request.args.get('equipment', '')
+    week = request.args.get('week', '')
+    task_type = request.args.get('task_type', '')
+
+    docs = prev_doc_mgr.get_documents_for_task(
+        sheet=sheet, raw_index=raw_index, equipment=equipment, week=week, task_type=task_type
+    )
+    return jsonify({'success': True, 'documents': docs, 'count': len(docs)})
+
+
+@app.route('/pma/document/file/<int:doc_id>')
+@login_required
+def pma_document_view_file(doc_id: int):
+    """Serve the original uploaded document for inline browser viewing."""
+    doc = prev_doc_mgr.get_document_by_id(doc_id)
+    if not doc:
+        return "Document introuvable.", 404
+
+    file_path = doc.get('file_path')
+    if not file_path or not os.path.exists(file_path):
+        return "Fichier physique introuvable sur le disque.", 404
+
+    mimetype = doc.get('mime_type') or ('application/pdf' if doc.get('file_type') == 'pdf' else 'image/jpeg')
+    return send_file(file_path, mimetype=mimetype, as_attachment=False)
+
+
+@app.route('/pma/document/download/<int:doc_id>')
+@login_required
+def pma_document_download(doc_id: int):
+    """Download the original uploaded document with its original filename."""
+    doc = prev_doc_mgr.get_document_by_id(doc_id)
+    if not doc:
+        return "Document introuvable.", 404
+
+    file_path = doc.get('file_path')
+    if not file_path or not os.path.exists(file_path):
+        return "Fichier physique introuvable sur le disque.", 404
+
+    return send_file(
+        file_path,
+        as_attachment=True,
+        download_name=doc.get('original_filename') or os.path.basename(file_path)
+    )
+
+
+@app.route('/pma/document/validate/<int:doc_id>', methods=['POST'])
+@admin_required
+def pma_document_validate(doc_id: int):
+    """Validate a pending document and complete the preventive task."""
+    validated_by = session.get('username') or session.get('name') or 'admin'
+    ok, msg, doc = prev_doc_mgr.validate_document(doc_id, validated_by=validated_by)
+    if not ok:
+        return jsonify({'success': False, 'message': msg}), 400
+
+    # Also complete the task in the Excel planning engine
+    try:
+        eng = get_pma_engine()
+        eng.complete_task(
+            doc.get('sheet', ''),
+            doc.get('raw_index', ''),
+            doc.get('task_type', ''),
+            doc.get('technician_name') or validated_by,
+            doc.get('shift') or 'A'
+        )
+        invalidate_pma_cache()
+        logger.info(f"[PMA-DOC] Validated document #{doc_id} and marked task complete: {doc.get('equipment')}")
+    except Exception as e:
+        logger.error(f"[PMA-DOC] Error updating Excel task after doc validation: {e}")
+
+    return jsonify({
+        'success': True,
+        'message': "Document validé avec succès ! La tâche a été marquée complétée dans le planning.",
+        'document': doc
+    })
+
+
+@app.route('/pma/document/reject/<int:doc_id>', methods=['POST'])
+@admin_required
+def pma_document_reject(doc_id: int):
+    """Reject an uploaded document with an optional reason."""
+    rejected_by = session.get('username') or session.get('name') or 'admin'
+    data = request.get_json(silent=True) or {}
+    reason = data.get('reason') or request.form.get('reason', '')
+
+    ok, msg, doc = prev_doc_mgr.reject_document(doc_id, rejected_by=rejected_by, reason=reason)
+    if not ok:
+        return jsonify({'success': False, 'message': msg}), 400
+
+    return jsonify({
+        'success': True,
+        'message': "Document rejeté avec succès.",
+        'document': doc
+    })
+
+
+@app.route('/pma/document/delete/<int:doc_id>', methods=['POST'])
+@admin_required
+def pma_document_delete(doc_id: int):
+    """Delete an uploaded document."""
+    ok, msg = prev_doc_mgr.delete_document(doc_id)
+    if not ok:
+        return jsonify({'success': False, 'message': msg}), 400
+
+    return jsonify({'success': True, 'message': msg})
+
 
 @app.route('/pma/checklist')
 @login_required
