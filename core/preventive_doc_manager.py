@@ -227,25 +227,187 @@ class PreventiveDocManager:
                 docs.append(d)
             return docs
 
+    def register_document_file(
+        self,
+        equipment: str,
+        machine_name: str,
+        sheet: str,
+        raw_index: Any,
+        task_type: str,
+        week: str,
+        month: str,
+        file_path: str,
+        original_filename: str,
+        file_type: str = "pdf",
+        mime_type: str = "application/pdf",
+        technician_name: str = "",
+        technician_matricule: str = "",
+        technician_id: Optional[int] = None,
+        shift: str = "A",
+        completion_date: Optional[str] = None,
+        comments: str = "",
+        validation_status: str = "VALIDATED",
+        validated_by: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Registers an already existing document file (e.g. generated web checklist PDF)
+        directly into the preventive_documents database.
+        """
+        if not file_path or not os.path.exists(file_path):
+            logger.error(f"[PREV-DOC] Cannot register non-existent file: {file_path}")
+            return None
+
+        file_path = os.path.normpath(os.path.abspath(file_path))
+        file_size = os.path.getsize(file_path)
+        stored_filename = os.path.basename(file_path)
+        task_key = self.build_task_key(sheet, raw_index, equipment, week, task_type)
+        comp_date = completion_date or datetime.now().strftime('%Y-%m-%d')
+        now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+        with self._get_conn() as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT id FROM preventive_documents WHERE file_path = ? OR stored_filename = ?", (file_path, stored_filename))
+            existing = cur.fetchone()
+            if existing:
+                return self.get_document_by_id(existing[0])
+
+            cur.execute("""
+            INSERT INTO preventive_documents (
+                equipment, machine_name, sheet, raw_index, task_type, week, month,
+                task_key, original_filename, stored_filename, file_path, file_type,
+                mime_type, file_size, technician_name, technician_matricule, technician_id,
+                shift, completion_date, comments, validation_status, validated_by, validated_at,
+                created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            """, (
+                equipment,
+                machine_name or equipment,
+                sheet,
+                str(raw_index),
+                task_type or 'Monthly',
+                week or '',
+                month or '',
+                task_key,
+                original_filename or stored_filename,
+                stored_filename,
+                file_path,
+                file_type,
+                mime_type,
+                file_size,
+                technician_name,
+                technician_matricule or '',
+                technician_id,
+                shift or 'A',
+                comp_date,
+                comments or '',
+                validation_status,
+                validated_by or technician_name,
+                now_str
+            ))
+            doc_id = cur.lastrowid
+            conn.commit()
+
+        return self.get_document_by_id(doc_id)
+
+    def sync_checklist_executions(self, checklist_mgr, storage_dir: str):
+        """
+        Scans all checklist executions in the DB and generates/registers
+        the official completed PDF document if not already registered.
+        """
+        try:
+            from core.checklist_pdf_generator import generate_completed_checklist_pdf
+            executions = checklist_mgr.get_execution_history(limit=500)
+            for exec_rec in executions:
+                exec_id = exec_rec.get('id')
+                equip = exec_rec.get('equipment') or 'equip'
+                week = exec_rec.get('week') or ''
+                sheet = exec_rec.get('sheet') or ''
+                task_type = exec_rec.get('task_type', 'Monthly')
+                safe_equip = re.sub(r'[^a-zA-Z0-9_\-]', '_', str(equip))
+                safe_week = re.sub(r'[^a-zA-Z0-9_\-]', '_', str(week))
+                pdf_filename = f"checklist_web_{safe_equip}_{safe_week}_exec{exec_id}.pdf"
+                pdf_path = os.path.normpath(os.path.abspath(os.path.join(storage_dir, pdf_filename)))
+
+                with self._get_conn() as conn:
+                    cur = conn.cursor()
+                    cur.execute("SELECT id FROM preventive_documents WHERE file_path = ? OR stored_filename = ?", (pdf_path, pdf_filename))
+                    if cur.fetchone():
+                        continue
+
+                version_id = exec_rec.get('version_id')
+                items = checklist_mgr.get_items_for_version(version_id) if version_id else []
+                if not items:
+                    continue
+
+                if not os.path.exists(pdf_path):
+                    ok = generate_completed_checklist_pdf(exec_rec, items, pdf_path)
+                    if not ok:
+                        continue
+
+                self.register_document_file(
+                    equipment=equip,
+                    machine_name=equip,
+                    sheet=sheet,
+                    raw_index='',
+                    task_type=task_type,
+                    week=week,
+                    month=exec_rec.get('month', ''),
+                    file_path=pdf_path,
+                    original_filename=f"Checklist_{safe_equip}_{safe_week}.pdf",
+                    file_type='pdf',
+                    mime_type='application/pdf',
+                    technician_name=exec_rec.get('technician_name', ''),
+                    technician_matricule=exec_rec.get('technician_matricule', ''),
+                    shift=exec_rec.get('shift', 'A'),
+                    completion_date=str(exec_rec.get('executed_at', ''))[:10],
+                    comments='Checklist préventive validée via formulaire web',
+                    validation_status='VALIDATED',
+                    validated_by=exec_rec.get('technician_name', 'Système')
+                )
+                logger.info(f"[PREV-DOC] Synced past checklist execution #{exec_id} -> {pdf_filename}")
+        except Exception as e:
+            logger.error(f"[PREV-DOC] Error syncing checklist executions: {e}")
+
     def get_all_documents_map(self) -> Dict[str, List[Dict[str, Any]]]:
         """
-        Returns a dictionary mapping task_key -> list of documents.
-        Also maps fallback key `(sheet, str(raw_index))` for quick O(1) lookup.
+        Returns a dictionary mapping task keys to lists of documents.
+        Maps primary task_key, (sheet, raw_index), (equipment, week, task_type),
+        and (sheet, equipment, week) for multi-angle reliable lookup.
         """
         with self._get_conn() as conn:
             cur = conn.cursor()
             cur.execute("SELECT * FROM preventive_documents ORDER BY created_at DESC")
             rows = cur.fetchall()
             mapping: Dict[str, List[Dict[str, Any]]] = {}
+
+            def add_to_key(key: str, doc: dict):
+                if not key:
+                    return
+                lst = mapping.setdefault(key, [])
+                if not any(item['id'] == doc['id'] for item in lst):
+                    lst.append(doc)
+
             for r in rows:
                 d = dict(r)
                 d['formatted_size'] = self.format_file_size(d.get('file_size', 0))
+                s = str(d.get('sheet', '')).strip().lower()
+                idx = str(d.get('raw_index', '')).strip()
+                eq = str(d.get('equipment', '')).strip().lower()
+                w = str(d.get('week', '')).strip().lower()
+                tt = str(d.get('task_type', '')).strip().lower().replace(" ", "_")
+
                 tk = d.get('task_key')
                 if tk:
-                    mapping.setdefault(tk, []).append(d)
-                # Also index by fallback (equipment, week) and (sheet, raw_index)
-                sec_key = f"{str(d.get('sheet', '')).strip().lower()}__{str(d.get('raw_index', '')).strip()}"
-                mapping.setdefault(sec_key, []).append(d)
+                    add_to_key(tk, d)
+                if s and idx:
+                    add_to_key(f"{s}__{idx}", d)
+                if eq and w and tt:
+                    add_to_key(f"{eq}__{w}__{tt}", d)
+                if s and eq and w:
+                    add_to_key(f"{s}__{eq}__{w}", d)
+                if eq and w:
+                    add_to_key(f"{eq}__{w}", d)
+
             return mapping
 
     def validate_document(self, doc_id: int, validated_by: str) -> Tuple[bool, str, Optional[Dict[str, Any]]]:

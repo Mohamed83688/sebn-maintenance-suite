@@ -3775,7 +3775,16 @@ def pma_dashboard():
                 "raw_index":    str(r.get(col_ri, ''))
             })
 
-        # Map manual preventive documents
+        # Sync any past completed web checklists into permanent document storage
+        try:
+            prev_doc_mgr.sync_checklist_executions(
+                checklist_mgr,
+                os.path.join(pma_config.active_base, "documents", "preventive_uploads")
+            )
+        except Exception as _e_sync:
+            logger.error(f"[PMA] Error syncing checklist executions to documents: {_e_sync}")
+
+        # Map preventive documents (both web checklists and manual table scans)
         try:
             doc_map = prev_doc_mgr.get_all_documents_map()
         except Exception as _e_doc:
@@ -3787,14 +3796,26 @@ def pma_dashboard():
 
         for t in tasks:
             k_full = prev_doc_mgr.build_task_key(t['sheet'], t['raw_index'], t['equipment'], t['week'], t['type'])
-            k_simple = f"{t['sheet']}__{t['raw_index']}"
-            t_docs = doc_map.get(k_full) or doc_map.get(k_simple) or []
-            t['documents'] = t_docs
-            t['doc_count'] = len(t_docs)
-            t['has_documents'] = len(t_docs) > 0
-            if t_docs:
-                manual_docs_count += len(t_docs)
-                latest = t_docs[0]
+            k_simple = f"{str(t['sheet']).strip().lower()}__{str(t['raw_index']).strip()}"
+            k_equip_week = f"{str(t['equipment']).strip().lower()}__{str(t['week']).strip().lower()}__{str(t['type']).strip().lower().replace(' ', '_')}"
+            k_sheet_equip = f"{str(t['sheet']).strip().lower()}__{str(t['equipment']).strip().lower()}__{str(t['week']).strip().lower()}"
+            k_equip_w = f"{str(t['equipment']).strip().lower()}__{str(t['week']).strip().lower()}"
+
+            # Aggregate matching documents without duplicates
+            matching = []
+            seen_ids = set()
+            for key in [k_full, k_simple, k_equip_week, k_sheet_equip, k_equip_w]:
+                for d in doc_map.get(key, []):
+                    if d['id'] not in seen_ids:
+                        seen_ids.add(d['id'])
+                        matching.append(d)
+
+            t['documents'] = matching
+            t['doc_count'] = len(matching)
+            t['has_documents'] = len(matching) > 0
+            if matching:
+                manual_docs_count += len(matching)
+                latest = matching[0]
                 t['latest_doc'] = latest
                 t['doc_status'] = latest.get('validation_status')
                 if latest.get('validation_status') == 'PENDING':
@@ -4285,6 +4306,44 @@ def checklist_save():
         )
     except Exception as e:
         logger.error(f"[EXCEL] Record execution error: {e}")
+
+    # 3b. AUTOMATICALLY GENERATE & PERMANENTLY SAVE COMPLETED CHECKLIST PDF DOCUMENT
+    if exec_id:
+        try:
+            pdf_dir = os.path.join(pma_config.active_base, "documents", "preventive_uploads")
+            os.makedirs(pdf_dir, exist_ok=True)
+            pdf_filename = f"checklist_web_{safe_equip}_{safe_week}_exec{exec_id}.pdf"
+            pdf_path = os.path.join(pdf_dir, pdf_filename)
+            
+            exec_record = checklist_mgr.get_execution_by_id(exec_id)
+            if exec_record:
+                from core.checklist_pdf_generator import generate_completed_checklist_pdf
+                pdf_ok = generate_completed_checklist_pdf(exec_record, tasks, pdf_path)
+                if pdf_ok and os.path.isfile(pdf_path):
+                    prev_doc_mgr.register_document_file(
+                        equipment=equip,
+                        machine_name=equip,
+                        sheet=sheet,
+                        raw_index=str(idx),
+                        task_type=task_type,
+                        week=week,
+                        month=datetime.datetime.now().strftime('%B'),
+                        file_path=pdf_path,
+                        original_filename=f"Checklist_{safe_equip}_{safe_week}.pdf",
+                        file_type='pdf',
+                        mime_type='application/pdf',
+                        technician_name=session.get('name', 'Technicien'),
+                        technician_matricule=session.get('matricule', ''),
+                        technician_id=session.get('user_id'),
+                        shift=session.get('shift', 'A'),
+                        completion_date=datetime.date.today().strftime('%Y-%m-%d'),
+                        comments='Checklist préventive validée via formulaire web',
+                        validation_status='VALIDATED',
+                        validated_by=session.get('name', 'Système')
+                    )
+                    logger.info(f"[CHECKLIST-DOC] Auto-generated & registered completed checklist PDF: {pdf_path}")
+        except Exception as e:
+            logger.error(f"[CHECKLIST-DOC] Error auto-generating checklist PDF: {e}", exc_info=True)
 
     # 4. COMPLETE PMA TASK & ADD SIGNATURE
     eng = get_pma_engine()

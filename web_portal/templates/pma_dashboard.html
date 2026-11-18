@@ -179,6 +179,53 @@
     color: #FFFFFF;
     border-color: var(--primary);
 }
+
+/* Dedicated Direct View Document Button & No-Doc Pill */
+.btn-view-doc {
+    background: #2E008B;
+    border: 1px solid #2E008B;
+    color: #FFFFFF;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 11px;
+    border-radius: 6px;
+    font-size: 11.5px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    text-decoration: none;
+    box-shadow: 0 1px 3px rgba(46,0,139,0.15);
+}
+.btn-view-doc:hover {
+    background: #4A00E0;
+    border-color: #4A00E0;
+    color: #FFFFFF;
+    box-shadow: 0 3px 10px rgba(46,0,139,0.3);
+    transform: translateY(-1px);
+}
+
+.no-doc-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 9px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #94A3B8;
+    background: #F8FAFC;
+    border: 1px dashed #CBD5E1;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.no-doc-pill:hover {
+    background: #F1F5F9;
+    color: #64748B;
+    border-color: #94A3B8;
+}
 </style>
 {% endblock %}
 
@@ -288,6 +335,7 @@
                     <th>Semaine</th>
                     <th>Mois</th>
                     <th>Statut</th>
+                    <th style="text-align:center;">Document</th>
                     <th style="text-align:right; padding-right:20px;">Actions</th>
                 </tr>
             </thead>
@@ -325,7 +373,7 @@
                     <td style="font-size:12px; color:var(--text-sec);">{{ t.month }}</td>
                     <td>
                         {% if t.doc_status == 'VALIDATED' %}
-                        <span class="badge badge-success" title="Tableau validé sur document papier">
+                        <span class="badge badge-success" title="Tableau validé sur document">
                             <i class="fa-solid fa-file-circle-check"></i> Fiche Validée
                         </span>
                         {% elif t.doc_status == 'PENDING' %}
@@ -346,16 +394,27 @@
                         </span>
                         {% endif %}
                     </td>
+                    <td style="text-align:center;">
+                        {% if t.has_documents %}
+                        <button type="button" class="btn-view-doc" onclick="openDocViewer(this)"
+                                data-task-title="{{ t.equipment }} ({{ t.type }})"
+                                data-task-sub="{{ t.sheet }} — Semaine {{ t.week }}"
+                                data-docs="{{ t.documents|tojson|forceescape }}"
+                                title="Voir le document enregistré (Checklist Web / Scan)">
+                            <i class="fa-solid fa-file-lines"></i> Voir le fichier
+                            {% if t.doc_count > 1 %}<span class="badge" style="background:rgba(255,255,255,0.3); font-size:9.5px; padding:1px 5px; margin-left:3px;">{{ t.doc_count }}</span>{% endif %}
+                        </button>
+                        {% else %}
+                        <button type="button" class="no-doc-pill" onclick="showNoDocNotice('{{ t.equipment }}', '{{ t.week }}')" title="Aucun document disponible pour cette tâche">
+                            <i class="fa-regular fa-file"></i> Aucun document
+                        </button>
+                        {% endif %}
+                    </td>
                     <td>
                         <div class="action-cell">
-                            {% if t.has_documents %}
-                            <button type="button" class="btn btn-primary btn-xs" onclick="openDocViewer(this)"
-                                    data-task-title="{{ t.equipment }} ({{ t.type }})"
-                                    data-task-sub="{{ t.sheet }} — Semaine {{ t.week }}"
-                                    data-docs="{{ t.documents|tojson|forceescape }}"
-                                    title="Voir le tableau / document validé">
-                                <i class="fa-solid fa-file-lines"></i> Voir le tableau
-                                {% if t.doc_count > 1 %}<span class="badge" style="background:rgba(255,255,255,0.25); font-size:9.5px; padding:1px 5px; margin-left:3px;">{{ t.doc_count }}</span>{% endif %}
+                            {% if is_done %}
+                            <button class="btn btn-complete done btn-xs" disabled>
+                                <i class="fa-solid fa-check"></i> Complété
                             </button>
                             <button type="button" class="btn btn-secondary btn-xs" onclick="openUploadDocModal(this)"
                                     data-sheet="{{ t.sheet }}"
@@ -365,55 +424,34 @@
                                     data-type="{{ t.type }}"
                                     data-week="{{ t.week }}"
                                     data-month="{{ t.month }}"
-                                    title="Ajouter un document / page supplémentaire">
-                                <i class="fa-solid fa-paperclip"></i>
+                                    style="font-weight:600; display:inline-flex; align-items:center; gap:4px; font-size:11px;"
+                                    title="Joindre un scan / photo supplémentaire à cette tâche">
+                                <i class="fa-solid fa-paperclip"></i> Joindre
+                            </button>
+                            {% else %}
+                            <a href="{{ url_for('checklist', sheet=t.sheet, idx=t.raw_index, type=t.type, equip=t.equipment, week=t.week) }}"
+                               class="btn btn-primary btn-xs" title="Exécuter la checklist préventive interactive">
+                                <i class="fa-solid fa-clipboard-check"></i> Checklist Web
+                            </a>
+                            <button type="button" class="btn btn-secondary btn-xs" onclick="openUploadDocModal(this)"
+                                    data-sheet="{{ t.sheet }}"
+                                    data-raw-index="{{ t.raw_index }}"
+                                    data-equip="{{ t.equipment }}"
+                                    data-machine="{{ t.machine_name }}"
+                                    data-type="{{ t.type }}"
+                                    data-week="{{ t.week }}"
+                                    data-month="{{ t.month }}"
+                                    style="font-weight:600; display:inline-flex; align-items:center; gap:5px; background:#FFFFFF; border:1px solid #CBD5E1; color:var(--primary);"
+                                    title="Valider manuellement en important une photo ou scan">
+                                <i class="fa-solid fa-file-arrow-up" style="color:var(--primary);"></i> Importer Papier
+                            </button>
+                            {% if session.get('role') in ['OWNER', 'ADMIN', 'admin'] %}
+                            <button class="btn btn-success btn-xs btn-complete"
+                                    onclick="completeTask(this,'{{ t.sheet|replace("'","\\'") }}',{{ t.raw_index }},'{{ t.type }}')"
+                                    title="Validation rapide administrateur">
+                                <i class="fa-solid fa-check"></i>
                             </button>
                             {% endif %}
-
-                            {% if is_done %}
-                                {% if not t.has_documents %}
-                                <button class="btn btn-complete done btn-xs" disabled>
-                                    <i class="fa-solid fa-check"></i> Complété
-                                </button>
-                                <button type="button" class="btn btn-secondary btn-xs" onclick="openUploadDocModal(this)"
-                                        data-sheet="{{ t.sheet }}"
-                                        data-raw-index="{{ t.raw_index }}"
-                                        data-equip="{{ t.equipment }}"
-                                        data-machine="{{ t.machine_name }}"
-                                        data-type="{{ t.type }}"
-                                        data-week="{{ t.week }}"
-                                        data-month="{{ t.month }}"
-                                        style="font-weight:600; display:inline-flex; align-items:center; gap:4px; font-size:11px;"
-                                        title="Joindre la fiche papier à cette tâche terminée">
-                                    <i class="fa-solid fa-file-arrow-up" style="color:var(--primary);"></i> Joindre fichier
-                                </button>
-                                {% endif %}
-                            {% else %}
-                                {% if not t.has_documents %}
-                                <button type="button" class="btn btn-secondary btn-xs" onclick="openUploadDocModal(this)"
-                                        data-sheet="{{ t.sheet }}"
-                                        data-raw-index="{{ t.raw_index }}"
-                                        data-equip="{{ t.equipment }}"
-                                        data-machine="{{ t.machine_name }}"
-                                        data-type="{{ t.type }}"
-                                        data-week="{{ t.week }}"
-                                        data-month="{{ t.month }}"
-                                        style="font-weight:600; display:inline-flex; align-items:center; gap:5px; background:#FFFFFF; border:1px solid #CBD5E1; color:var(--primary);"
-                                        title="Valider le tableau manuellement par scan ou photo">
-                                    <i class="fa-solid fa-file-arrow-up" style="color:var(--primary);"></i> Valider le tableau
-                                </button>
-                                {% endif %}
-                                <a href="{{ url_for('checklist', sheet=t.sheet, idx=t.raw_index, type=t.type, equip=t.equipment, week=t.week) }}"
-                                   class="btn btn-primary btn-xs" title="Exécuter la checklist préventive">
-                                    <i class="fa-solid fa-clipboard-check"></i> Checklist
-                                </a>
-                                {% if session.get('role') in ['OWNER', 'ADMIN', 'admin'] %}
-                                <button class="btn btn-success btn-xs btn-complete"
-                                        onclick="completeTask(this,'{{ t.sheet|replace("'","\\'") }}',{{ t.raw_index }},'{{ t.type }}')"
-                                        title="Validation rapide administrateur">
-                                    <i class="fa-solid fa-check"></i>
-                                </button>
-                                {% endif %}
                             {% endif %}
                         </div>
                     </td>
@@ -1074,6 +1112,10 @@ function closeDocViewerModal() {
     if (img) img.src = '';
 }
 
+function showNoDocNotice(equip, week) {
+    alert("ℹ️ Aucun document disponible pour " + equip + (week ? " (" + week + ")" : "") + ".\n\nVous pouvez soit exécuter la Checklist Web, soit utiliser le bouton 'Importer Papier' pour joindre une photo ou un scan de votre tableau.");
+}
+
 function renderViewerTabs() {
     const tabsContainer = document.getElementById('viewer-doc-tabs');
     tabsContainer.innerHTML = '';
@@ -1083,7 +1125,25 @@ function renderViewerTabs() {
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'doc-tab-btn ' + (idx === currentViewerDocIdx ? 'active' : '');
-        btn.innerHTML = '<i class="fa-solid ' + (doc.file_type === 'pdf' ? 'fa-file-pdf' : 'fa-file-image') + '"></i> Page ' + (idx + 1);
+
+        let label = 'Fichier ' + (idx + 1);
+        let icon = 'fa-file';
+        const fn = (doc.original_filename || '').toLowerCase();
+        const cm = (doc.comments || '').toLowerCase();
+
+        if (doc.file_type === 'pdf') {
+            icon = 'fa-file-pdf';
+            if (fn.includes('checklist') || cm.includes('web')) {
+                label = 'Checklist Web (PDF)';
+            } else {
+                label = 'Scan PDF ' + (idx + 1);
+            }
+        } else {
+            icon = 'fa-file-image';
+            label = 'Photo / Scan ' + (idx + 1);
+        }
+
+        btn.innerHTML = `<i class="fa-solid ${icon}"></i> ${label}`;
         btn.onclick = () => switchViewerDoc(idx);
         tabsContainer.appendChild(btn);
     });
