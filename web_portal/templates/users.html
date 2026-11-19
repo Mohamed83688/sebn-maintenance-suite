@@ -276,6 +276,14 @@
                                         <i class="fa-solid {% if u.is_active == 1 %}fa-user-slash{% else %}fa-user-check{% endif %}"></i>
                                     </button>
                                 </form>
+                                <form method="POST" action="{{ url_for('admin_users_delete', user_id=u.id) }}" style="display:inline;"
+                                      onsubmit="return confirmDeleteUser(this);"
+                                      data-uname="{{ u.name }}" data-username="{{ u.username }}">
+                                    <button type="submit" class="btn btn-xs" title="Supprimer définitivement ce compte"
+                                            style="background:#FEE2E2; border:1px solid #FECACA; color:#DC2626;">
+                                        <i class="fa-solid fa-trash"></i>
+                                    </button>
+                                </form>
                                 {% endif %}
                             </div>
                         </td>
@@ -555,6 +563,18 @@ function togglePwd(inputId, iconId) {
         inp.type = 'password';
         ico.classList.replace('fa-eye-slash', 'fa-eye');
     }
+}
+
+function confirmDeleteUser(form) {
+    const name = form.getAttribute('data-uname') || '';
+    const username = form.getAttribute('data-username') || '';
+    return confirm(
+        '⚠️ SUPPRESSION DÉFINITIVE\n\n' +
+        'Utilisateur : ' + name + ' (' + username + ')\n\n' +
+        'Cette action supprimera DÉFINITIVEMENT ce compte ainsi que toutes ses données associées ' +
+        '(historique d\'examens, affectations organisationnelles, etc.).\n\n' +
+        'Cette opération est IRRÉVERSIBLE. Continuer ?'
+    );
 }
 </script>
 {% endblock %}

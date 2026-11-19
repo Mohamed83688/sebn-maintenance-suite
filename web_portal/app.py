@@ -2012,6 +2012,15 @@ def admin_users_toggle(user_id: int):
     return redirect(url_for('admin_users'))
 
 
+@app.route('/admin/users/delete/<int:user_id>', methods=['POST'])
+@owner_required
+def admin_users_delete(user_id: int):
+    """OWNER ONLY: permanently delete a user account and all associated data."""
+    ok, msg = user_mgr.delete_user(user_id)
+    flash(msg, "success" if ok else "danger")
+    return redirect(url_for('admin_users'))
+
+
 # =============================================================
 # EBM MODULE (OWNER ONLY)
 # =============================================================
@@ -4849,11 +4858,14 @@ def manager_plan():
         'Bloquée':  [a for a in actions if a.get('Statut') == 'Bloquée'],
     }
     meeting_titles = [m.get('Titre', '') for m in meetings if m.get('Titre')]
+    email_path     = os.path.join(pma_config.active_base, "email_config.json")
+    email_cfg      = pma_config.load_json(email_path, {})
     return render_template(
         'manager_plan.html',
         meetings=meetings, actions=actions,
         kpis=kpis, kanban=kanban,
-        meeting_titles=meeting_titles
+        meeting_titles=meeting_titles,
+        email_config=email_cfg
     )
 
 @app.route('/manager-plan/meeting/add', methods=['POST'])
@@ -4920,6 +4932,213 @@ def manager_plan_delete_action(action_id):
 def api_manager_plan_kpis():
     actions = load_actions(MANAGER_PLAN_PATH)
     return jsonify(get_action_kpis(actions))
+
+
+# ─── Email notifications: Réunion ─────────────────────────────────────────────
+
+@app.route('/manager-plan/meeting/notify', methods=['POST'])
+@admin_required
+def manager_plan_notify_meeting():
+    """Send an email notification about a meeting to all participants."""
+    from web_portal.utils.email_service import send_email_core, parse_recipients, get_default_smtp_config
+
+    email_path = os.path.join(pma_config.active_base, "email_config.json")
+    email_cfg  = pma_config.load_json(email_path, {})
+    sender     = email_cfg.get('sender') or email_cfg.get('sender_email', '')
+    password   = email_cfg.get('password', '')
+    smtp_server= email_cfg.get('smtp_server', '')
+    smtp_port  = int(email_cfg.get('smtp_port', 587))
+    security   = email_cfg.get('security', 'STARTTLS')
+
+    if not sender:
+        flash("Configuration email non définie. Veuillez configurer l'adresse email d'envoi dans Administration → Paramètres Email.", "warning")
+        return redirect(url_for('manager_plan'))
+
+    # Collect form fields
+    titre        = request.form.get('titre', '').strip()
+    date_reunion = request.form.get('date', '').strip()
+    responsable  = request.form.get('responsable', '').strip()
+    participants = request.form.get('participants', '').strip()
+    notes        = request.form.get('notes', '').strip()
+    custom_emails= request.form.get('custom_emails', '').strip()
+
+    # Build recipient list from participants field + extra custom emails
+    all_recipients_raw = ', '.join(filter(None, [participants, custom_emails]))
+    recipients = parse_recipients(all_recipients_raw)
+
+    if not recipients:
+        flash("Aucun email de participant valide. Ajoutez des adresses email aux participants.", "warning")
+        return redirect(url_for('manager_plan'))
+
+    if not smtp_server:
+        def_host, _, _ = get_default_smtp_config(sender)
+        smtp_server = def_host
+
+    expediteur_name = session.get('name') or session.get('username') or 'Administration SEBN-TN'
+
+    subject = f"📅 [RÉUNION] {titre} — {date_reunion}"
+    body_text = (
+        f"Bonjour,\n\n"
+        f"Vous êtes convoqué(e) à la réunion suivante :\n\n"
+        f"  Titre        : {titre}\n"
+        f"  Date         : {date_reunion}\n"
+        f"  Responsable  : {responsable}\n"
+        f"  Participants : {participants}\n"
+        f"  Notes / Ordre du Jour : {notes or '—'}\n\n"
+        f"Merci de confirmer votre présence.\n\n"
+        f"Cordialement,\n{expediteur_name}\nSEBN-TN Maintenance System"
+    )
+    body_html = f"""
+    <div style="max-width:600px; margin:0 auto; font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+                border:1px solid #E2E8F0; border-radius:12px; overflow:hidden; background:#FFFFFF;
+                box-shadow:0 4px 20px rgba(0,0,0,0.06);">
+        <div style="background:linear-gradient(135deg,#2E008B 0%,#5B21B6 100%); padding:22px 28px; color:#FFFFFF;">
+            <div style="font-size:11px; font-weight:800; letter-spacing:1.5px; opacity:0.85; text-transform:uppercase;">SEBN-TN — Plan de Réunion</div>
+            <h2 style="margin:8px 0 2px; font-size:20px; font-weight:800; color:#FFFFFF;">📅 Convocation à une Réunion</h2>
+            <div style="font-size:13px; opacity:0.9;">{date_reunion}</div>
+        </div>
+        <div style="padding:24px 28px;">
+            <p style="font-size:14px; color:#334155; line-height:1.6; margin-top:0;">Bonjour,<br>
+            Vous êtes convoqué(e) à la réunion suivante :</p>
+            <table style="width:100%; border-collapse:collapse; font-size:13px; margin:16px 0;">
+                <tr><td style="padding:8px 12px; background:#F8FAFC; border:1px solid #E2E8F0; font-weight:700; width:150px; color:#2E008B;">📌 Titre</td>
+                    <td style="padding:8px 12px; border:1px solid #E2E8F0; font-weight:700; color:#1E293B;">{titre}</td></tr>
+                <tr><td style="padding:8px 12px; background:#F8FAFC; border:1px solid #E2E8F0; font-weight:700; color:#2E008B;">📅 Date</td>
+                    <td style="padding:8px 12px; border:1px solid #E2E8F0;">{date_reunion}</td></tr>
+                <tr><td style="padding:8px 12px; background:#F8FAFC; border:1px solid #E2E8F0; font-weight:700; color:#2E008B;">👤 Responsable</td>
+                    <td style="padding:8px 12px; border:1px solid #E2E8F0;">{responsable}</td></tr>
+                <tr><td style="padding:8px 12px; background:#F8FAFC; border:1px solid #E2E8F0; font-weight:700; color:#2E008B;">👥 Participants</td>
+                    <td style="padding:8px 12px; border:1px solid #E2E8F0;">{participants}</td></tr>
+                {"<tr><td style='padding:8px 12px; background:#F8FAFC; border:1px solid #E2E8F0; font-weight:700; color:#2E008B;'>📋 Notes</td><td style='padding:8px 12px; border:1px solid #E2E8F0;'>" + notes + "</td></tr>" if notes else ""}
+            </table>
+            <div style="background:#F0F4FF; border-left:4px solid #2E008B; padding:12px 16px; border-radius:0 8px 8px 0; font-size:12px; color:#475569; margin-top:16px;">
+                Merci de confirmer votre présence. En cas d'empêchement, veuillez contacter le responsable.
+            </div>
+        </div>
+        <div style="background:#F8FAFC; border-top:1px solid #E2E8F0; padding:14px 28px; font-size:11px; color:#94A3B8; text-align:center;">
+            SEBN-TN Maintenance System — Notification automatique
+        </div>
+    </div>
+    """
+
+    ok, msg = send_email_core(
+        smtp_server=smtp_server, smtp_port=smtp_port, security=security,
+        sender_email=sender, app_password=password,
+        recipients=recipients, subject=subject,
+        body_text=body_text, body_html=body_html
+    )
+
+    if ok:
+        flash(f"✅ Notification envoyée à {len(recipients)} participant(s) : {', '.join(recipients)}", "success")
+    else:
+        flash(f"❌ Erreur d'envoi email : {msg}", "danger")
+    return redirect(url_for('manager_plan'))
+
+
+# ─── Email notifications: Plan d'Action ───────────────────────────────────────
+
+@app.route('/manager-plan/action/notify', methods=['POST'])
+@admin_required
+def manager_plan_notify_action():
+    """Send an email notification about an action item to its responsible + extra recipients."""
+    from web_portal.utils.email_service import send_email_core, parse_recipients, get_default_smtp_config
+
+    email_path = os.path.join(pma_config.active_base, "email_config.json")
+    email_cfg  = pma_config.load_json(email_path, {})
+    sender     = email_cfg.get('sender') or email_cfg.get('sender_email', '')
+    password   = email_cfg.get('password', '')
+    smtp_server= email_cfg.get('smtp_server', '')
+    smtp_port  = int(email_cfg.get('smtp_port', 587))
+    security   = email_cfg.get('security', 'STARTTLS')
+
+    if not sender:
+        flash("Configuration email non définie. Veuillez configurer l'adresse email d'envoi dans Administration → Paramètres Email.", "warning")
+        return redirect(url_for('manager_plan'))
+
+    action_desc  = request.form.get('action', '').strip()
+    responsable  = request.form.get('responsable', '').strip()
+    echeance     = request.form.get('echeance', '').strip()
+    statut       = request.form.get('statut', '').strip()
+    notes        = request.form.get('notes', '').strip()
+    reunion_ref  = request.form.get('reunion_ref', '').strip()
+    custom_emails= request.form.get('custom_emails', '').strip()
+
+    all_raw = ', '.join(filter(None, [responsable, custom_emails]))
+    recipients = parse_recipients(all_raw)
+
+    if not recipients:
+        flash("Aucun email valide. Ajoutez des adresses email au champ Responsable ou emails additionnels.", "warning")
+        return redirect(url_for('manager_plan'))
+
+    if not smtp_server:
+        def_host, _, _ = get_default_smtp_config(sender)
+        smtp_server = def_host
+
+    expediteur_name = session.get('name') or session.get('username') or 'Administration SEBN-TN'
+
+    statut_colors = {
+        'Backlog': '#94A3B8', 'En cours': '#F59E0B', 'Terminée': '#10B981', 'Bloquée': '#EF4444'
+    }
+    statut_color = statut_colors.get(statut, '#6366F1')
+
+    subject = f"📋 [ACTION] {action_desc[:60]}{'...' if len(action_desc) > 60 else ''} — Échéance: {echeance}"
+    body_text = (
+        f"Bonjour,\n\n"
+        f"Une action vous est assignée dans le Plan d'Action SEBN-TN :\n\n"
+        f"  Action       : {action_desc}\n"
+        f"  Responsable  : {responsable}\n"
+        f"  Échéance     : {echeance or '—'}\n"
+        f"  Statut       : {statut}\n"
+        f"  Réunion réf. : {reunion_ref or '—'}\n"
+        f"  Notes        : {notes or '—'}\n\n"
+        f"Merci de mettre à jour le statut de cette action dans l'application.\n\n"
+        f"Cordialement,\n{expediteur_name}\nSEBN-TN Maintenance System"
+    )
+    body_html = f"""
+    <div style="max-width:600px; margin:0 auto; font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+                border:1px solid #E2E8F0; border-radius:12px; overflow:hidden; background:#FFFFFF;
+                box-shadow:0 4px 20px rgba(0,0,0,0.06);">
+        <div style="background:linear-gradient(135deg,#1E293B 0%,#2E008B 100%); padding:22px 28px; color:#FFFFFF;">
+            <div style="font-size:11px; font-weight:800; letter-spacing:1.5px; opacity:0.85; text-transform:uppercase;">SEBN-TN — Plan d'Action</div>
+            <h2 style="margin:8px 0 2px; font-size:20px; font-weight:800; color:#FFFFFF;">📋 Action Assignée</h2>
+            <div style="display:inline-block; background:{statut_color}; color:#fff; padding:3px 12px; border-radius:20px; font-size:12px; font-weight:700; margin-top:4px;">{statut}</div>
+        </div>
+        <div style="padding:24px 28px;">
+            <p style="font-size:14px; color:#334155; line-height:1.6; margin-top:0;">Bonjour,<br>
+            Une action vous est assignée dans le Plan d'Action SEBN-TN :</p>
+            <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; padding:16px 20px; margin:16px 0; font-size:13px;">
+                <div style="font-weight:800; font-size:15px; color:#1E293B; margin-bottom:12px; border-bottom:1px solid #E2E8F0; padding-bottom:10px;">{action_desc}</div>
+                <table style="width:100%; border-collapse:collapse;">
+                    <tr><td style="padding:5px 0; font-weight:700; color:#2E008B; width:140px;">👤 Responsable</td>
+                        <td style="padding:5px 0; color:#334155;">{responsable}</td></tr>
+                    <tr><td style="padding:5px 0; font-weight:700; color:#2E008B;">📅 Échéance</td>
+                        <td style="padding:5px 0; color:#DC2626; font-weight:700;">{echeance or '—'}</td></tr>
+                    {"<tr><td style='padding:5px 0; font-weight:700; color:#2E008B;'>🔗 Réunion Réf.</td><td style='padding:5px 0; color:#334155;'>" + reunion_ref + "</td></tr>" if reunion_ref else ""}
+                    {"<tr><td style='padding:5px 0; font-weight:700; color:#2E008B;'>📝 Notes</td><td style='padding:5px 0; color:#334155;'>" + notes + "</td></tr>" if notes else ""}
+                </table>
+            </div>
+            <div style="background:#FFF7ED; border-left:4px solid #F59E0B; padding:12px 16px; border-radius:0 8px 8px 0; font-size:12px; color:#92400E;">
+                ⚠️ Merci de mettre à jour le statut de cette action dans l'application de maintenance SEBN-TN.
+            </div>
+        </div>
+        <div style="background:#F8FAFC; border-top:1px solid #E2E8F0; padding:14px 28px; font-size:11px; color:#94A3B8; text-align:center;">
+            SEBN-TN Maintenance System — Notification automatique
+        </div>
+    </div>
+    """
+
+    ok, msg = send_email_core(
+        smtp_server=smtp_server, smtp_port=smtp_port, security=security,
+        sender_email=sender, app_password=password,
+        recipients=recipients, subject=subject,
+        body_text=body_text, body_html=body_html
+    )
+
+    if ok:
+        flash(f"✅ Notification envoyée à {len(recipients)} destinataire(s) : {', '.join(recipients)}", "success")
+    else:
+        flash(f"❌ Erreur d'envoi email : {msg}", "danger")
+    return redirect(url_for('manager_plan'))
 
 # =============================================================
 # DOCUMENT MANAGEMENT

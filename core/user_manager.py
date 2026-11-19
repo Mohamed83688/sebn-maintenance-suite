@@ -553,6 +553,42 @@ class UserManager:
             status_label = "activé" if new_status == 1 else "désactivé"
             return True, f"Le compte '{row['name']}' a été {status_label}.", new_status
 
+    def delete_user(self, user_id: int) -> Tuple[bool, str]:
+        """
+        Permanently deletes a user account.
+        - The OWNER account can never be deleted.
+        - Cascades: also removes exam_attempts and org_assignments tied to that user.
+        Returns (success, message).
+        """
+        with self._get_conn() as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT id, name, role FROM users WHERE id = ?", (user_id,))
+            row = cur.fetchone()
+            if not row:
+                return False, "Utilisateur introuvable."
+            if row["role"] == "OWNER":
+                return False, "Le compte Propriétaire ne peut pas être supprimé."
+            name = row["name"]
+            # Cascade: remove exam attempts
+            try:
+                cur.execute("DELETE FROM exam_attempts WHERE user_id = ?", (user_id,))
+            except Exception:
+                pass
+            # Cascade: remove org assignments
+            try:
+                cur.execute("DELETE FROM org_assignments WHERE user_id = ?", (user_id,))
+            except Exception:
+                pass
+            # Cascade: remove level history
+            try:
+                cur.execute("DELETE FROM technician_level_history WHERE user_id = ?", (user_id,))
+            except Exception:
+                pass
+            # Delete the user
+            cur.execute("DELETE FROM users WHERE id = ?", (user_id,))
+            conn.commit()
+        return True, f"Le compte de '{name}' a été supprimé définitivement."
+
     def get_technician_full_profile(self, user_id_or_matricule: Any) -> Optional[Dict[str, Any]]:
         """
         Loads the complete technician employee file (Fiche Technicien):

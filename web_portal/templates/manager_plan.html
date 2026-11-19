@@ -170,6 +170,17 @@
             </button>
         </form>
         {% endif %}
+        <button type="button" class="btn btn-glass btn-xs" title="Envoyer une notification email"
+                style="color:#2E008B;"
+                data-action="{{ a.Action }}"
+                data-responsable="{{ a.Responsable }}"
+                data-echeance="{{ a.Échéance|default('') }}"
+                data-statut="{{ a.Statut }}"
+                data-notes="{{ a.Notes|default('') }}"
+                data-reunion-ref="{{ a.get('Réunion_Ref', '') }}"
+                onclick="openNotifyActionModalFromBtn(this)">
+            <i class="fa-solid fa-envelope"></i>
+        </button>
         <form method="POST" action="{{ url_for('manager_plan_delete_action', action_id=a.ID) }}"
               onsubmit="return confirm('Supprimer cette action ?');" style="display:inline;">
             <button type="submit" class="btn btn-glass btn-xs" title="Supprimer" style="color:var(--danger);">
@@ -368,9 +379,18 @@
                         </td>
                         <td style="font-size:12px; color:var(--text-sec); max-width:200px;">{{ m.Notes or '—' }}</td>
                         <td style="text-align:right;">
-                            <form method="POST" action="{{ url_for('manager_plan_add_meeting') }}" style="display:inline;">
-                                <!-- Status quick-update would go here -->
-                            </form>
+                            <button type="button"
+                                    class="btn btn-xs"
+                                    style="background:#EEF2FF; border:1px solid #C7D2FE; color:#2E008B; display:inline-flex; align-items:center; gap:5px;"
+                                    title="Envoyer une notification email aux participants"
+                                    data-titre="{{ m.Titre }}"
+                                    data-date="{{ m.Date }}"
+                                    data-responsable="{{ m.Responsable }}"
+                                    data-participants="{{ m.Participants }}"
+                                    data-notes="{{ m.Notes }}"
+                                    onclick="openNotifyMeetingModalFromBtn(this)">
+                                <i class="fa-solid fa-envelope"></i> Notifier
+                            </button>
                         </td>
                     </tr>
                     {% endfor %}
@@ -569,5 +589,206 @@ document.querySelectorAll('.modal-overlay').forEach(el => {
         if (!inp.value) inp.value = today;
     });
 })();
+
+// ── Notify Meeting Modal ──────────────────────────────────────────────────────
+function openNotifyMeetingModalFromBtn(btn) {
+    const titre = btn.getAttribute('data-titre') || '';
+    const date = btn.getAttribute('data-date') || '';
+    const responsable = btn.getAttribute('data-responsable') || '';
+    const participants = btn.getAttribute('data-participants') || '';
+    const notes = btn.getAttribute('data-notes') || '';
+
+    document.getElementById('nm-titre').value = titre;
+    document.getElementById('nm-date').value = date;
+    document.getElementById('nm-responsable').value = responsable;
+    document.getElementById('nm-participants').value = participants;
+    document.getElementById('nm-notes').value = notes;
+    document.getElementById('nm-custom-emails').value = '';
+
+    const prevEl = document.getElementById('nm-participants-preview');
+    if (prevEl) prevEl.textContent = participants || '—';
+
+    document.getElementById('notify-meeting-modal').classList.add('open');
+}
+
+// ── Notify Action Modal ───────────────────────────────────────────────────────
+function openNotifyActionModalFromBtn(btn) {
+    const action = btn.getAttribute('data-action') || '';
+    const responsable = btn.getAttribute('data-responsable') || '';
+    const echeance = btn.getAttribute('data-echeance') || '';
+    const statut = btn.getAttribute('data-statut') || '';
+    const notes = btn.getAttribute('data-notes') || '';
+    const reunionRef = btn.getAttribute('data-reunion-ref') || '';
+
+    document.getElementById('na-action').value = action;
+    document.getElementById('na-responsable').value = responsable;
+    document.getElementById('na-echeance').value = echeance;
+    document.getElementById('na-statut').value = statut;
+    document.getElementById('na-notes').value = notes;
+    document.getElementById('na-reunion-ref').value = reunionRef;
+    document.getElementById('na-custom-emails').value = '';
+
+    const prevEl = document.getElementById('na-responsable-preview');
+    if (prevEl) prevEl.textContent = ' ' + (responsable || '—');
+
+    document.getElementById('notify-action-modal').classList.add('open');
+}
+
+function addEmailChipToInput(inputId, email) {
+    const inp = document.getElementById(inputId);
+    if (!inp) return;
+    const current = inp.value.trim();
+    if (!current) {
+        inp.value = email;
+    } else {
+        const parts = current.split(',').map(s => s.trim());
+        if (!parts.includes(email)) {
+            inp.value = current + ', ' + email;
+        }
+    }
+}
 </script>
+
+<!-- ═══════════ MODAL: Notify Meeting ══════════════════════════════════════ -->
+<div class="modal-overlay" id="notify-meeting-modal">
+    <div class="modal-box" style="max-width:520px;">
+        <div class="modal-close" onclick="closeModal('notify-meeting-modal')">
+            <i class="fa-solid fa-xmark"></i>
+        </div>
+        <h3 style="font-size:17px; font-weight:800; margin-bottom:6px;">
+            <i class="fa-solid fa-envelope" style="color:var(--primary);"></i> Notifier les Participants
+        </h3>
+        <p style="font-size:12px; color:var(--text-sec); margin-bottom:20px;">
+            Envoyer une notification email officielle à tous les participants de cette réunion.
+        </p>
+        <form method="POST" action="{{ url_for('manager_plan_notify_meeting') }}">
+            <input type="hidden" id="nm-titre" name="titre">
+            <input type="hidden" id="nm-date" name="date">
+            <input type="hidden" id="nm-responsable" name="responsable">
+            <input type="hidden" id="nm-participants" name="participants">
+            <input type="hidden" id="nm-notes" name="notes">
+
+            <div style="background:#F0F4FF; border:1px solid #C7D2FE; border-radius:8px; padding:12px 14px; margin-bottom:16px; font-size:12.5px; color:#1E293B;">
+                <strong><i class="fa-solid fa-circle-info" style="color:#2E008B;"></i> Participants détectés :</strong><br>
+                <span id="nm-participants-preview" style="color:#2E008B; font-weight:700;"></span>
+                <script>
+                    document.addEventListener('DOMContentLoaded', function() {
+                        const el = document.getElementById('nm-participants-preview');
+                        const src = document.getElementById('nm-participants');
+                        if (el && src) el.textContent = src.value || '—';
+                    });
+                </script>
+                <div style="margin-top:6px; color:#64748B; font-size:11px;">
+                    Les adresses email valides présentes dans le champ Participants seront extraites automatiquement.
+                    Vous pouvez ajouter des emails supplémentaires ci-dessous.
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Emails Supplémentaires <span style="color:#94A3B8;">(optionnel)</span></label>
+                <input type="text" id="nm-custom-emails" name="custom_emails" class="form-control"
+                       placeholder="ex: chef@sebn.tn, manager@sebn.tn (séparés par virgule)">
+                {% if email_config and (email_config.team_leader_emails or email_config.recipient) %}
+                <div style="margin-top:6px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                    <span style="font-size:11px; color:#64748B;">Suggestions configurées :</span>
+                    {% set sug_emails = (email_config.team_leader_emails or email_config.recipient).split(',') %}
+                    {% for em in sug_emails %}
+                        {% set em_clean = em.strip() %}
+                        {% if em_clean %}
+                        <button type="button" class="badge" style="background:#EEF2FF; color:#2E008B; border:1px solid #C7D2FE; cursor:pointer;"
+                                onclick="addEmailChipToInput('nm-custom-emails', '{{ em_clean }}')">
+                            + {{ em_clean }}
+                        </button>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+                {% endif %}
+                <small style="color:#64748B; font-size:11px; margin-top:4px; display:block;">
+                    Ajoutez ici des adresses email additionnelles qui ne sont pas dans la liste des participants.
+                </small>
+            </div>
+
+            <div style="display:flex; gap:10px; margin-top:16px;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('notify-meeting-modal')" style="flex:1;">
+                    Annuler
+                </button>
+                <button type="submit" class="btn btn-primary" style="flex:2; justify-content:center;">
+                    <i class="fa-solid fa-paper-plane"></i> Envoyer la Notification
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ═══════════ MODAL: Notify Action ═══════════════════════════════════════ -->
+<div class="modal-overlay" id="notify-action-modal">
+    <div class="modal-box" style="max-width:520px;">
+        <div class="modal-close" onclick="closeModal('notify-action-modal')">
+            <i class="fa-solid fa-xmark"></i>
+        </div>
+        <h3 style="font-size:17px; font-weight:800; margin-bottom:6px;">
+            <i class="fa-solid fa-envelope" style="color:var(--primary);"></i> Notifier — Plan d'Action
+        </h3>
+        <p style="font-size:12px; color:var(--text-sec); margin-bottom:20px;">
+            Envoyer une notification email au responsable de cette action corrective / préventive.
+        </p>
+        <form method="POST" action="{{ url_for('manager_plan_notify_action') }}">
+            <input type="hidden" id="na-action" name="action">
+            <input type="hidden" id="na-responsable" name="responsable">
+            <input type="hidden" id="na-echeance" name="echeance">
+            <input type="hidden" id="na-statut" name="statut">
+            <input type="hidden" id="na-notes" name="notes">
+            <input type="hidden" id="na-reunion-ref" name="reunion_ref">
+
+            <div style="background:#FFF7ED; border:1px solid #FED7AA; border-radius:8px; padding:12px 14px; margin-bottom:16px; font-size:12.5px; color:#1E293B;">
+                <strong><i class="fa-solid fa-user" style="color:#F59E0B;"></i> Responsable :</strong>
+                <span id="na-responsable-preview" style="color:#2E008B; font-weight:700;"></span>
+                <script>
+                    document.addEventListener('DOMContentLoaded', function() {
+                        const el = document.getElementById('na-responsable-preview');
+                        const src = document.getElementById('na-responsable');
+                        if (el && src) el.textContent = ' ' + (src.value || '—');
+                    });
+                </script>
+                <div style="margin-top:6px; color:#64748B; font-size:11px;">
+                    Si le champ Responsable contient une adresse email, elle sera utilisée directement.
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Emails Destinataires <span style="color:#EF4444;">*</span></label>
+                <input type="text" id="na-custom-emails" name="custom_emails" class="form-control"
+                       placeholder="ex: responsable@sebn.tn, chef@sebn.tn (séparés par virgule)" required>
+                {% if email_config and (email_config.team_leader_emails or email_config.recipient) %}
+                <div style="margin-top:6px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                    <span style="font-size:11px; color:#64748B;">Suggestions configurées :</span>
+                    {% set sug_emails = (email_config.team_leader_emails or email_config.recipient).split(',') %}
+                    {% for em in sug_emails %}
+                        {% set em_clean = em.strip() %}
+                        {% if em_clean %}
+                        <button type="button" class="badge" style="background:#EEF2FF; color:#2E008B; border:1px solid #C7D2FE; cursor:pointer;"
+                                onclick="addEmailChipToInput('na-custom-emails', '{{ em_clean }}')">
+                            + {{ em_clean }}
+                        </button>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+                {% endif %}
+                <small style="color:#64748B; font-size:11px; margin-top:4px; display:block;">
+                    Renseignez les adresses email des destinataires à notifier pour cette action.
+                </small>
+            </div>
+
+            <div style="display:flex; gap:10px; margin-top:16px;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('notify-action-modal')" style="flex:1;">
+                    Annuler
+                </button>
+                <button type="submit" class="btn btn-primary" style="flex:2; justify-content:center;">
+                    <i class="fa-solid fa-paper-plane"></i> Envoyer la Notification
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
 {% endblock %}
