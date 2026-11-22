@@ -2347,7 +2347,8 @@ def admin():
         org_unassigned=org_mgr.get_unassigned_users(),
         org_levels=POSITION_LEVELS,
         org_history=org_mgr.get_assignment_history(limit=50),
-        org_groups_teams=org_mgr.get_groups_and_teams()
+        org_groups_teams=org_mgr.get_groups_and_teams(),
+        admin_docs=doc_mgr.get_all_documents(active_only=False)
     )
 
 @app.route('/admin/credentials', methods=['POST'])
@@ -5225,95 +5226,86 @@ def admin_documents():
 @app.route('/admin/documents/add', methods=['POST'])
 @admin_required
 def admin_documents_add():
-    """Upload + register a new document."""
+    """Upload + register a new document directly in web storage."""
     display_name  = request.form.get('display_name', '').strip()
     display_order = int(request.form.get('display_order', 0) or 0)
     is_active     = int(request.form.get('is_active', 1) or 1)
     file_obj      = request.files.get('file')
+    redirect_to   = request.form.get('redirect_to', 'admin_documents')
+    target_url    = url_for('admin') + '#documents' if redirect_to == 'admin' else url_for('admin_documents')
 
     if not display_name:
         flash("Le nom du bouton est obligatoire.", "danger")
-        return redirect(url_for('admin_documents'))
+        return redirect(target_url)
     if not file_obj or file_obj.filename == '':
         flash("Veuillez sélectionner un fichier.", "danger")
-        return redirect(url_for('admin_documents'))
+        return redirect(target_url)
 
-    # 1. Insert DB row to get doc_id
-    ok, msg, doc_id = doc_mgr.add_document(
+    ok, msg, doc_id = doc_mgr.create_document(
         display_name  = display_name,
-        file_name     = DocumentManager.safe_filename(file_obj.filename),
-        file_type     = DocumentManager.detect_file_type(file_obj.filename),
-        storage_path  = '',   # will update after file save
-        display_order = display_order
+        file_storage  = file_obj,
+        display_order = display_order,
+        is_active     = is_active
     )
-    if not ok:
-        flash(msg, "danger")
-        return redirect(url_for('admin_documents'))
-
-    # 2. Save file to disk
-    file_ok, file_msg, rel_path, file_type = doc_mgr.save_uploaded_file(file_obj, doc_id)
-    if not file_ok:
-        # Remove the orphan DB row
-        doc_mgr.soft_delete(doc_id)
-        flash(f"Erreur fichier: {file_msg}", "danger")
-        return redirect(url_for('admin_documents'))
-
-    # 3. Update DB row with real path + is_active
-    with doc_mgr._get_conn() as _conn:
-        _conn.execute(
-            "UPDATE documents SET storage_path=?, file_name=?, file_type=?, is_active=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
-            (rel_path, DocumentManager.safe_filename(request.files['file'].filename), file_type, is_active, doc_id)
-        )
-        _conn.commit()
-
-    logger.info(f"[DOC] Added doc_id={doc_id} name='{display_name}' path={rel_path} user={session.get('user')}")
-    flash(f"Document '{display_name}' ajouté avec succès.", "success")
-    return redirect(url_for('admin_documents'))
+    flash(msg, "success" if ok else "danger")
+    return redirect(target_url)
 
 
 @app.route('/admin/documents/<int:doc_id>/replace', methods=['POST'])
 @admin_required
 def admin_documents_replace(doc_id):
     """Replace the physical file for a document — button label unchanged."""
-    file_obj = request.files.get('file')
+    file_obj    = request.files.get('file')
+    redirect_to = request.form.get('redirect_to', 'admin_documents')
+    target_url  = url_for('admin') + '#documents' if redirect_to == 'admin' else url_for('admin_documents')
+
     if not file_obj or file_obj.filename == '':
         flash("Veuillez sélectionner un nouveau fichier.", "danger")
-        return redirect(url_for('admin_documents'))
+        return redirect(target_url)
 
     ok, msg = doc_mgr.replace_file(doc_id, file_obj)
     flash(msg, "success" if ok else "danger")
-    return redirect(url_for('admin_documents'))
+    return redirect(target_url)
 
 
 @app.route('/admin/documents/<int:doc_id>/rename', methods=['POST'])
 @admin_required
 def admin_documents_rename(doc_id):
     """Update only the display name (button label)."""
-    new_name = request.form.get('display_name', '').strip()
+    new_name    = request.form.get('display_name', '').strip()
+    redirect_to = request.form.get('redirect_to', 'admin_documents')
+    target_url  = url_for('admin') + '#documents' if redirect_to == 'admin' else url_for('admin_documents')
+
     ok, msg = doc_mgr.update_display_name(doc_id, new_name)
     flash(msg, "success" if ok else "danger")
-    return redirect(url_for('admin_documents'))
+    return redirect(target_url)
 
 
 @app.route('/admin/documents/<int:doc_id>/toggle', methods=['POST'])
 @admin_required
 def admin_documents_toggle(doc_id):
     """Toggle is_active (show/hide from Documents page)."""
+    redirect_to = request.form.get('redirect_to', 'admin_documents')
+    target_url  = url_for('admin') + '#documents' if redirect_to == 'admin' else url_for('admin_documents')
+
     ok, msg, _ = doc_mgr.toggle_active(doc_id)
     flash(msg, "success" if ok else "danger")
-    return redirect(url_for('admin_documents'))
+    return redirect(target_url)
 
 
 @app.route('/admin/documents/<int:doc_id>/reorder', methods=['POST'])
 @admin_required
 def admin_documents_reorder(doc_id):
     """Update display_order for a document."""
+    redirect_to = request.form.get('redirect_to', 'admin_documents')
+    target_url  = url_for('admin') + '#documents' if redirect_to == 'admin' else url_for('admin_documents')
+
     try:
         new_order = int(request.form.get('display_order', 0))
     except ValueError:
         new_order = 0
     doc_mgr.update_order(doc_id, new_order)
-    return redirect(url_for('admin_documents'))
+    return redirect(target_url)
 
 
 @app.route('/admin/documents/<int:doc_id>/delete', methods=['POST'])
@@ -5323,10 +5315,13 @@ def admin_documents_delete(doc_id):
     Soft delete: sets is_active=0, archives physical file as <file>.archived.
     Does NOT permanently remove anything — safe for historical references.
     """
+    redirect_to = request.form.get('redirect_to', 'admin_documents')
+    target_url  = url_for('admin') + '#documents' if redirect_to == 'admin' else url_for('admin_documents')
+
     ok, msg = doc_mgr.soft_delete(doc_id)
     logger.info(f"[DOC] Soft-delete doc_id={doc_id} user={session.get('user')} ok={ok}")
     flash(msg, "success" if ok else "danger")
-    return redirect(url_for('admin_documents'))
+    return redirect(target_url)
 
 
 # =============================================================

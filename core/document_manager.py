@@ -103,7 +103,51 @@ class DocumentManager:
 
     def _is_safe_path(self, abs_path: str) -> bool:
         """Prevents path traversal: ensures abs_path is under storage_base."""
-        return os.path.normpath(abs_path).startswith(os.path.normpath(self.storage_base))
+        norm_abs = os.path.normcase(os.path.normpath(abs_path))
+        norm_base = os.path.normcase(os.path.normpath(self.storage_base))
+        return norm_abs.startswith(norm_base)
+
+    def _sync_doc_config(self, display_name: str, abs_path: str):
+        """Syncs the document file path with document_config.json for desktop/offline components."""
+        try:
+            name_lower = display_name.lower()
+            key = None
+            if 'aide' in name_lower or 'help' in name_lower:
+                key = 'help_pdf'
+            elif 'pdr' in name_lower:
+                key = 'pdr_pdf'
+            elif 'polyvalence' in name_lower:
+                key = 'polyvalence_file'
+            elif 'instruction' in name_lower:
+                key = 'inst_pdf'
+            elif 'organigramme' in name_lower:
+                key = 'org_pdf'
+            elif 'kpi' in name_lower or 'indicateur' in name_lower:
+                key = 'kpi_pdf'
+            elif 'testing' in name_lower or 'test' in name_lower:
+                key = 'testing_pdf'
+
+            if key and abs_path and os.path.isfile(abs_path):
+                import json
+                for base in [self.data_dir, getattr(self, 'active_base', None), os.getcwd()]:
+                    if not base or not os.path.isdir(base):
+                        continue
+                    cfg_file = os.path.join(base, "document_config.json")
+                    cfg = {}
+                    if os.path.exists(cfg_file):
+                        try:
+                            with open(cfg_file, 'r', encoding='utf-8') as f:
+                                cfg = json.load(f)
+                        except Exception:
+                            cfg = {}
+                    cfg[key] = abs_path
+                    try:
+                        with open(cfg_file, 'w', encoding='utf-8') as f:
+                            json.dump(cfg, f, indent=2, ensure_ascii=False)
+                    except Exception as _e_cf:
+                        logger.warning(f"[DocMgr] Could not write {cfg_file}: {_e_cf}")
+        except Exception as e:
+            logger.warning(f"[DocMgr] _sync_doc_config error: {e}")
 
     # ── Read ──────────────────────────────────────────────────────────────────
 
@@ -168,17 +212,15 @@ class DocumentManager:
     def add_document(
         self,
         display_name: str,
-        file_name: str,
-        file_type: str,
-        storage_path: str,
+        file_name: str = '',
+        file_type: str = '',
+        storage_path: str = '',
         display_order: int = 0
     ) -> Tuple[bool, str, Optional[int]]:
-        """Registers a new document. The file must already be saved to storage_path."""
+        """Registers a new document placeholder or complete record."""
         display_name = display_name.strip()
         if not display_name:
             return False, "Le nom d'affichage est obligatoire.", None
-        if not storage_path:
-            return False, "Le chemin de stockage est manquant.", None
 
         with self._get_conn() as conn:
             cur = conn.cursor()
@@ -189,6 +231,64 @@ class DocumentManager:
             """, (display_name, file_name, file_type, storage_path, display_order))
             conn.commit()
             return True, f"Document '{display_name}' ajouté avec succès.", cur.lastrowid
+
+    def create_document(
+        self,
+        display_name: str,
+        file_storage,
+        display_order: int = 0,
+        is_active: int = 1
+    ) -> Tuple[bool, str, Optional[int]]:
+        """
+        Atomically creates a new document record and saves its file to web storage.
+        Guarantees that files are permanently stored on the web server without path errors.
+        """
+        display_name = (display_name or '').strip()
+        if not display_name:
+            return False, "Le nom d'affichage du document est obligatoire.", None
+        if not file_storage or not getattr(file_storage, 'filename', ''):
+            return False, "Veuillez sélectionner un fichier valide.", None
+
+        raw_filename = file_storage.filename
+        file_type = self.detect_file_type(raw_filename)
+        if file_type not in self.ALLOWED_EXTENSIONS:
+            return False, f"Type de fichier non autorisé: .{file_type}. Formats acceptés : {', '.join(sorted(self.ALLOWED_EXTENSIONS))}", None
+
+        safe_name = self.safe_filename(raw_filename)
+
+        with self._get_conn() as conn:
+            cur = conn.cursor()
+            cur.execute("""
+                INSERT INTO documents
+                    (display_name, file_name, file_type, storage_path, is_active, display_order, created_at, updated_at)
+                VALUES (?, ?, ?, '', ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            """, (display_name, safe_name, file_type, is_active, display_order))
+            doc_id = cur.lastrowid
+            conn.commit()
+
+        # Save the physical file on the server
+        ok, msg, rel_path, detected_type = self.save_uploaded_file(file_storage, doc_id)
+        if not ok:
+            with self._get_conn() as conn:
+                conn.cursor().execute("DELETE FROM documents WHERE id = ?", (doc_id,))
+                conn.commit()
+            return False, msg, None
+
+        # Update final storage path
+        with self._get_conn() as conn:
+            cur = conn.cursor()
+            cur.execute("""
+                UPDATE documents
+                SET storage_path = ?, file_name = ?, file_type = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            """, (rel_path, safe_name, detected_type, is_active, doc_id))
+            conn.commit()
+
+        # Sync with document_config.json
+        abs_final = self._abs_path(rel_path)
+        self._sync_doc_config(display_name, abs_final)
+
+        return True, f"Document '{display_name}' ajouté et sauvegardé avec succès.", doc_id
 
     def save_uploaded_file(self, file_storage, doc_id: int) -> Tuple[bool, str, str, str]:
         """
@@ -262,6 +362,10 @@ class DocumentManager:
                 doc_id
             ))
             conn.commit()
+
+        # Sync with document_config.json
+        self._sync_doc_config(doc['display_name'], self._abs_path(rel_path))
+
         return True, f"Fichier remplacé pour '{doc['display_name']}'."
 
     def update_display_name(self, doc_id: int, new_name: str) -> Tuple[bool, str]:

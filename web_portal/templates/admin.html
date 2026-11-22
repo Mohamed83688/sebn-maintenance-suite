@@ -165,6 +165,9 @@ input:checked + .slider:before { transform: translateX(20px); }
         <div class="admin-tab" onclick="switchAdminTab('exams')" id="tab-exams">
             <i class="fa-solid fa-graduation-cap"></i> Examens
         </div>
+        <div class="admin-tab" onclick="switchAdminTab('documents')" id="tab-documents">
+            <i class="fa-solid fa-folder-open"></i> Documents &amp; Fichiers
+        </div>
     </div>
 
     <div class="admin-main">
@@ -1718,6 +1721,171 @@ input:checked + .slider:before { transform: translateX(20px); }
     </div>
 </div>
 
+<!-- ══ ADMIN DOCUMENTS & FICHIERS PANEL ════════════════════════════════════ -->
+<div id="panel-documents" class="admin-panel">
+    <div class="settings-card">
+        <div class="settings-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+            <div>
+                <div class="settings-title"><i class="fa-solid fa-folder-open"></i> Bibliothèque &amp; Fichiers Documents</div>
+                <div class="settings-desc">Gérez, téléchargez et remplacez les fichiers officiels (Aide, PDR, Polyvalence, Instructions, Organigramme, KPIs, Testing). Les fichiers sont enregistrés de façon permanente sur le serveur web.</div>
+            </div>
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                <a href="{{ url_for('documents_page') }}" class="btn btn-secondary btn-sm" target="_blank">
+                    <i class="fa-solid fa-arrow-up-right-from-square"></i> Ouvrir Bibliothèque
+                </a>
+                <button type="button" class="btn btn-primary btn-sm" onclick="openAdminDocAddModal()">
+                    <i class="fa-solid fa-plus"></i> Ajouter un Document
+                </button>
+            </div>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:12px;">
+            <div style="display:flex; align-items:center; gap:8px; flex:1; max-width:360px;">
+                <i class="fa-solid fa-magnifying-glass" style="color:var(--text-sec); font-size:13px;"></i>
+                <input type="text" id="admin-doc-filter" class="form-control form-control-sm"
+                       placeholder="Filtrer les documents..." oninput="filterAdminDocs()">
+            </div>
+            <div style="font-size:12px; color:var(--text-sec);">
+                Total : <strong>{{ admin_docs|length }}</strong> documents configurés
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="data-table" id="admin-docs-table" style="width:100%;">
+                <thead>
+                    <tr>
+                        <th style="width:60px; text-align:center;">Ordre</th>
+                        <th>Document &amp; Titre</th>
+                        <th>Fichier Serveur</th>
+                        <th style="width:80px; text-align:center;">Type</th>
+                        <th style="width:170px; text-align:center;">État / Présence</th>
+                        <th style="width:90px; text-align:center;">Visibilité</th>
+                        <th style="width:160px; text-align:right;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for doc in admin_docs %}
+                    <tr class="admin-doc-row" data-search="{{ (doc.display_name ~ ' ' ~ doc.file_name ~ ' ' ~ doc.file_type)|lower }}">
+                        <td style="text-align:center;">
+                            <form method="POST" action="{{ url_for('admin_documents_reorder', doc_id=doc.id) }}" style="display:inline-flex; align-items:center; justify-content:center;">
+                                <input type="hidden" name="redirect_to" value="admin">
+                                <input type="number" name="display_order" value="{{ doc.display_order }}"
+                                       class="form-control form-control-sm" style="width:52px; text-align:center; padding:2px 4px; font-weight:700;"
+                                       min="0" max="999" onchange="this.form.submit()" title="Changer l'ordre d'affichage">
+                            </form>
+                        </td>
+                        <td>
+                            <div style="font-weight:700; color:var(--text); font-size:13px;">
+                                {% if doc.file_type == 'pdf' %}
+                                <i class="fa-solid fa-file-pdf" style="color:#EF4444; margin-right:6px;"></i>
+                                {% elif doc.file_type in ['xlsx', 'xls', 'xlsm', 'csv'] %}
+                                <i class="fa-solid fa-file-excel" style="color:#10B981; margin-right:6px;"></i>
+                                {% elif doc.file_type in ['png', 'jpg', 'jpeg', 'gif'] %}
+                                <i class="fa-solid fa-file-image" style="color:#8B5CF6; margin-right:6px;"></i>
+                                {% elif doc.file_type in ['docx', 'doc'] %}
+                                <i class="fa-solid fa-file-word" style="color:#3B82F6; margin-right:6px;"></i>
+                                {% else %}
+                                <i class="fa-solid fa-file-lines" style="color:#6B7280; margin-right:6px;"></i>
+                                {% endif %}
+                                {{ doc.display_name }}
+                            </div>
+                        </td>
+                        <td>
+                            {% if doc.file_name %}
+                            <code style="font-size:11px; color:#1E3A8A; background:#EFF6FF; padding:3px 7px; border-radius:5px; border:1px solid #BFDBFE;">
+                                {{ doc.file_name }}
+                            </code>
+                            {% else %}
+                            <span style="font-size:11.5px; color:#DC2626; font-style:italic;">
+                                <i class="fa-solid fa-triangle-exclamation"></i> Aucun fichier assigné
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td style="text-align:center;">
+                            <span class="badge" style="background:#F1F5F9; color:#475569; font-size:10.5px; text-transform:uppercase;">
+                                {{ doc.file_type or '–' }}
+                            </span>
+                        </td>
+                        <td style="text-align:center;">
+                            {% if doc.file_exists %}
+                            <span class="badge" style="background:#ECFDF5; color:#059669; border:1px solid #BBF7D0; font-size:11px; padding:3px 8px;">
+                                <i class="fa-solid fa-circle-check"></i> Présent ({{ doc.file_size_formatted }})
+                            </span>
+                            {% else %}
+                            <span class="badge" style="background:#FEF2F2; color:#DC2626; border:1px solid #FECACA; font-size:11px; padding:3px 8px;">
+                                <i class="fa-solid fa-triangle-exclamation"></i> Chemin manquant
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td style="text-align:center;">
+                            {% if doc.is_active == 1 %}
+                            <span class="badge" style="background:#ECFDF5; color:#059669; font-size:11px;">
+                                <i class="fa-solid fa-eye"></i> Actif
+                            </span>
+                            {% else %}
+                            <span class="badge" style="background:#F1F5F9; color:#94A3B8; font-size:11px;">
+                                <i class="fa-solid fa-eye-slash"></i> Inactif
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td style="text-align:right;">
+                            <div style="display:flex; justify-content:flex-end; gap:5px;">
+                                {% if doc.file_exists %}
+                                <a href="{{ url_for('document_view', doc_id=doc.id) }}"
+                                   class="btn btn-sm btn-outline-primary" style="padding:4px 8px; font-size:11px;"
+                                   title="Ouvrir / Visualiser" target="_blank">
+                                    <i class="fa-solid fa-eye"></i>
+                                </a>
+                                <a href="{{ url_for('document_download', doc_id=doc.id) }}"
+                                   class="btn btn-sm btn-outline-secondary" style="padding:4px 8px; font-size:11px;"
+                                   title="Télécharger">
+                                    <i class="fa-solid fa-download"></i>
+                                </a>
+                                {% endif %}
+
+                                <button type="button" class="btn btn-sm btn-outline-warning" style="padding:4px 8px; font-size:11px;"
+                                        onclick="openAdminDocReplaceModal({{ doc.id }}, '{{ doc.display_name|replace("'","\\'")|e }}', '{{ doc.file_name|replace("'","\\'")|e }}')"
+                                        title="Remplacer le fichier sur le serveur">
+                                    <i class="fa-solid fa-arrow-up-from-bracket"></i>
+                                </button>
+
+                                <button type="button" class="btn btn-sm btn-outline-secondary" style="padding:4px 8px; font-size:11px;"
+                                        onclick="openAdminDocRenameModal({{ doc.id }}, '{{ doc.display_name|replace("'","\\'")|e }}')"
+                                        title="Renommer le document">
+                                    <i class="fa-solid fa-pen"></i>
+                                </button>
+
+                                <form method="POST" action="{{ url_for('admin_documents_toggle', doc_id=doc.id) }}" style="display:inline;">
+                                    <input type="hidden" name="redirect_to" value="admin">
+                                    <button type="submit" class="btn btn-sm {{ 'btn-outline-danger' if doc.is_active == 1 else 'btn-outline-success' }}"
+                                            style="padding:4px 8px; font-size:11px;"
+                                            title="{{ 'Masquer de la bibliothèque' if doc.is_active == 1 else 'Afficher dans la bibliothèque' }}">
+                                        <i class="fa-solid {{ 'fa-eye-slash' if doc.is_active == 1 else 'fa-eye' }}"></i>
+                                    </button>
+                                </form>
+
+                                <button type="button" class="btn btn-sm btn-outline-danger" style="padding:4px 8px; font-size:11px;"
+                                        onclick="confirmAdminDocDelete({{ doc.id }}, '{{ doc.display_name|replace("'","\\'")|e }}')"
+                                        title="Supprimer">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" style="text-align:center; padding:40px; color:var(--text-sec);">
+                            <i class="fa-solid fa-folder-open" style="font-size:32px; opacity:0.3; display:block; margin-bottom:10px;"></i>
+                            Aucun document disponible. Cliquez sur <strong>"Ajouter un Document"</strong> pour importer des fichiers.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
     </div><!-- /admin-main -->
 </div><!-- /admin-layout -->
 
@@ -2271,6 +2439,130 @@ input:checked + .slider:before { transform: translateX(20px); }
         </div>
     </div>
 </div>
+
+<!-- ══ MODALS GESTION DOCUMENTS ════════════════════════════════════════════ -->
+
+<!-- Remplacer Fichier Modal -->
+<div class="modal-overlay" id="admin-doc-replace-modal">
+    <div class="modal-box" style="max-width: 520px;">
+        <div class="modal-close" onclick="closeModal('admin-doc-replace-modal')">
+            <i class="fa-solid fa-xmark"></i>
+        </div>
+        <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+            <div style="width:40px; height:40px; border-radius:10px; background:#FEF3C7; color:#D97706; display:flex; align-items:center; justify-content:center; font-size:18px;">
+                <i class="fa-solid fa-arrow-up-from-bracket"></i>
+            </div>
+            <div>
+                <h3 style="font-size:16px; font-weight:800; color:var(--text); margin:0;">Remplacer le Fichier Serveur</h3>
+                <p style="font-size:12px; color:var(--text-sec); margin:0;">Le bouton conserve son libellé, son ordre et son rôle.</p>
+            </div>
+        </div>
+
+        <div id="admin-doc-replace-info" style="background:#FFFBEB; border:1px solid #FCD34D; border-radius:8px; padding:12px 14px; margin-bottom:18px; font-size:12.5px;"></div>
+
+        <form id="admin-doc-replace-form" method="POST" enctype="multipart/form-data">
+            <input type="hidden" name="redirect_to" value="admin">
+            <div class="form-group">
+                <label class="form-label">Sélectionner le nouveau fichier *</label>
+                <div class="drop-zone" onclick="document.getElementById('admin-doc-replace-file').click()" style="border:2px dashed var(--border); border-radius:12px; padding:24px; text-align:center; cursor:pointer; background:#F8FAFC;">
+                    <i class="fa-solid fa-cloud-arrow-up" style="font-size:28px; color:var(--primary); opacity:0.6;"></i>
+                    <p id="admin-doc-replace-file-lbl" style="font-size:12.5px; margin:8px 0 0; color:var(--text-sec);">Cliquez ou glissez-déposez le fichier ici</p>
+                    <input type="file" id="admin-doc-replace-file" name="file" required style="display:none;"
+                           onchange="updateAdminDocFileName('admin-doc-replace-file-lbl', this)">
+                </div>
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('admin-doc-replace-modal')">Annuler</button>
+                <button type="submit" class="btn btn-primary" style="font-weight:700;">
+                    <i class="fa-solid fa-floppy-disk"></i> Enregistrer le Fichier
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Ajouter Document Modal -->
+<div class="modal-overlay" id="admin-doc-add-modal">
+    <div class="modal-box" style="max-width: 520px;">
+        <div class="modal-close" onclick="closeModal('admin-doc-add-modal')">
+            <i class="fa-solid fa-xmark"></i>
+        </div>
+        <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+            <div style="width:40px; height:40px; border-radius:10px; background:#EDE9FE; color:#7C3AED; display:flex; align-items:center; justify-content:center; font-size:18px;">
+                <i class="fa-solid fa-folder-plus"></i>
+            </div>
+            <div>
+                <h3 style="font-size:16px; font-weight:800; color:var(--text); margin:0;">Ajouter un Nouveau Document</h3>
+                <p style="font-size:12px; color:var(--text-sec); margin:0;">Téléversez un fichier pour l'ajouter à la bibliothèque.</p>
+            </div>
+        </div>
+
+        <form method="POST" action="{{ url_for('admin_documents_add') }}" enctype="multipart/form-data">
+            <input type="hidden" name="redirect_to" value="admin">
+            <div class="form-group">
+                <label class="form-label">Titre / Nom d'affichage *</label>
+                <input type="text" name="display_name" class="form-control" required placeholder="ex: 14 — NOUVELLE PROCÉDURE">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Fichier * (PDF, Excel, Word, Image)</label>
+                <div class="drop-zone" onclick="document.getElementById('admin-doc-add-file').click()" style="border:2px dashed var(--border); border-radius:12px; padding:24px; text-align:center; cursor:pointer; background:#F8FAFC;">
+                    <i class="fa-solid fa-cloud-arrow-up" style="font-size:28px; color:var(--primary); opacity:0.6;"></i>
+                    <p id="admin-doc-add-file-lbl" style="font-size:12.5px; margin:8px 0 0; color:var(--text-sec);">Cliquez ou glissez-déposez le fichier ici</p>
+                    <input type="file" id="admin-doc-add-file" name="file" required style="display:none;"
+                           onchange="updateAdminDocFileName('admin-doc-add-file-lbl', this)">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Ordre d'affichage</label>
+                <input type="number" name="display_order" class="form-control" value="{{ (admin_docs|length + 1) * 10 }}" min="0" max="999">
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('admin-doc-add-modal')">Annuler</button>
+                <button type="submit" class="btn btn-primary" style="font-weight:700;">
+                    <i class="fa-solid fa-upload"></i> Téléverser &amp; Ajouter
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Renommer Modal -->
+<div class="modal-overlay" id="admin-doc-rename-modal">
+    <div class="modal-box" style="max-width: 480px;">
+        <div class="modal-close" onclick="closeModal('admin-doc-rename-modal')">
+            <i class="fa-solid fa-xmark"></i>
+        </div>
+        <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+            <div style="width:40px; height:40px; border-radius:10px; background:#EFF6FF; color:#2563EB; display:flex; align-items:center; justify-content:center; font-size:18px;">
+                <i class="fa-solid fa-pen"></i>
+            </div>
+            <div>
+                <h3 style="font-size:16px; font-weight:800; color:var(--text); margin:0;">Renommer le Document</h3>
+                <p style="font-size:12px; color:var(--text-sec); margin:0;">Modifie le libellé affiché sur les boutons et cartes.</p>
+            </div>
+        </div>
+
+        <form id="admin-doc-rename-form" method="POST">
+            <input type="hidden" name="redirect_to" value="admin">
+            <div class="form-group">
+                <label class="form-label">Nom d'affichage *</label>
+                <input type="text" id="admin-doc-rename-input" name="display_name" class="form-control" required>
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('admin-doc-rename-modal')">Annuler</button>
+                <button type="submit" class="btn btn-primary" style="font-weight:700;">
+                    <i class="fa-solid fa-floppy-disk"></i> Enregistrer
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Formulaire masqué pour suppression -->
+<form id="admin-doc-delete-form" method="POST" style="display:none;">
+    <input type="hidden" name="redirect_to" value="admin">
+</form>
+
 {% endblock %}
 
 {% block extra_js %}
@@ -2353,6 +2645,59 @@ async function previewItems(versionId, name) {
         }
     }
 })();
+
+// ══════════════════════════════════════════════════════
+//  ADMIN DOCUMENTS & FICHIERS MANAGEMENT JS
+// ══════════════════════════════════════════════════════
+
+function updateAdminDocFileName(labelId, input) {
+    const label = document.getElementById(labelId);
+    if (input.files && input.files[0]) {
+        const f = input.files[0];
+        const sizeKb = (f.size / 1024).toFixed(1);
+        label.innerHTML = `<strong>${f.name}</strong> <span style="color:#64748B;">(${sizeKb} Ko)</span>`;
+        label.style.color = 'var(--primary)';
+    }
+}
+
+function openAdminDocReplaceModal(docId, displayName, currentFile) {
+    document.getElementById('admin-doc-replace-form').action = `/admin/documents/${docId}/replace`;
+    document.getElementById('admin-doc-replace-info').innerHTML =
+        `<i class="fa-solid fa-file" style="color:#D97706; margin-right:6px;"></i>
+         <strong>${displayName}</strong><br>
+         <span style="color:#92400E;">Fichier actuel : <code style="background:#FDE68A; padding:1px 5px; border-radius:4px;">${currentFile || 'aucun'}</code></span>`;
+    document.getElementById('admin-doc-replace-file-lbl').textContent = 'Cliquez ou glissez-déposez le fichier ici';
+    document.getElementById('admin-doc-replace-file').value = '';
+    openModal('admin-doc-replace-modal');
+}
+
+function openAdminDocAddModal() {
+    document.getElementById('admin-doc-add-file-lbl').textContent = 'Cliquez ou glissez-déposez le fichier ici';
+    document.getElementById('admin-doc-add-file').value = '';
+    openModal('admin-doc-add-modal');
+}
+
+function openAdminDocRenameModal(docId, currentName) {
+    document.getElementById('admin-doc-rename-form').action = `/admin/documents/${docId}/rename`;
+    document.getElementById('admin-doc-rename-input').value = currentName;
+    openModal('admin-doc-rename-modal');
+}
+
+function confirmAdminDocDelete(docId, displayName) {
+    if (confirm(`Voulez-vous supprimer (archiver) le document :\n\n"${displayName}" ?\n\nLe fichier sera conservé de façon sécurisée mais masqué de la bibliothèque.\nCette action peut être annulée.`)) {
+        const form = document.getElementById('admin-doc-delete-form');
+        form.action = `/admin/documents/${docId}/delete`;
+        form.submit();
+    }
+}
+
+function filterAdminDocs() {
+    const q = (document.getElementById('admin-doc-filter').value || '').toLowerCase().trim();
+    document.querySelectorAll('#admin-docs-table .admin-doc-row').forEach(row => {
+        const txt = row.getAttribute('data-search') || '';
+        row.style.display = txt.includes(q) ? '' : 'none';
+    });
+}
 
 // ══════════════════════════════════════════════════════
 //  ADMIN EXAM MANAGEMENT JS
